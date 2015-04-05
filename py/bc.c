@@ -89,6 +89,9 @@ void mp_setup_code_state(mp_code_state *code_state, mp_obj_t self_in, mp_uint_t 
     #if MICROPY_STACKLESS
     code_state->prev = NULL;
     #endif
+    #if MICROPY_KEEP_LAST_CODE_STATE
+    code_state->current = NULL;
+    #endif
     code_state->code_info = self->bytecode;
     code_state->sp = &code_state->state[0] - 1;
     code_state->exc_sp = (mp_exc_stack_t*)(code_state->state + n_state) - 1;

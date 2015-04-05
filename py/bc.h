@@ -49,6 +49,9 @@ typedef struct _mp_code_state {
     #if MICROPY_STACKLESS
     struct _mp_code_state *prev;
     #endif
+    #if MICROPY_KEEP_LAST_CODE_STATE
+    struct _mp_code_state *current;
+    #endif
     mp_uint_t n_state;
     // Variable-length
     mp_obj_t state[0];

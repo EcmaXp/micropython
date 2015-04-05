@@ -37,6 +37,12 @@
 #include "py/bc0.h"
 #include "py/bc.h"
 
+#if MICROPY_KEEP_LAST_CODE_STATE
+#define UPDATE_LAST_CODE_STATE() first_code_state->current = code_state;
+#else
+#define UPDATE_LAST_CODE_STATE()
+#endif
+
 #if 0
 #define TRACE(ip) printf("sp=" INT_FMT " ", sp - code_state->sp); mp_bytecode_print2(ip, 1);
 #else
@@ -128,6 +134,11 @@ mp_vm_return_kind_t mp_execute_bytecode(mp_code_state *code_state, volatile mp_o
     // handler.  Without this, the code may have a different stack layout in the dispatch
     // loop and the exception handler, leading to very obscure bugs.
     #define RAISE(o) do { nlr_pop(); nlr.ret_val = o; goto exception_handler; } while(0)
+
+#if MICROPY_KEEP_LAST_CODE_STATE
+    mp_code_state *first_code_state = code_state;
+    UPDATE_LAST_CODE_STATE();
+#endif
 
 #if MICROPY_STACKLESS
 run_code_state: ;
@@ -877,6 +888,7 @@ unwind_jump:;
                         if (new_state) {
                             new_state->prev = code_state;
                             code_state = new_state;
+                            UPDATE_LAST_CODE_STATE();
                             nlr_pop();
                             goto run_code_state;
                         }
@@ -915,6 +927,7 @@ unwind_jump:;
                         if (new_state) {
                             new_state->prev = code_state;
                             code_state = new_state;
+                            UPDATE_LAST_CODE_STATE();
                             nlr_pop();
                             goto run_code_state;
                         }
@@ -949,6 +962,7 @@ unwind_jump:;
                         if (new_state) {
                             new_state->prev = code_state;
                             code_state = new_state;
+                            UPDATE_LAST_CODE_STATE();
                             nlr_pop();
                             goto run_code_state;
                         }
@@ -986,6 +1000,7 @@ unwind_jump:;
                         if (new_state) {
                             new_state->prev = code_state;
                             code_state = new_state;
+                            UPDATE_LAST_CODE_STATE();
                             nlr_pop();
                             goto run_code_state;
                         }
@@ -1027,6 +1042,7 @@ unwind_return:
                         mp_obj_t res = *sp;
                         mp_globals_set(code_state->old_globals);
                         code_state = code_state->prev;
+                        UPDATE_LAST_CODE_STATE();
                         *code_state->sp = res;
                         goto run_code_state;
                     }
@@ -1298,6 +1314,7 @@ unwind_loop:
             } else if (code_state->prev != NULL) {
                 mp_globals_set(code_state->old_globals);
                 code_state = code_state->prev;
+                UPDATE_LAST_CODE_STATE();
                 fastn = &code_state->state[code_state->n_state - 1];
                 exc_stack = (mp_exc_stack_t*)(code_state->state + code_state->n_state);
                 // variables that are visible to the exception handler (declared volatile)
