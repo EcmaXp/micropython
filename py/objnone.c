@@ -41,6 +41,12 @@ STATIC void none_print(void (*print)(void *env, const char *fmt, ...), void *env
     } else {
         print(env, "None");
     }
+
+    #if MICROPY_ALLOW_PAUSE_VM
+    if (self_in == &mp_const__vm_pause_obj){
+        print(env, "! (MICROPY_ALLOW_PAUSE_VM)");
+    }
+    #endif
 }
 
 STATIC mp_obj_t none_unary_op(mp_uint_t op, mp_obj_t o_in) {
@@ -59,3 +65,15 @@ const mp_obj_type_t mp_type_NoneType = {
 };
 
 const mp_obj_none_t mp_const_none_obj = {{&mp_type_NoneType}};
+
+#if MICROPY_ALLOW_PAUSE_VM
+// TODO: move this.
+const mp_obj_type_t mp_type_VMPauseNoneType = {
+    { &mp_type_type },
+    .name = MP_QSTR_NoneType,
+    .print = none_print,
+    .unary_op = none_unary_op,
+};
+
+const mp_obj_none_t mp_const__vm_pause_obj = {{&mp_type_VMPauseNoneType}};
+#endif

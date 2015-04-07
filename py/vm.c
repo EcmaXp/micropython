@@ -43,7 +43,7 @@
 #define UPDATE_LAST_CODE_STATE()
 #endif
 
-#if 0
+#if 1
 #define TRACE(ip) printf("sp=" INT_FMT " ", sp - code_state->sp); mp_bytecode_print2(ip, 1);
 #else
 #define TRACE(ip)
@@ -97,13 +97,63 @@ typedef enum {
     currently_in_except_block = MP_TAGPTR_TAG0(exc_sp->val_sp); /* restore previous state */ \
     exc_sp--; /* pop back to previous exception handler */
 
+#if MICROPY_ALLOW_PAUSE_VM
+#define VM_PAUSE_POINT() do { \
+    if (sp[0] == mp_const__vm_pause){ \
+        code_state->ip = ip; \
+        code_state->sp = sp; \
+        code_state->exc_sp = MP_TAGPTR_MAKE(exc_sp, currently_in_except_block); \
+        UPDATE_LAST_CODE_STATE(); \
+        nlr_pop(); \
+        return MP_VM_RETURN_PAUSE; \
+    } \
+} while (0)
+#else
+#define VM_PAUSE_POINT()
+#endif
+
 // fastn has items in reverse order (fastn[0] is local[0], fastn[-1] is local[1], etc)
 // sp points to bottom of stack which grows up
 // returns:
 //  MP_VM_RETURN_NORMAL, sp valid, return value in *sp
 //  MP_VM_RETURN_YIELD, ip, sp valid, yielded value in *sp
 //  MP_VM_RETURN_EXCEPTION, exception in fastn[0]
+#if MICROPY_ALLOW_PAUSE_VM
+//  MP_VM_RETURN_PAUSE, sp vaild, *sp accept resume value
+    #if !MICROPY_KEEP_LAST_CODE_STATE
+        #error MICROPY_ALLOW_PAUSE_VM require MICROPY_KEEP_LAST_CODE_STATE
+    #endif
+#endif
+#if !MICROPY_ALLOW_PAUSE_VM
 mp_vm_return_kind_t mp_execute_bytecode(mp_code_state *code_state, volatile mp_obj_t inject_exc) {
+#else
+mp_vm_return_kind_t mp_execute_bytecode(mp_code_state *code_state, volatile mp_obj_t inject_exc) {
+    mp_code_state *first_code_state = code_state;
+    while (first_code_state->prev != NULL) {
+        first_code_state = first_code_state->prev;
+    }
+    
+    mp_vm_return_kind_t kind = mp_resume_bytecode(first_code_state, code_state, inject_exc);
+    mp_obj_t exc = NULL;
+    
+    switch (kind){
+        case MP_VM_RETURN_NORMAL:
+        case MP_VM_RETURN_YIELD:
+        case MP_VM_RETURN_EXCEPTION:
+            return kind;
+        case MP_VM_RETURN_PAUSE:
+            exc = mp_obj_new_exception_msg(&mp_type_SystemError, "VM can't pauseable");
+            nlr_raise(exc);
+        default:
+            exc = mp_obj_new_exception_msg(&mp_type_SystemError, "Unknown vm return kind from mp_resume_bytecode");
+            nlr_raise(exc);
+    }
+    
+    assert(0);
+}
+
+mp_vm_return_kind_t mp_resume_bytecode(mp_code_state *first_code_state, mp_code_state *code_state, volatile mp_obj_t inject_exc) {
+#endif
 #define SELECTIVE_EXC_IP (0)
 #if SELECTIVE_EXC_IP
 #define MARK_EXC_IP_SELECTIVE() { code_state->ip = ip; } /* stores ip 1 byte past last opcode */
@@ -135,10 +185,14 @@ mp_vm_return_kind_t mp_execute_bytecode(mp_code_state *code_state, volatile mp_o
     // loop and the exception handler, leading to very obscure bugs.
     #define RAISE(o) do { nlr_pop(); nlr.ret_val = o; goto exception_handler; } while(0)
 
-#if MICROPY_KEEP_LAST_CODE_STATE
-    mp_code_state *first_code_state = code_state;
-    UPDATE_LAST_CODE_STATE();
+#if MICROPY_ALLOW_PAUSE_VM
+    if (first_code_state->prev != NULL){
+        mp_obj_t obj = mp_obj_new_exception_msg(&mp_type_SystemError, "Can't resume. (first_code_state is not root of code_state)");
+        nlr_raise(obj);
+    }
 #endif
+
+    UPDATE_LAST_CODE_STATE();
 
 #if MICROPY_STACKLESS
 run_code_state: ;
@@ -901,6 +955,7 @@ unwind_jump:;
                     }
                     #endif
                     SET_TOP(mp_call_function_n_kw(*sp, unum & 0xff, (unum >> 8) & 0xff, sp + 1));
+                    VM_PAUSE_POINT();
                     DISPATCH();
                 }
 
@@ -939,6 +994,7 @@ unwind_jump:;
                     }
                     #endif
                     SET_TOP(mp_call_method_n_kw_var(false, unum, sp));
+                    VM_PAUSE_POINT();
                     DISPATCH();
                 }
 
@@ -974,6 +1030,7 @@ unwind_jump:;
                     }
                     #endif
                     SET_TOP(mp_call_method_n_kw(unum & 0xff, (unum >> 8) & 0xff, sp));
+                    VM_PAUSE_POINT();
                     DISPATCH();
                 }
 
@@ -1012,6 +1069,7 @@ unwind_jump:;
                     }
                     #endif
                     SET_TOP(mp_call_method_n_kw_var(true, unum, sp));
+                    VM_PAUSE_POINT();
                     DISPATCH();
                 }
 
@@ -1234,6 +1292,8 @@ exception_handler:
             // with selective ip, we store the ip 1 byte past the opcode, so move ptr back
             code_state->ip -= 1;
             #endif
+
+            /* TODO: mp_const__vm_pause to VMPauseException */
 
             // check if it's a StopIteration within a for block
             if (*code_state->ip == MP_BC_FOR_ITER && mp_obj_is_subclass_fast(mp_obj_get_type(nlr.ret_val), &mp_type_StopIteration)) {

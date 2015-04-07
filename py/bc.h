@@ -61,6 +61,9 @@ typedef struct _mp_code_state {
 
 mp_uint_t mp_decode_uint(const byte **ptr);
 
+#if MICROPY_ALLOW_PAUSE_VM
+mp_vm_return_kind_t mp_resume_bytecode(mp_code_state *first_code_state, mp_code_state *code_state, volatile mp_obj_t inject_exc);
+#endif
 mp_vm_return_kind_t mp_execute_bytecode(mp_code_state *code_state, volatile mp_obj_t inject_exc);
 mp_code_state *mp_obj_fun_bc_prepare_codestate(mp_obj_t func, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args);
 void mp_setup_code_state(mp_code_state *code_state, mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args);

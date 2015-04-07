@@ -246,7 +246,7 @@ MP_DEFINE_EXCEPTION(Exception, BaseException)
       MP_DEFINE_EXCEPTION_BASE(IndentationError)
       MP_DEFINE_EXCEPTION(TabError, IndentationError)
       */
-  //MP_DEFINE_EXCEPTION(SystemError, Exception)
+  MP_DEFINE_EXCEPTION(SystemError, Exception)
   MP_DEFINE_EXCEPTION(TypeError, Exception)
   MP_DEFINE_EXCEPTION(ValueError, Exception)
 #if MICROPY_PY_BUILTINS_STR_UNICODE

@@ -33,6 +33,9 @@ typedef enum {
     MP_VM_RETURN_NORMAL,
     MP_VM_RETURN_YIELD,
     MP_VM_RETURN_EXCEPTION,
+#if MICROPY_ALLOW_PAUSE_VM
+    MP_VM_RETURN_PAUSE,
+#endif
 } mp_vm_return_kind_t;
 
 typedef enum {

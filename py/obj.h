@@ -420,6 +420,7 @@ extern const mp_obj_type_t mp_type_OverflowError;
 extern const mp_obj_type_t mp_type_RuntimeError;
 extern const mp_obj_type_t mp_type_StopIteration;
 extern const mp_obj_type_t mp_type_SyntaxError;
+extern const mp_obj_type_t mp_type_SystemError;
 extern const mp_obj_type_t mp_type_SystemExit;
 extern const mp_obj_type_t mp_type_TypeError;
 extern const mp_obj_type_t mp_type_UnicodeError;
@@ -433,11 +434,17 @@ extern const mp_obj_type_t mp_type_ZeroDivisionError;
 #define mp_const_true ((mp_obj_t)&mp_const_true_obj)
 #define mp_const_empty_bytes ((mp_obj_t)&mp_const_empty_bytes_obj)
 #define mp_const_empty_tuple ((mp_obj_t)&mp_const_empty_tuple_obj)
+#if MICROPY_ALLOW_PAUSE_VM
+#define mp_const__vm_pause ((mp_obj_t)&mp_const__vm_pause_obj)
+#endif
 extern const struct _mp_obj_none_t mp_const_none_obj;
 extern const struct _mp_obj_bool_t mp_const_false_obj;
 extern const struct _mp_obj_bool_t mp_const_true_obj;
 extern const struct _mp_obj_str_t mp_const_empty_bytes_obj;
 extern const struct _mp_obj_tuple_t mp_const_empty_tuple_obj;
+#if MICROPY_ALLOW_PAUSE_VM
+extern const struct _mp_obj_none_t mp_const__vm_pause_obj;
+#endif
 extern const struct _mp_obj_ellipsis_t mp_const_ellipsis_obj;
 extern const struct _mp_obj_exception_t mp_const_MemoryError_obj;
 extern const struct _mp_obj_exception_t mp_const_GeneratorExit_obj;
