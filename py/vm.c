@@ -43,7 +43,7 @@
 #define UPDATE_LAST_CODE_STATE()
 #endif
 
-#if 1
+#if 0
 #define TRACE(ip) printf("sp=" INT_FMT " ", sp - code_state->sp); mp_bytecode_print2(ip, 1);
 #else
 #define TRACE(ip)
