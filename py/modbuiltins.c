@@ -594,7 +594,9 @@ STATIC const mp_map_elem_t mp_module_builtins_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_complex), (mp_obj_t)&mp_type_complex },
 #endif
     { MP_OBJ_NEW_QSTR(MP_QSTR_dict), (mp_obj_t)&mp_type_dict },
+    #if MICROPY_PY_BUILTINS_ENUMERATE
     { MP_OBJ_NEW_QSTR(MP_QSTR_enumerate), (mp_obj_t)&mp_type_enumerate },
+    #endif
     { MP_OBJ_NEW_QSTR(MP_QSTR_filter), (mp_obj_t)&mp_type_filter },
 #if MICROPY_PY_BUILTINS_FLOAT
     { MP_OBJ_NEW_QSTR(MP_QSTR_float), (mp_obj_t)&mp_type_float },
@@ -613,7 +615,9 @@ STATIC const mp_map_elem_t mp_module_builtins_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_property), (mp_obj_t)&mp_type_property },
 #endif
     { MP_OBJ_NEW_QSTR(MP_QSTR_range), (mp_obj_t)&mp_type_range },
+    #if MICROPY_PY_BUILTINS_REVERSED
     { MP_OBJ_NEW_QSTR(MP_QSTR_reversed), (mp_obj_t)&mp_type_reversed },
+    #endif
 #if MICROPY_PY_BUILTINS_SET
     { MP_OBJ_NEW_QSTR(MP_QSTR_set), (mp_obj_t)&mp_type_set },
 #endif
