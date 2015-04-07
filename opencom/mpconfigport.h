@@ -26,6 +26,7 @@
 
 // for OpenComptuers
 #define MICROPY_KEEP_LAST_CODE_STATE (1)
+#define MICROPY_ALLOW_PAUSE_VM      (1)
 /*
 
 */
@@ -117,6 +118,7 @@ extern const struct _mp_obj_module_t mp_module_time;
 extern const struct _mp_obj_module_t mp_module_termios;
 extern const struct _mp_obj_module_t mp_module_socket;
 extern const struct _mp_obj_module_t mp_module_ffi;
+extern const struct _mp_obj_module_t mp_module_mpoc;
 
 #if MICROPY_PY_FFI
 #define MICROPY_PY_FFI_DEF { MP_OBJ_NEW_QSTR(MP_QSTR_ffi), (mp_obj_t)&mp_module_ffi },
@@ -143,6 +145,7 @@ extern const struct _mp_obj_module_t mp_module_ffi;
     MICROPY_PY_FFI_DEF \
     MICROPY_PY_TIME_DEF \
     MICROPY_PY_SOCKET_DEF \
+    { MP_OBJ_NEW_QSTR(MP_QSTR_mpoc), (mp_obj_t)&mp_module_mpoc }, \
     { MP_OBJ_NEW_QSTR(MP_QSTR__os), (mp_obj_t)&mp_module_os }, \
     MICROPY_PY_TERMIOS_DEF \
 

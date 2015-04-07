@@ -31,21 +31,29 @@
 #include "py/objtuple.h"
 
 STATIC mp_obj_t mod_mpoc_test(mp_obj_t asdf) {
-    
-    return MP_OBJ_NEW_SMALL_INT(32);
+    return mp_const__vm_pause;
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_mpoc_test_obj, mod_mpoc_test);
 
+
+STATIC mp_obj_t mod_mpoc_pause() {
+    return mp_const__vm_pause;
+}
+
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_mpoc_pause_obj, mod_mpoc_pause);
+
+
 STATIC const mp_map_elem_t mp_module_mpoc_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_mpoc) },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_test), mod_mpoc_test_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&mod_mpoc_test_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_pause), (mp_obj_t)&mod_mpoc_pause_obj },
 };
 
 STATIC MP_DEFINE_CONST_DICT(mp_module_mpoc_globals, mp_module_mpoc_globals_table);
 
 const mp_obj_module_t mp_module_mpoc = {
     .base = { &mp_type_module },
-    .name = MP_QSTR__mpoc,
+    .name = MP_QSTR_mpoc,
     .globals = (mp_obj_dict_t*)&mp_module_mpoc_globals,
 };

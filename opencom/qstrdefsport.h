@@ -104,3 +104,4 @@ Q(B115200)
 // mpoc
 Q(mpoc)
 Q(test)
+Q(pause)

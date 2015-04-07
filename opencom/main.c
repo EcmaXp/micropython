@@ -42,6 +42,7 @@
 #include "py/builtin.h"
 #include "py/repl.h"
 #include "py/gc.h"
+#include "py/bc.h"
 #include "py/stackctrl.h"
 #include "py/pfenv.h"
 #include "genhdr/py-version.h"
@@ -135,7 +136,29 @@ STATIC int execute_from_lexer(mp_lexer_t *lex, mp_parse_input_kind_t input_kind,
 
         if (!compile_only) {
             // execute it
-            mp_call_function_0(module_fun);
+            // mp_call_function_0(module_fun);
+            
+            // mp_call_function_0(module_fun) are changed to:
+                mp_code_state *code_state = mp_obj_fun_bc_prepare_codestate(module_fun, 0, 0, NULL);
+                mp_vm_return_kind_t kind = MP_VM_RETURN_PAUSE;
+                code_state->current = code_state;
+    
+                while (true){ // it will be mainloop.
+                    kind = mp_resume_bytecode(code_state, code_state->current, NULL);
+                    if (kind == MP_VM_RETURN_PAUSE){
+                        // change object to throw event!
+                        *(code_state->current->sp) = mp_const_true;
+                    } else if (kind == MP_VM_RETURN_EXCEPTION) {
+                        nlr_raise(code_state->current->state[code_state->current->n_state - 1]);
+                        return 1;
+                    } else {
+                        assert(code_state->current == code_state);
+                        printf("%d!\n", kind);
+                        break;
+                    }
+                }
+                
+                code_state->current = NULL;
         }
 
         #ifndef _WIN32
