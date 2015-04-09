@@ -46,15 +46,8 @@
 #include "genhdr/py-version.h"
 
 // Command line options, with their defaults
-STATIC bool compile_only = false;
 STATIC uint emit_opt = MP_EMIT_OPT_NONE;
 mp_uint_t mp_verbose_flag = 0;
-
-#if MICROPY_ENABLE_GC
-// Heap size of GC heap (if enabled)
-// Make it larger on a 64 bit machine, because pointers are larger.
-long heap_size = 128*1024 * (sizeof(mp_uint_t) / 4);
-#endif
 
 #define FORCED_EXIT (0x100)
 // If exc is SystemExit, return value where FORCED_EXIT bit set,
@@ -97,36 +90,32 @@ STATIC int execute_from_lexer(mp_lexer_t *lex) {
         mp_parse_node_t pn = mp_parse(lex, MP_PARSE_FILE_INPUT);
         mp_obj_t module_fun = mp_compile(pn, source_name, emit_opt, false);
 
-        if (!compile_only) {
-            // execute it
-            // mp_call_function_0(module_fun);
+        // execute it
+        // mp_call_function_0(module_fun);
+        // mp_call_function_0(module_fun) are changed to:
+        mp_code_state *code_state = mp_obj_fun_bc_prepare_codestate(module_fun, 0, 0, NULL);
+        mp_vm_return_kind_t kind = MP_VM_RETURN_PAUSE;
+        code_state->current = code_state;
 
-            // mp_call_function_0(module_fun) are changed to:
-                mp_code_state *code_state = mp_obj_fun_bc_prepare_codestate(module_fun, 0, 0, NULL);
-                mp_vm_return_kind_t kind = MP_VM_RETURN_PAUSE;
-                code_state->current = code_state;
-    
-                while (true){ // it will be mainloop.
-                    kind = mp_resume_bytecode(code_state, code_state->current, NULL);
-                    if (kind == MP_VM_RETURN_PAUSE){
-                        // TODO: change object to throw event?
-                        *(code_state->current->sp) = mp_const_true;
-                    } else if (kind == MP_VM_RETURN_EXCEPTION) {
-                        nlr_raise(code_state->current->state[code_state->current->n_state - 1]);
-                        return 1;
-                    } else {
-                        assert(code_state->current == code_state);
-                        // maybe yield or return?
-                        break;
-                    }
-                }
-                
-                code_state->current = NULL;
+        while (true){ // it will be mainloop.
+            kind = mp_resume_bytecode(code_state, code_state->current, NULL);
+            if (kind == MP_VM_RETURN_PAUSE){
+                // TODO: change object to throw event?
+                *(code_state->current->sp) = mp_const_true;
+            } else if (kind == MP_VM_RETURN_EXCEPTION) {
+                nlr_raise(code_state->current->state[code_state->current->n_state - 1]);
+                return 1;
+            } else {
+                assert(code_state->current == code_state);
+                // maybe yield or return?
+                break;
+            }
         }
-
+        
+        code_state->current = NULL;
         nlr_pop();
+        
         return 0;
-
     } else {
         // uncaught exception
         return handle_uncaught_exception((mp_obj_t)nlr.ret_val);
@@ -144,13 +133,39 @@ STATIC void set_sys_argv(char *argv[], int argc, int start_arg) {
     }
 }
 
-int main(int argc, char **argv) {
-    int ret = 0;
+STATIC int usage(char **argv) {
+    printf("usage: ./micropython [-X emit=bytecode] file [arg ...]\n");
+    return 1;
+}
 
+// Process options which set interpreter init options
+STATIC void pre_process_options(int argc, char **argv) {
+    for (int a = 1; a < argc; a++) {
+        if (argv[a][0] == '-') {
+            if (strcmp(argv[a], "-X") == 0) {
+                if (a + 1 >= argc) {
+                    exit(usage(argv));
+                }
+                if (0) {
+                } else if (strcmp(argv[a + 1], "emit=bytecode") == 0) {
+                    emit_opt = MP_EMIT_OPT_BYTECODE;
+                } else {
+                    exit(usage(argv));
+                }
+                a++;
+            }
+        }
+    }
+}
+
+int main(int argc, char **argv) {
+    pre_process_options(argc, argv);
     mp_stack_set_limit(40000 * (BYTES_PER_WORD / 4));
-    emit_opt = MP_EMIT_OPT_BYTECODE;
 
 #if MICROPY_ENABLE_GC
+    // Heap size of GC heap (if enabled)
+    // Make it larger on a 64 bit machine, because pointers are larger.
+    long heap_size = 128*1024 * (sizeof(mp_uint_t) / 4);
     char *heap = malloc(heap_size);
     gc_init(heap, heap + heap_size);
 #endif
@@ -158,11 +173,24 @@ int main(int argc, char **argv) {
     mp_init();
     mp_obj_list_init(mp_sys_argv, 0);
 
-    if (argc >= 2){
-        set_sys_argv(argv, argc, 2);
-        ret = do_file(argv[1]);
-    } else {
-        printf("usage: ./micropython bios.py [arg ...]\n");
+    const int NOTHING_EXECUTED = -2;
+    int ret = NOTHING_EXECUTED;
+    for (int a = 1; a < argc; a++) {
+        if (argv[a][0] == '-') {
+            if (strcmp(argv[a], "-X") == 0) {
+                a += 1;
+            } else {
+                return usage(argv);
+            }
+        } else {
+            if (a + 1 <= argc){
+                set_sys_argv(argv, argc, a);
+                ret = do_file(argv[a]);
+            } else {
+                // TODO: get bios path?
+                return usage(argv);
+            }
+        }
     }
 
     mp_deinit();
