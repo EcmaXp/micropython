@@ -49,48 +49,21 @@ ifeq ($(MICROPY_FORCE_32BIT),1)
 # starting with linux-libc-dev:i386
 CFLAGS += -m32
 LDFLAGS += -m32
-ifeq ($(MICROPY_PY_FFI),1)
-ifeq ($(UNAME_S),Linux)
-CFLAGS_MOD += -I/usr/include/i686-linux-gnu
-endif
-endif
 endif
 
-ifeq ($(MICROPY_USE_READLINE),1)
-CFLAGS_MOD += -DMICROPY_USE_READLINE=1
-LDFLAGS_MOD += -lreadline
-# the following is needed for BSD
-#LDFLAGS_MOD += -ltermcap
-endif
 ifeq ($(MICROPY_PY_TIME),1)
 CFLAGS_MOD += -DMICROPY_PY_TIME=1
 SRC_MOD += modtime.c
-endif
-ifeq ($(MICROPY_PY_TERMIOS),1)
-CFLAGS_MOD += -DMICROPY_PY_TERMIOS=1
-SRC_MOD += modtermios.c
 endif
 ifeq ($(MICROPY_PY_SOCKET),1)
 CFLAGS_MOD += -DMICROPY_PY_SOCKET=1
 SRC_MOD += modsocket.c
 endif
-ifeq ($(MICROPY_PY_FFI),1)
-LIBFFI_LDFLAGS_MOD := $(shell pkg-config --libs libffi)
-LIBFFI_CFLAGS_MOD := $(shell pkg-config --cflags libffi)
-CFLAGS_MOD += $(LIBFFI_CFLAGS_MOD) -DMICROPY_PY_FFI=1
-ifeq ($(UNAME_S),Linux)
-LDFLAGS_MOD += -ldl
-endif
-LDFLAGS_MOD += $(LIBFFI_LDFLAGS_MOD)
-SRC_MOD += modffi.c
-endif
-
 
 # source files
 SRC_C = \
 	main.c \
 	gccollect.c \
-	input.c \
 	file.c \
 	modos.c \
 	modmpoc.c \
@@ -130,7 +103,7 @@ fast:
 
 # build a minimal interpreter
 minimal:
-	$(MAKE) COPT="-Os -DNDEBUG" CFLAGS_EXTRA='-DMP_CONFIGFILE="<mpconfigport_minimal.h>"' BUILD=build-minimal PROG=micropython_minimal MICROPY_PY_TIME=0 MICROPY_PY_TERMIOS=0 MICROPY_PY_SOCKET=0 MICROPY_PY_FFI=0
+	$(MAKE) COPT="-Os -DNDEBUG" CFLAGS_EXTRA='-DMP_CONFIGFILE="<mpconfigport_minimal.h>"' BUILD=build-minimal PROG=micropython_minimal MICROPY_PY_TIME=0 MICROPY_PY_SOCKET=0
 
 # build an interpreter for coverage testing and do the testing
 coverage:
