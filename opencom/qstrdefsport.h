@@ -39,19 +39,6 @@ Q(stat)
 Q(system)
 Q(unlink)
 
-Q(ffi)
-Q(ffimod)
-Q(ffifunc)
-Q(fficallback)
-Q(ffivar)
-Q(as_bytearray)
-Q(callback)
-Q(addr)
-Q(func)
-Q(var)
-Q(get)
-Q(set)
-
 Q(input)
 Q(utime)
 Q(time)
@@ -89,17 +76,6 @@ Q(SO_ERROR)
 Q(SO_KEEPALIVE)
 Q(SO_LINGER)
 Q(SO_REUSEADDR)
-
-#if MICROPY_PY_TERMIOS
-Q(termios)
-Q(tcgetattr)
-Q(tcsetattr)
-Q(setraw)
-Q(TCSANOW)
-Q(B9600)
-Q(B57600)
-Q(B115200)
-#endif
 
 // mpoc
 Q(mpoc)

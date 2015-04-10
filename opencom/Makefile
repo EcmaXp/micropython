@@ -67,7 +67,6 @@ SRC_C = \
 	file.c \
 	modos.c \
 	modmpoc.c \
-	alloc.c \
 	$(SRC_MOD)
 
 

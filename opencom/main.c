@@ -160,12 +160,12 @@ STATIC void pre_process_options(int argc, char **argv) {
 
 int main(int argc, char **argv) {
     pre_process_options(argc, argv);
-    mp_stack_set_limit(40000 * (BYTES_PER_WORD / 4));
+    mp_stack_set_limit(40 * 1024 * (BYTES_PER_WORD / 4));
 
 #if MICROPY_ENABLE_GC
     // Heap size of GC heap (if enabled)
     // Make it larger on a 64 bit machine, because pointers are larger.
-    long heap_size = 128*1024 * (sizeof(mp_uint_t) / 4);
+    long heap_size = 128 * 1024 * (BYTES_PER_WORD / 4);
     char *heap = malloc(heap_size);
     gc_init(heap, heap + heap_size);
 #endif

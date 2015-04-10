@@ -27,14 +27,15 @@
 // for OpenComptuers
 #define MICROPY_KEEP_LAST_CODE_STATE (1)
 #define MICROPY_ALLOW_PAUSE_VM      (1)
-/*
-
-*/
 
 // options to control how Micro Python is built
 
-#define MICROPY_ALLOC_PATH_MAX      (PATH_MAX)
+#define MICROPY_EMIT_X64            (0)
+#define MICROPY_EMIT_X86            (0)
+#define MICROPY_EMIT_THUMB          (0)
+#define MICROPY_EMIT_ARM            (0)
 
+#define MICROPY_ALLOC_PATH_MAX      (PATH_MAX)
 #define MICROPY_COMP_MODULE_CONST   (1)
 #define MICROPY_COMP_TRIPLE_TUPLE_ASSIGN (1)
 #define MICROPY_ENABLE_GC           (1)
@@ -43,15 +44,15 @@
 #define MICROPY_MALLOC_USES_ALLOCATED_SIZE (1)
 #define MICROPY_MEM_STATS           (1)
 #define MICROPY_DEBUG_PRINTERS      (1)
-#define MICROPY_USE_READLINE_HISTORY (1)
+#define MICROPY_USE_READLINE_HISTORY (0) // Default: 1
 #define MICROPY_HELPER_REPL         (1)
 #define MICROPY_HELPER_LEXER_UNIX   (1)
 #define MICROPY_ENABLE_SOURCE_LINE  (1)
 #define MICROPY_FLOAT_IMPL          (MICROPY_FLOAT_IMPL_DOUBLE)
 #define MICROPY_LONGINT_IMPL        (MICROPY_LONGINT_IMPL_MPZ)
 #define MICROPY_STREAMS_NON_BLOCK   (1)
-#define MICROPY_OPT_COMPUTED_GOTO   (1)
-#define MICROPY_OPT_CACHE_MAP_LOOKUP_IN_BYTECODE (1)
+#define MICROPY_OPT_COMPUTED_GOTO   (0) // Default: 1
+#define MICROPY_OPT_CACHE_MAP_LOOKUP_IN_BYTECODE (0) // Default: 1
 #define MICROPY_CAN_OVERRIDE_BUILTINS (1)
 #define MICROPY_PY_FUNCTION_ATTRS   (1)
 #define MICROPY_PY_DESCRIPTORS      (1)
@@ -73,8 +74,8 @@
 #define MICROPY_PY_IO_FILEIO        (1)
 #define MICROPY_PY_GC_COLLECT_RETVAL (1)
 
-#define MICROPY_STACKLESS           (1)
-#define MICROPY_STACKLESS_STRICT    (1)
+#define MICROPY_STACKLESS           (1) // Default: 0
+#define MICROPY_STACKLESS_STRICT    (1) // Default: 0
 
 #define MICROPY_PY_UCTYPES          (1)
 #define MICROPY_PY_UZLIB            (1)
@@ -102,26 +103,16 @@
 #define MICROPY_ENABLE_EMERGENCY_EXCEPTION_BUF   (1)
 #define MICROPY_EMERGENCY_EXCEPTION_BUF_SIZE  (256)
 
+// Porting Program's internal modules.
 extern const struct _mp_obj_module_t mp_module_os;
 extern const struct _mp_obj_module_t mp_module_time;
 extern const struct _mp_obj_module_t mp_module_socket;
-extern const struct _mp_obj_module_t mp_module_ffi;
 extern const struct _mp_obj_module_t mp_module_mpoc;
 
-#if MICROPY_PY_FFI
-#define MICROPY_PY_FFI_DEF { MP_OBJ_NEW_QSTR(MP_QSTR_ffi), (mp_obj_t)&mp_module_ffi },
-#else
-#define MICROPY_PY_FFI_DEF
-#endif
 #if MICROPY_PY_TIME
 #define MICROPY_PY_TIME_DEF { MP_OBJ_NEW_QSTR(MP_QSTR_utime), (mp_obj_t)&mp_module_time },
 #else
 #define MICROPY_PY_TIME_DEF
-#endif
-#if MICROPY_PY_TERMIOS
-#define MICROPY_PY_TERMIOS_DEF { MP_OBJ_NEW_QSTR(MP_QSTR_termios), (mp_obj_t)&mp_module_termios },
-#else
-#define MICROPY_PY_TERMIOS_DEF
 #endif
 #if MICROPY_PY_SOCKET
 #define MICROPY_PY_SOCKET_DEF { MP_OBJ_NEW_QSTR(MP_QSTR_usocket), (mp_obj_t)&mp_module_socket },
@@ -129,13 +120,14 @@ extern const struct _mp_obj_module_t mp_module_mpoc;
 #define MICROPY_PY_SOCKET_DEF
 #endif
 
+#define MICROPY_PY_END_DEF
+
 #define MICROPY_PORT_BUILTIN_MODULES \
-    MICROPY_PY_FFI_DEF \
     MICROPY_PY_TIME_DEF \
     MICROPY_PY_SOCKET_DEF \
     { MP_OBJ_NEW_QSTR(MP_QSTR_mpoc), (mp_obj_t)&mp_module_mpoc }, \
     { MP_OBJ_NEW_QSTR(MP_QSTR__os), (mp_obj_t)&mp_module_os }, \
-    MICROPY_PY_TERMIOS_DEF \
+    MICROPY_PY_END_DEF
 
 // type definitions for the specific machine
 
@@ -161,18 +153,9 @@ typedef long mp_off_t;
 typedef void *machine_ptr_t; // must be of pointer size
 typedef const void *machine_const_ptr_t; // must be of pointer size
 
-void mp_unix_alloc_exec(mp_uint_t min_size, void** ptr, mp_uint_t *size);
-void mp_unix_free_exec(void *ptr, mp_uint_t size);
-void mp_unix_mark_exec(void);
-#define MP_PLAT_ALLOC_EXEC(min_size, ptr, size) mp_unix_alloc_exec(min_size, ptr, size)
-#define MP_PLAT_FREE_EXEC(ptr, size) mp_unix_free_exec(ptr, size)
-
 extern const struct _mp_obj_fun_builtin_t mp_builtin_open_obj;
 #define MICROPY_PORT_BUILTINS \
     { MP_OBJ_NEW_QSTR(MP_QSTR_open), (mp_obj_t)&mp_builtin_open_obj },
-
-#define MICROPY_PORT_ROOT_POINTERS \
-    void *mmap_region_head; \
 
 // We need to provide a declaration/definition of alloca()
 #ifdef __FreeBSD__
