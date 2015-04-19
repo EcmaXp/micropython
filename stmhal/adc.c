@@ -58,7 +58,8 @@
 
 #if defined(STM32F405xx) || defined(STM32F415xx) || \
     defined(STM32F407xx) || defined(STM32F417xx) || \
-    defined(STM32F401xC) || defined(STM32F401xE)
+    defined(STM32F401xC) || defined(STM32F401xE) || \
+    defined(STM32F411xE)
 #define VBAT_DIV (2)
 #elif defined(STM32F427xx) || defined(STM32F429xx) || \
       defined(STM32F437xx) || defined(STM32F439xx)
@@ -138,11 +139,11 @@ STATIC uint32_t adc_read_channel(ADC_HandleTypeDef *adcHandle) {
 /******************************************************************************/
 /* Micro Python bindings : adc object (single channel)                        */
 
-STATIC void adc_print(void (*print)(void *env, const char *fmt, ...), void *env, mp_obj_t self_in, mp_print_kind_t kind) {
+STATIC void adc_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     pyb_obj_adc_t *self = self_in;
-    print(env, "<ADC on ");
-    mp_obj_print_helper(print, env, self->pin_name, PRINT_STR);
-    print(env, " channel=%lu>", self->channel);
+    mp_print_str(print, "<ADC on ");
+    mp_obj_print_helper(print, self->pin_name, PRINT_STR);
+    mp_printf(print, " channel=%lu>", self->channel);
 }
 
 /// \classmethod \constructor(pin)
@@ -163,7 +164,7 @@ STATIC mp_obj_t adc_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw,
         const pin_obj_t *pin = pin_find(pin_obj);
         if ((pin->adc_num & PIN_ADC1) == 0) {
             // No ADC1 function on that pin
-            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "pin %s does not have ADC capabilities", qstr_str(pin->name)));
+            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "pin %q does not have ADC capabilities", pin->name));
         }
         channel = pin->adc_channel;
     }
@@ -212,6 +213,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(adc_read_obj, adc_read);
 ///         print(val)                      # print the value out
 ///
 /// This function does not allocate any memory.
+#if defined(TIM6)
 STATIC mp_obj_t adc_read_timed(mp_obj_t self_in, mp_obj_t buf_in, mp_obj_t freq_in) {
     pyb_obj_adc_t *self = self_in;
 
@@ -274,10 +276,13 @@ STATIC mp_obj_t adc_read_timed(mp_obj_t self_in, mp_obj_t buf_in, mp_obj_t freq_
     return mp_obj_new_int(bufinfo.len);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_3(adc_read_timed_obj, adc_read_timed);
+#endif
 
 STATIC const mp_map_elem_t adc_locals_dict_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_read), (mp_obj_t)&adc_read_obj},
+    #if defined(TIM6)
     { MP_OBJ_NEW_QSTR(MP_QSTR_read_timed), (mp_obj_t)&adc_read_timed_obj},
+    #endif
 };
 
 STATIC MP_DEFINE_CONST_DICT(adc_locals_dict, adc_locals_dict_table);

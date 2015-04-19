@@ -31,7 +31,7 @@
 #include "py/nlr.h"
 #include "py/runtime.h"
 #include "py/gc.h"
-#include "py/pfenv.h"
+#include MICROPY_HAL_H
 #include "pin.h"
 #include "extint.h"
 
@@ -102,7 +102,10 @@ typedef struct {
 STATIC uint32_t pyb_extint_mode[EXTI_NUM_VECTORS];
 
 #if !defined(ETH)
-#define ETH_WKUP_IRQn   62  // The 405 doesn't have ETH, but we want a value to put in our table
+#define ETH_WKUP_IRQn   62  // Some MCUs don't have ETH, but we want a value to put in our table
+#endif
+#if !defined(OTG_HS_WKUP_IRQn)
+#define OTG_HS_WKUP_IRQn 76  // Some MCUs don't have HS, but we want a value to put in our table
 #endif
 
 STATIC const uint8_t nvic_irq_channel[EXTI_NUM_VECTORS] = {
@@ -296,9 +299,9 @@ STATIC mp_obj_t extint_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_
     return self;
 }
 
-STATIC void extint_obj_print(void (*print)(void *env, const char *fmt, ...), void *env, mp_obj_t self_in, mp_print_kind_t kind) {
+STATIC void extint_obj_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     extint_obj_t *self = self_in;
-    print(env, "<ExtInt line=%u>", self->line);
+    mp_printf(print, "<ExtInt line=%u>", self->line);
 }
 
 STATIC const mp_map_elem_t extint_locals_dict_table[] = {
@@ -356,7 +359,7 @@ void Handle_EXTI_Irq(uint32_t line) {
                     *cb = mp_const_none;
                     extint_disable(line);
                     printf("Uncaught exception in ExtInt interrupt handler line %lu\n", line);
-                    mp_obj_print_exception(printf_wrapper, NULL, (mp_obj_t)nlr.ret_val);
+                    mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
                 }
                 gc_unlock();
             }

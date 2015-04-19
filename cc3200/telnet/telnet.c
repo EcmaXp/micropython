@@ -25,7 +25,6 @@
  */
 
 #include <stdint.h>
-#include <std.h>
 
 #include "py/mpconfig.h"
 #include MICROPY_HAL_H
@@ -325,7 +324,7 @@ static bool telnet_create_socket (void) {
 
         // Bind the socket to a port number
         sServerAddress.sin_family = AF_INET;
-        sServerAddress.sin_addr.s_addr = htonl(INADDR_ANY);
+        sServerAddress.sin_addr.s_addr = INADDR_ANY;
         sServerAddress.sin_port = htons(TELNET_PORT);
 
         ASSERT (sl_Bind(telnet_data.sd, (const SlSockAddr_t *)&sServerAddress, sizeof(sServerAddress)) == SL_SOC_OK);
