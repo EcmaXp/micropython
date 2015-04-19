@@ -39,10 +39,10 @@
 #include "py/compile.h"
 #include "py/runtime.h"
 #include "py/builtin.h"
+#include "py/repl.h"
 #include "py/gc.h"
 #include "py/bc.h"
 #include "py/stackctrl.h"
-#include "py/pfenv.h"
 #include "genhdr/py-version.h"
 
 // Command line options, with their defaults
@@ -66,7 +66,7 @@ STATIC int handle_uncaught_exception(mp_obj_t exc) {
     }
 
     // Report all other exceptions
-    mp_obj_print_exception(printf_wrapper, NULL, exc);
+    mp_obj_print_exception(&mp_plat_print, exc);
     return 1;
 }
 
@@ -93,28 +93,30 @@ STATIC int execute_from_lexer(mp_lexer_t *lex) {
         // execute it
         // mp_call_function_0(module_fun);
         // mp_call_function_0(module_fun) are changed to:
+
         mp_code_state *code_state = mp_obj_fun_bc_prepare_codestate(module_fun, 0, 0, NULL);
         mp_vm_return_kind_t kind = MP_VM_RETURN_PAUSE;
         code_state->current = code_state;
 
         while (true){ // it will be mainloop.
-            kind = mp_resume_bytecode(code_state, code_state->current, NULL);
+            kind = mp_resume_bytecode(code_state, code_state->current, MP_OBJ_NULL);
+            
             if (kind == MP_VM_RETURN_PAUSE){
                 // TODO: change object to throw event?
-                *(code_state->current->sp) = mp_const_true;
+                *(code_state->sp) = mp_const_true;
             } else if (kind == MP_VM_RETURN_EXCEPTION) {
-                nlr_raise(code_state->current->state[code_state->current->n_state - 1]);
+                nlr_raise(code_state->state[code_state->n_state - 1]);
                 return 1;
             } else {
-                assert(code_state->current == code_state);
+                assert(code_state == code_state);
                 // maybe yield or return?
                 break;
             }
         }
         
         code_state->current = NULL;
-        nlr_pop();
         
+        nlr_pop();
         return 0;
     } else {
         // uncaught exception
