@@ -193,7 +193,7 @@ mp_vm_return_kind_t mp_resume_bytecode(mp_code_state *first_code_state, mp_code_
 #endif
 
     UPDATE_LAST_CODE_STATE();
-
+            
 #if MICROPY_STACKLESS
 run_code_state: ;
 #endif
