@@ -26,7 +26,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <std.h>
+#include "std.h"
 
 #include "py/mpconfig.h"
 #include MICROPY_HAL_H
@@ -196,7 +196,7 @@ static bool bootmgr_verify (void) {
             }
 
             // read the hash from the file and close it
-            ASSERT (BOOTMGR_HASH_SIZE == sl_FsRead(fHandle, offset, bootmgr_file_buf, BOOTMGR_HASH_SIZE));
+            sl_FsRead(fHandle, offset, bootmgr_file_buf, BOOTMGR_HASH_SIZE);
             sl_FsClose (fHandle, NULL, NULL, 0);
             bootmgr_file_buf[BOOTMGR_HASH_SIZE] = '\0';
             // compare both hashes
@@ -347,3 +347,12 @@ int main (void) {
     }
 }
 
+//*****************************************************************************
+//! The following stub function is needed to link mp_vprintf
+//*****************************************************************************
+#include "py/qstr.h"
+
+const byte *qstr_data(qstr q, mp_uint_t *len) {
+    *len = 0;
+    return NULL;
+}

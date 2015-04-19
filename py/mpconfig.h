@@ -691,15 +691,20 @@ typedef double mp_float_t;
 #define MICROPY_MAKE_POINTER_CALLABLE(p) (p)
 #endif
 
-// If these MP_PLAT_* macros are overridden then the memory allocated by them
+// If these MP_PLAT_*_EXEC macros are overridden then the memory allocated by them
 // must be somehow reachable for marking by the GC, since the native code
 // generators store pointers to GC managed memory in the code.
 #ifndef MP_PLAT_ALLOC_EXEC
-#define MP_PLAT_ALLOC_EXEC(min_size, ptr, size) do { *ptr = m_new(byte, min_size); *size = min_size; } while(0)
+#define MP_PLAT_ALLOC_EXEC(min_size, ptr, size) do { *ptr = m_new(byte, min_size); *size = min_size; } while (0)
 #endif
 
 #ifndef MP_PLAT_FREE_EXEC
 #define MP_PLAT_FREE_EXEC(ptr, size) m_del(byte, ptr, size)
+#endif
+
+// This macro is used to do all output (except when MICROPY_PY_IO is defined)
+#ifndef MP_PLAT_PRINT_STRN
+#define MP_PLAT_PRINT_STRN(str, len) printf("%.*s", (int)len, str)
 #endif
 
 #ifndef MP_SSIZE_MAX

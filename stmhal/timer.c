@@ -35,7 +35,7 @@
 #include "py/nlr.h"
 #include "py/runtime.h"
 #include "py/gc.h"
-#include "py/pfenv.h"
+#include MICROPY_HAL_H
 #include "timer.h"
 #include "servo.h"
 #include "pin.h"
@@ -223,6 +223,7 @@ void timer_tim5_init(void) {
     HAL_TIM_PWM_Init(&TIM5_Handle);
 }
 
+#if defined(TIM6)
 // Init TIM6 with a counter-overflow at the given frequency (given in Hz)
 // TIM6 is used by the DAC and ADC for auto sampling at a given frequency
 // This function inits but does not start the timer
@@ -247,6 +248,7 @@ void timer_tim6_init(uint freq) {
     TIM6_Handle.Init.CounterMode = TIM_COUNTERMODE_UP; // unused for TIM6
     HAL_TIM_Base_Init(&TIM6_Handle);
 }
+#endif
 
 // Interrupt dispatch
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
@@ -468,17 +470,17 @@ STATIC void config_deadtime(pyb_timer_obj_t *self, mp_int_t ticks) {
     HAL_TIMEx_ConfigBreakDeadTime(&self->tim, &deadTimeConfig);
 }
 
-STATIC void pyb_timer_print(void (*print)(void *env, const char *fmt, ...), void *env, mp_obj_t self_in, mp_print_kind_t kind) {
+STATIC void pyb_timer_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     pyb_timer_obj_t *self = self_in;
 
     if (self->tim.State == HAL_TIM_STATE_RESET) {
-        print(env, "Timer(%u)", self->tim_id);
+        mp_printf(print, "Timer(%u)", self->tim_id);
     } else {
         uint32_t prescaler = self->tim.Instance->PSC & 0xffff;
         uint32_t period = __HAL_TIM_GetAutoreload(&self->tim) & TIMER_CNT_MASK(self);
         // for efficiency, we compute and print freq as an int (not a float)
         uint32_t freq = timer_get_source_freq(self->tim_id) / ((prescaler + 1) * (period + 1));
-        print(env, "Timer(%u, freq=%u, prescaler=%u, period=%u, mode=%s, div=%u",
+        mp_printf(print, "Timer(%u, freq=%u, prescaler=%u, period=%u, mode=%s, div=%u",
             self->tim_id,
             freq,
             prescaler,
@@ -488,9 +490,10 @@ STATIC void pyb_timer_print(void (*print)(void *env, const char *fmt, ...), void
             self->tim.Init.ClockDivision == TIM_CLOCKDIVISION_DIV4 ? 4 :
             self->tim.Init.ClockDivision == TIM_CLOCKDIVISION_DIV2 ? 2 : 1);
         if (IS_TIM_ADVANCED_INSTANCE(self->tim.Instance)) {
-            print(env, ", deadtime=%u", compute_ticks_from_dtg(self->tim.Instance->BDTR & TIM_BDTR_DTG));
+            mp_printf(print, ", deadtime=%u",
+                compute_ticks_from_dtg(self->tim.Instance->BDTR & TIM_BDTR_DTG));
         }
-        print(env, ")");
+        mp_print_str(print, ")");
     }
 }
 
@@ -586,15 +589,27 @@ STATIC mp_obj_t pyb_timer_init_helper(pyb_timer_obj_t *self, mp_uint_t n_args, c
         case 3: __TIM3_CLK_ENABLE(); break;
         case 4: __TIM4_CLK_ENABLE(); break;
         case 5: __TIM5_CLK_ENABLE(); break;
+        #if defined(TIM6)
         case 6: __TIM6_CLK_ENABLE(); break;
+        #endif
+        #if defined(TIM7)
         case 7: __TIM7_CLK_ENABLE(); break;
+        #endif
+        #if defined(TIM8)
         case 8: __TIM8_CLK_ENABLE(); break;
+        #endif
         case 9: __TIM9_CLK_ENABLE(); break;
         case 10: __TIM10_CLK_ENABLE(); break;
         case 11: __TIM11_CLK_ENABLE(); break;
+        #if defined(TIM12)
         case 12: __TIM12_CLK_ENABLE(); break;
+        #endif
+        #if defined(TIM13)
         case 13: __TIM13_CLK_ENABLE(); break;
+        #endif
+        #if defined(TIM14)
         case 14: __TIM14_CLK_ENABLE(); break;
+        #endif
     }
 
     // set IRQ priority (if not a special timer)
@@ -642,15 +657,27 @@ STATIC mp_obj_t pyb_timer_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t
         case 3: nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "Timer 3 is for internal use only")); // TIM3 used for low-level stuff; go via regs if necessary
         case 4: tim->tim.Instance = TIM4; tim->irqn = TIM4_IRQn; break;
         case 5: tim->tim.Instance = TIM5; tim->irqn = TIM5_IRQn; tim->is_32bit = true; break;
+        #if defined(TIM6)
         case 6: tim->tim.Instance = TIM6; tim->irqn = TIM6_DAC_IRQn; break;
+        #endif
+        #if defined(TIM7)
         case 7: tim->tim.Instance = TIM7; tim->irqn = TIM7_IRQn; break;
+        #endif
+        #if defined(TIM8)
         case 8: tim->tim.Instance = TIM8; tim->irqn = TIM8_UP_TIM13_IRQn; break;
+        #endif
         case 9: tim->tim.Instance = TIM9; tim->irqn = TIM1_BRK_TIM9_IRQn; break;
         case 10: tim->tim.Instance = TIM10; tim->irqn = TIM1_UP_TIM10_IRQn; break;
         case 11: tim->tim.Instance = TIM11; tim->irqn = TIM1_TRG_COM_TIM11_IRQn; break;
+        #if defined(TIM12)
         case 12: tim->tim.Instance = TIM12; tim->irqn = TIM8_BRK_TIM12_IRQn; break;
+        #endif
+        #if defined(TIM13)
         case 13: tim->tim.Instance = TIM13; tim->irqn = TIM8_UP_TIM13_IRQn; break;
+        #endif
+        #if defined(TIM14)
         case 14: tim->tim.Instance = TIM14; tim->irqn = TIM8_TRG_COM_TIM14_IRQn; break;
+        #endif
         default: nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "Timer %d does not exist", tim->tim_id));
     }
 
@@ -845,7 +872,7 @@ STATIC mp_obj_t pyb_timer_channel(mp_uint_t n_args, const mp_obj_t *pos_args, mp
         const pin_obj_t *pin = pin_obj;
         const pin_af_obj_t *af = pin_find_af(pin, AF_FN_TIM, self->tim_id);
         if (af == NULL) {
-            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "pin %s doesn't have an af for TIM%d", qstr_str(pin->name), self->tim_id));
+            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "pin %q doesn't have an af for TIM%d", pin->name, self->tim_id));
         }
         // pin.init(mode=AF_PP, af=idx)
         const mp_obj_t args2[6] = {
@@ -985,7 +1012,10 @@ STATIC mp_obj_t pyb_timer_channel(mp_uint_t n_args, const mp_obj_t *pos_args, mp
             &&  self->tim.Instance != TIM3
             &&  self->tim.Instance != TIM4
             &&  self->tim.Instance != TIM5
-            &&  self->tim.Instance != TIM8 ) {
+            #if defined(TIM8)
+            &&  self->tim.Instance != TIM8
+            #endif
+            ) {
                 nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "encoder not supported on timer %d", self->tim_id));
             }
 
@@ -1166,10 +1196,10 @@ const mp_obj_type_t pyb_timer_type = {
 /// Timer channels are used to generate/capture a signal using a timer.
 ///
 /// TimerChannel objects are created using the Timer.channel() method.
-STATIC void pyb_timer_channel_print(void (*print)(void *env, const char *fmt, ...), void *env, mp_obj_t self_in, mp_print_kind_t kind) {
+STATIC void pyb_timer_channel_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     pyb_timer_channel_obj_t *self = self_in;
 
-    print(env, "TimerChannel(timer=%u, channel=%u, mode=%s)",
+    mp_printf(print, "TimerChannel(timer=%u, channel=%u, mode=%s)",
           self->timer->tim_id,
           self->channel,
           qstr_str(channel_mode_info[self->mode].name));
@@ -1308,7 +1338,7 @@ STATIC void timer_handle_irq_channel(pyb_timer_obj_t *tim, uint8_t channel, mp_o
                     } else {
                         printf("uncaught exception in Timer(%u) channel %u interrupt handler\n", tim->tim_id, channel);
                     }
-                    mp_obj_print_exception(printf_wrapper, NULL, (mp_obj_t)nlr.ret_val);
+                    mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
                 }
                 gc_unlock();
             }

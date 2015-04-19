@@ -36,6 +36,11 @@
 
 #if defined(MICROPY_HW_LED1)
 
+// default is to not PWM LED4
+#if !defined(MICROPY_HW_LED4_PWM)
+#define MICROPY_HW_LED4_PWM (0)
+#endif
+
 /// \moduleref pyb
 /// \class LED - LED object
 ///
@@ -78,7 +83,7 @@ void led_init(void) {
         HAL_GPIO_Init(led_pin->gpio, &GPIO_InitStructure);
     }
 
-#if defined(PYBV4) || defined(PYBV10)
+    #if MICROPY_HW_LED4_PWM
     // LED4 (blue) is on PB4 which is TIM3_CH1
     // we use PWM on this channel to fade the LED
 
@@ -102,15 +107,14 @@ void led_init(void) {
 
     // start PWM
     TIM_CCxChannelCmd(TIM3, TIM_CHANNEL_1, TIM_CCx_ENABLE);
-#endif
+    #endif
 }
 
 void led_state(pyb_led_t led, int state) {
     if (led < 1 || led > NUM_LEDS) {
         return;
     }
-#if defined(PYBV4) || defined(PYBV10)
-    if (led == 4) {
+    if (MICROPY_HW_LED4_PWM && led == 4) {
         if (state) {
             TIM3->CCR1 = 0xffff;
         } else {
@@ -118,7 +122,6 @@ void led_state(pyb_led_t led, int state) {
         }
         return;
     }
-#endif
     const pin_obj_t *led_pin = pyb_led_obj[led - 1].led_pin;
     //printf("led_state(%d,%d)\n", led, state);
     if (state == 0) {
@@ -135,8 +138,7 @@ void led_toggle(pyb_led_t led) {
         return;
     }
 
-#if defined(PYBV4) || defined(PYBV10)
-    if (led == 4) {
+    if (MICROPY_HW_LED4_PWM && led == 4) {
         if (TIM3->CCR1 == 0) {
             TIM3->CCR1 = 0xffff;
         } else {
@@ -144,7 +146,6 @@ void led_toggle(pyb_led_t led) {
         }
         return;
     }
-#endif
 
     // toggle the output data register to toggle the LED state
     const pin_obj_t *led_pin = pyb_led_obj[led - 1].led_pin;
@@ -156,15 +157,13 @@ int led_get_intensity(pyb_led_t led) {
         return 0;
     }
 
-#if defined(PYBV4) || defined(PYBV10)
-    if (led == 4) {
+    if (MICROPY_HW_LED4_PWM && led == 4) {
         mp_uint_t i = (TIM3->CCR1 * 255 + (USBD_CDC_POLLING_INTERVAL*1000) - 2) / ((USBD_CDC_POLLING_INTERVAL*1000) - 1);
         if (i > 255) {
             i = 255;
         }
         return i;
     }
-#endif
 
     const pin_obj_t *led_pin = pyb_led_obj[led - 1].led_pin;
     GPIO_TypeDef *gpio = led_pin->gpio;
@@ -180,8 +179,7 @@ int led_get_intensity(pyb_led_t led) {
 }
 
 void led_set_intensity(pyb_led_t led, mp_int_t intensity) {
-#if defined(PYBV4) || defined(PYBV10)
-    if (led == 4) {
+    if (MICROPY_HW_LED4_PWM && led == 4) {
         // set intensity using PWM pulse width
         if (intensity < 0) {
             intensity = 0;
@@ -193,7 +191,6 @@ void led_set_intensity(pyb_led_t led, mp_int_t intensity) {
         TIM3->CCR1 = intensity;
         return;
     }
-#endif
 
     // intensity not supported for this LED; just turn it on/off
     led_state(led, intensity > 0);
@@ -210,9 +207,9 @@ void led_debug(int n, int delay) {
 /******************************************************************************/
 /* Micro Python bindings                                                      */
 
-void led_obj_print(void (*print)(void *env, const char *fmt, ...), void *env, mp_obj_t self_in, mp_print_kind_t kind) {
+void led_obj_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     pyb_led_obj_t *self = self_in;
-    print(env, "<LED %lu>", self->led_id);
+    mp_printf(print, "LED(%lu)", self->led_id);
 }
 
 /// \classmethod \constructor(id)
@@ -228,7 +225,7 @@ STATIC mp_obj_t led_obj_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n
 
     // check led number
     if (!(1 <= led_id && led_id <= NUM_LEDS)) {
-        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "LED %d does not exist", led_id));
+        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "LED(%d) does not exist", led_id));
     }
 
     // return static led object

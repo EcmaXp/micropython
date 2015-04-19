@@ -153,6 +153,7 @@ STATIC bool uart_init2(pyb_uart_obj_t *uart_obj) {
             __USART2_CLK_ENABLE();
             break;
 
+        #if defined(USART3)
         // USART3 is on PB10/PB11 (CK,CTS,RTS on PB12,PB13,PB14), PC10/PC11 (CK on PC12), PD8/PD9 (CK on PD10)
         case PYB_UART_3:
             UARTx = USART3;
@@ -175,7 +176,9 @@ STATIC bool uart_init2(pyb_uart_obj_t *uart_obj) {
 #endif
             __USART3_CLK_ENABLE();
             break;
+        #endif
 
+        #if defined(UART4)
         // UART4 is on PA0/PA1, PC10/PC11
         case PYB_UART_4:
             UARTx = UART4;
@@ -187,6 +190,7 @@ STATIC bool uart_init2(pyb_uart_obj_t *uart_obj) {
 
             __UART4_CLK_ENABLE();
             break;
+        #endif
 
         // USART6 is on PC6/PC7 (CK on PC8)
         case PYB_UART_6:
@@ -330,23 +334,23 @@ void uart_irq_handler(mp_uint_t uart_id) {
 /******************************************************************************/
 /* Micro Python bindings                                                      */
 
-STATIC void pyb_uart_print(void (*print)(void *env, const char *fmt, ...), void *env, mp_obj_t self_in, mp_print_kind_t kind) {
+STATIC void pyb_uart_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     pyb_uart_obj_t *self = self_in;
     if (!self->is_enabled) {
-        print(env, "UART(%u)", self->uart_id);
+        mp_printf(print, "UART(%u)", self->uart_id);
     } else {
         mp_int_t bits = (self->uart.Init.WordLength == UART_WORDLENGTH_8B ? 8 : 9);
         if (self->uart.Init.Parity != UART_PARITY_NONE) {
             bits -= 1;
         }
-        print(env, "UART(%u, baudrate=%u, bits=%u, parity=",
+        mp_printf(print, "UART(%u, baudrate=%u, bits=%u, parity=",
             self->uart_id, self->uart.Init.BaudRate, bits);
         if (self->uart.Init.Parity == UART_PARITY_NONE) {
-            print(env, "None");
+            mp_print_str(print, "None");
         } else {
-            print(env, "%u", self->uart.Init.Parity == UART_PARITY_EVEN ? 0 : 1);
+            mp_printf(print, "%u", self->uart.Init.Parity == UART_PARITY_EVEN ? 0 : 1);
         }
-        print(env, ", stop=%u, timeout=%u, timeout_char=%u, read_buf_len=%u)",
+        mp_printf(print, ", stop=%u, timeout=%u, timeout_char=%u, read_buf_len=%u)",
             self->uart.Init.StopBits == UART_STOPBITS_1 ? 1 : 2,
             self->timeout, self->timeout_char, self->read_buf_len);
     }
@@ -570,16 +574,20 @@ STATIC mp_obj_t pyb_uart_deinit(mp_obj_t self_in) {
         __USART2_FORCE_RESET();
         __USART2_RELEASE_RESET();
         __USART2_CLK_DISABLE();
+    #if defined(USART3)
     } else if (uart->Instance == USART3) {
         HAL_NVIC_DisableIRQ(USART3_IRQn);
         __USART3_FORCE_RESET();
         __USART3_RELEASE_RESET();
         __USART3_CLK_DISABLE();
+    #endif
+    #if defined(UART4)
     } else if (uart->Instance == UART4) {
         HAL_NVIC_DisableIRQ(UART4_IRQn);
         __UART4_FORCE_RESET();
         __UART4_RELEASE_RESET();
         __UART4_CLK_DISABLE();
+    #endif
     } else if (uart->Instance == USART6) {
         HAL_NVIC_DisableIRQ(USART6_IRQn);
         __USART6_FORCE_RESET();

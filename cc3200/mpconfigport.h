@@ -38,6 +38,7 @@
 #define MICROPY_COMP_MODULE_CONST                   (1)
 #define MICROPY_ENABLE_GC                           (1)
 #define MICROPY_ENABLE_FINALISER                    (1)
+#define MICROPY_COMP_TRIPLE_TUPLE_ASSIGN            (0)
 #define MICROPY_STACK_CHECK                         (0)
 #define MICROPY_HELPER_REPL                         (1)
 #define MICROPY_ENABLE_SOURCE_LINE                  (1)
@@ -54,21 +55,26 @@
     2: Enable LFN with dynamic working buffer on the STACK.
     3: Enable LFN with dynamic working buffer on the HEAP.
 */
-#define MICROPY_ENABLE_LFN                          (0)
-#define MICROPY_LFN_CODE_PAGE                       (1)
+#define MICROPY_ENABLE_LFN                          (2)
+#define MICROPY_LFN_CODE_PAGE                       (437)       // 1=SFN/ANSI 437=LFN/U.S.(OEM)
 #define MICROPY_STREAMS_NON_BLOCK                   (1)
 #define MICROPY_MODULE_WEAK_LINKS                   (0)
 #define MICROPY_CAN_OVERRIDE_BUILTINS               (0)
 #define MICROPY_PY_BUILTINS_STR_UNICODE             (1)
+#define MICROPY_PY_BUILTINS_STR_SPLITLINES          (0)
 #define MICROPY_PY_BUILTINS_MEMORYVIEW              (1)
 #define MICROPY_PY_BUILTINS_FROZENSET               (1)
 #define MICROPY_PY_BUILTINS_EXECFILE                (1)
 #define MICROPY_PY_MICROPYTHON_MEM_INFO             (0)
+#define MICROPY_PY_ARRAY_SLICE_ASSIGN               (0)
+#define MICROPY_PY_COLLECTIONS_ORDEREDDICT          (0)
+#define MICROPY_PY_SYS_MAXSIZE                      (0)
 #define MICROPY_PY_SYS_EXIT                         (1)
 #define MICROPY_PY_SYS_STDFILES                     (1)
 #define MICROPY_PY_CMATH                            (0)
 #define MICROPY_PY_IO                               (1)
 #define MICROPY_PY_IO_FILEIO                        (1)
+#define MICROPY_PY_UBINASCII                        (1)
 #define MICROPY_PY_UCTYPES                          (1)
 #define MICROPY_PY_UZLIB                            (0)
 #define MICROPY_PY_UJSON                            (1)
@@ -90,6 +96,7 @@ extern const struct _mp_obj_fun_builtin_t mp_builtin_open_obj;
 
 // extra built in modules to add to the list of known ones
 extern const struct _mp_obj_module_t pyb_module;
+extern const struct _mp_obj_module_t mp_module_ubinascii;
 extern const struct _mp_obj_module_t mp_module_ure;
 extern const struct _mp_obj_module_t mp_module_ujson;
 extern const struct _mp_obj_module_t mp_module_uheapq;
@@ -128,6 +135,7 @@ extern const struct _mp_obj_module_t mp_module_network;
 // type definitions for the specific machine
 #define BYTES_PER_WORD                              (4)
 #define MICROPY_MAKE_POINTER_CALLABLE(p)            ((void*)((mp_uint_t)(p) | 1))
+#define MP_SSIZE_MAX                                (0x7FFFFFFF)
 
 #define UINT_FMT                                    "%u"
 #define INT_FMT                                     "%d"
@@ -137,6 +145,9 @@ typedef unsigned int    mp_uint_t;                  // must be pointer size
 typedef void            *machine_ptr_t;             // must be of pointer size
 typedef const void      *machine_const_ptr_t;       // must be of pointer size
 typedef long            mp_off_t;
+
+void mp_hal_stdout_tx_strn_cooked(const char *str, uint32_t len);
+#define MP_PLAT_PRINT_STRN(str, len) mp_hal_stdout_tx_strn_cooked(str, len)
 
 #define MICROPY_BEGIN_ATOMIC_SECTION()              disable_irq()
 #define MICROPY_END_ATOMIC_SECTION(state)           enable_irq(state)

@@ -90,7 +90,7 @@ STATIC void emit_inline_thumb_end_pass(emit_inline_asm_t *emit) {
 
     if (emit->pass == MP_PASS_EMIT) {
         void *f = asm_thumb_get_code(emit->as);
-        mp_emit_glue_assign_native(emit->scope->raw_code, MP_CODE_NATIVE_ASM, f, asm_thumb_get_code_size(emit->as), emit->scope->num_pos_args, 0);
+        mp_emit_glue_assign_native(emit->scope->raw_code, MP_CODE_NATIVE_ASM, f, asm_thumb_get_code_size(emit->as), emit->scope->num_pos_args, 0, 0, 0);
     }
 }
 
@@ -296,7 +296,7 @@ STATIC int get_arg_label(emit_inline_asm_t *emit, const char *op, mp_parse_node_
     }
     // only need to have the labels on the last pass
     if (emit->pass == MP_PASS_EMIT) {
-        emit_inline_thumb_error_exc(emit, mp_obj_new_exception_msg_varg(&mp_type_SyntaxError, "label '%s' not defined", qstr_str(label_qstr)));
+        emit_inline_thumb_error_exc(emit, mp_obj_new_exception_msg_varg(&mp_type_SyntaxError, "label '%q' not defined", label_qstr));
     }
     return 0;
 }
@@ -363,8 +363,8 @@ STATIC void emit_inline_thumb_op(emit_inline_asm_t *emit, qstr op, mp_uint_t n_a
     // three_args =
     // "subs", RLO, RLO, I3, asm_thumb_subs_reg_reg_i3
 
-    const char *op_str = qstr_str(op);
-    mp_uint_t op_len = strlen(op_str);
+    mp_uint_t op_len;
+    const char *op_str = (const char*)qstr_data(op, &op_len);
 
     if (n_args == 0) {
         if (strcmp(op_str, "nop") == 0) {
