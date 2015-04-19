@@ -44,7 +44,7 @@ STATIC void none_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_
 
     #if MICROPY_ALLOW_PAUSE_VM
     if (self_in == &mp_const__vm_pause_obj){
-        print(env, "! (MICROPY_ALLOW_PAUSE_VM)");
+        mp_print_str(print, "! (MICROPY_ALLOW_PAUSE_VM)");
     }
     #endif
 }
