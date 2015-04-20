@@ -43,6 +43,17 @@
 #define UPDATE_LAST_CODE_STATE()
 #endif
 
+/* check chance level;
+  first chance: if trying enter iter, special method, etc.
+  second chance: ?.
+  VM_IS_PAUSEABLE will used for MP_CPU_SOFT_CHECK()?
+*/
+#define MP_LIMIT_CPU() do { \
+    if (!MP_CPU_CHECK(){ \
+        assert(0); \
+    } \
+} while (0)
+
 #if 0
 #define TRACE(ip) printf("sp=" INT_FMT " ", sp - code_state->sp); mp_bytecode_print2(ip, 1);
 #else
@@ -108,8 +119,11 @@ typedef enum {
         return MP_VM_RETURN_PAUSE; \
     } \
 } while (0)
+#define VM_IS_PAUSEABLE() (is_pauseable)
+// in _mp_execute_bytecode
 #else
 #define VM_PAUSE_POINT()
+#define VM_IS_PAUSEABLE() (false)
 #endif
 
 // fastn has items in reverse order (fastn[0] is local[0], fastn[-1] is local[1], etc)
@@ -133,7 +147,7 @@ mp_vm_return_kind_t mp_execute_bytecode(mp_code_state *code_state, volatile mp_o
         first_code_state = first_code_state->prev;
     }
     
-    mp_vm_return_kind_t kind = mp_resume_bytecode(first_code_state, code_state, inject_exc);
+    mp_vm_return_kind_t kind = _mp_execute_bytecode(false, first_code_state, code_state, inject_exc);
     mp_obj_t exc = NULL;
     
     switch (kind){
@@ -153,6 +167,10 @@ mp_vm_return_kind_t mp_execute_bytecode(mp_code_state *code_state, volatile mp_o
 }
 
 mp_vm_return_kind_t mp_resume_bytecode(mp_code_state *first_code_state, mp_code_state *code_state, volatile mp_obj_t inject_exc) {
+    return _mp_execute_bytecode(true, first_code_state, code_state, inject_exc);
+}
+
+mp_vm_return_kind_t _mp_execute_bytecode(bool is_pauseable, mp_code_state *first_code_state, mp_code_state *code_state, volatile mp_obj_t inject_exc) {
 #endif
 #define SELECTIVE_EXC_IP (0)
 #if SELECTIVE_EXC_IP
@@ -165,6 +183,7 @@ mp_vm_return_kind_t mp_resume_bytecode(mp_code_state *first_code_state, mp_code_
 #if MICROPY_OPT_COMPUTED_GOTO
     #include "py/vmentrytable.h"
     #define DISPATCH() do { \
+        MP_CPU_CHECK(); \
         TRACE(ip); \
         MARK_EXC_IP_GLOBAL(); \
         goto *entry_table[*ip++]; \
@@ -233,6 +252,7 @@ dispatch_loop:
 #if MICROPY_OPT_COMPUTED_GOTO
                 DISPATCH();
 #else
+                MP_CPU_CHECK();
                 TRACE(ip);
                 MARK_EXC_IP_GLOBAL();
                 switch (*ip++) {

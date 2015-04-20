@@ -40,6 +40,7 @@
 #include "py/runtime0.h"
 #include "py/runtime.h"
 #include "py/builtin.h"
+#include "py/cpuctrl.h"
 #include "py/stackctrl.h"
 #include "py/gc.h"
 
@@ -91,6 +92,9 @@ void mp_init(void) {
     // start with no extensions to builtins
     MP_STATE_VM(mp_module_builtins_override_dict) = NULL;
     #endif
+    
+    // init cpu limit control
+    mp_cpu_ctrl_init();
 }
 
 void mp_deinit(void) {

@@ -140,6 +140,12 @@ typedef struct _mp_state_vm_t {
     #if MICROPY_ENABLE_EMERGENCY_EXCEPTION_BUF && MICROPY_EMERGENCY_EXCEPTION_BUF_SIZE == 0
     mp_int_t mp_emergency_exception_buf_size;
     #endif
+    
+    #if MICROPY_LIMIT_CPU
+    mp_uint_t maximum_opcodes_executeable;
+    mp_uint_t current_opcodes_executed;
+    mp_int_t cpu_limit_level;
+    #endif    
 } mp_state_vm_t;
 
 // This structure combines the above 2 structures, and adds the local
