@@ -71,6 +71,67 @@ STATIC int handle_uncaught_exception(mp_obj_t exc) {
     return 1;
 }
 
+typedef struct _mp_microthread_t {
+    mp_code_state *code_state;
+    mp_vm_return_kind_t last_kind;
+
+    mp_obj_dict_t *dict_locals;
+    mp_obj_dict_t *dict_globals;
+
+    #if MICROPY_LIMIT_CPU
+    mp_uint_t cpu_max_opcodes_executeable;
+    mp_uint_t cpu_min_opcodes_executeable;
+    mp_uint_t cpu_current_opcodes_executed;
+    #endif
+    
+    /* any value in MP_STATE_xxx(...) */
+} mp_microthread_t;
+
+STATIC mp_microthread_t *mp_new_microthread(mp_obj_t module_fun){
+    mp_code_state *code_state = mp_obj_fun_bc_prepare_codestate(module_fun, 0, 0, NULL);
+    code_state->current = code_state;
+    
+    mp_microthread_t *microthread = m_new_obj(mp_microthread_t);
+    microthread->code_state = code_state;
+    microthread->last_kind = MP_VM_RETURN_PAUSE;
+    microthread->dict_locals = MP_STATE_CTX(dict_locals);
+    microthread->dict_globals = MP_STATE_CTX(dict_globals);
+    microthread->cpu_max_opcodes_executeable = MP_STATE_VM(cpu_max_opcodes_executeable);
+    microthread->cpu_min_opcodes_executeable = MP_STATE_VM(cpu_min_opcodes_executeable);
+    microthread->cpu_current_opcodes_executed = 0;
+    return microthread;
+}
+
+STATIC void mp_load_microthread(mp_microthread_t *microthread){
+    MP_STATE_CTX(dict_locals) = microthread->dict_locals;
+    MP_STATE_CTX(dict_globals) = microthread->dict_globals;
+    MP_STATE_VM(cpu_max_opcodes_executeable) = microthread->cpu_max_opcodes_executeable;
+    MP_STATE_VM(cpu_min_opcodes_executeable) = microthread->cpu_min_opcodes_executeable; 
+    MP_STATE_VM(cpu_current_opcodes_executed) = microthread->cpu_current_opcodes_executed;
+}
+
+STATIC void mp_store_microthread(mp_microthread_t *microthread){
+    microthread->dict_locals = MP_STATE_CTX(dict_locals);
+    microthread->dict_globals = MP_STATE_CTX(dict_globals);
+    microthread->cpu_max_opcodes_executeable = MP_STATE_VM(cpu_max_opcodes_executeable);
+    microthread->cpu_min_opcodes_executeable = MP_STATE_VM(cpu_min_opcodes_executeable);
+    microthread->cpu_current_opcodes_executed = microthread->cpu_current_opcodes_executed;
+}
+
+
+STATIC mp_vm_return_kind_t mp_resume_microthread(mp_microthread_t *microthread){
+    mp_load_microthread(microthread);
+
+    mp_code_state *code_state = microthread->code_state;
+    mp_vm_return_kind_t kind = mp_resume_bytecode(code_state, code_state->current, MP_OBJ_NULL);
+    microthread->last_kind = kind;
+
+    mp_store_microthread(microthread);
+
+    return kind;
+}
+
+
 // Returns standard error codes: 0 for success, 1 for all other errors,
 // except if FORCED_EXIT bit is set then script raised SystemExit and the
 // value of the exit is in the lower 8 bits of the return value
@@ -94,14 +155,25 @@ STATIC int execute_from_lexer(mp_lexer_t *lex) {
         // execute it
         // mp_call_function_0(module_fun);
         // mp_call_function_0(module_fun) are changed to:
-
-        mp_code_state *code_state = mp_obj_fun_bc_prepare_codestate(module_fun, 0, 0, NULL);
+        mp_code_state *code_state = NULL;
         mp_vm_return_kind_t kind = MP_VM_RETURN_PAUSE;
-        code_state->current = code_state;
+        
+        mp_microthread_t *current_thread = NULL;
+        mp_microthread_t *threadA = mp_new_microthread(module_fun);
+        mp_microthread_t *threadB = mp_new_microthread(module_fun);
+        current_thread = threadA;
 
         while (true){ // it will be mainloop.
-            kind = mp_resume_bytecode(code_state, code_state->current, MP_OBJ_NULL);
-
+            code_state = current_thread->code_state;
+            kind = mp_resume_microthread(current_thread);
+            
+            // it will replace by custom manager.
+            if (current_thread == threadA){
+                current_thread = threadB;
+            } else {
+                current_thread = threadA;
+            }
+             
             if (kind == MP_VM_RETURN_PAUSE){
                 mp_cpu_clear_usage();
                 // TODO: change object to throw event?
