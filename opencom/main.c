@@ -42,6 +42,7 @@
 #include "py/repl.h"
 #include "py/gc.h"
 #include "py/bc.h"
+#include "py/cpuctrl.h"
 #include "py/stackctrl.h"
 #include "genhdr/py-version.h"
 
@@ -100,10 +101,13 @@ STATIC int execute_from_lexer(mp_lexer_t *lex) {
 
         while (true){ // it will be mainloop.
             kind = mp_resume_bytecode(code_state, code_state->current, MP_OBJ_NULL);
-            
+
             if (kind == MP_VM_RETURN_PAUSE){
+                mp_cpu_clear_usage();
                 // TODO: change object to throw event?
                 *(code_state->sp) = mp_const_true;
+            } else if (kind == MP_VM_RETURN_FORCE_PAUSE) {
+                mp_cpu_clear_usage();
             } else if (kind == MP_VM_RETURN_EXCEPTION) {
                 nlr_raise(code_state->state[code_state->n_state - 1]);
                 return 1;
@@ -174,6 +178,8 @@ int main(int argc, char **argv) {
     
     mp_init();
     mp_obj_list_init(mp_sys_argv, 0);
+    mp_cpu_set_limit(0xFFFFF);
+    mp_cpu_set_soft_limit(mp_cpu_get_limit() >> 2);
 
     const int NOTHING_EXECUTED = -2;
     int ret = NOTHING_EXECUTED;
