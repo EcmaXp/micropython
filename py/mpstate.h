@@ -142,9 +142,9 @@ typedef struct _mp_state_vm_t {
     #endif
     
     #if MICROPY_LIMIT_CPU
-    mp_uint_t maximum_opcodes_executeable;
-    mp_uint_t current_opcodes_executed;
-    mp_int_t cpu_limit_level;
+    mp_uint_t cpu_max_opcodes_executeable;
+    mp_uint_t cpu_min_opcodes_executeable;
+    mp_uint_t cpu_current_opcodes_executed;
     #endif    
 } mp_state_vm_t;
 

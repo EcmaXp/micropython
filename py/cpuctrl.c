@@ -27,30 +27,54 @@
 #include "py/mpstate.h"
 #include "py/obj.h"
 #include "py/runtime.h"
+#include "py/cpuctrl.h"
 
 void mp_cpu_ctrl_init(void) {
 #if MICROPY_LIMIT_CPU
-    /* TODO:
+    // hard limit
+    MP_STATE_VM(cpu_max_opcodes_executeable) = -1;
+    
+    // soft limit = hard limit / 2
+    MP_STATE_VM(cpu_min_opcodes_executeable) = MP_STATE_VM(cpu_max_opcodes_executeable) >> 1;
+
+    // executed opcodes: zero!
+    MP_STATE_VM(cpu_current_opcodes_executed) = 0;
+    
+    /* TODO: limit level
+            PAUSE ALLOWED / PAUSE DISALLOWED
+    - soft: just pause      continue execute
+    - hard: just pause      force stop
+    - error: raise error    raise error
+    error mode are not defined yet.
+    
+    - hard: cpu_max_opcodes_executeable
+    - soft: cpu_min_opcodes_executeable
+    - error: ?
     
     */
-    MP_STATE_CTX(maximum_opcodes_executeable) = -1;
-    MP_STATE_CTX(current_opcodes_executed) = 0;
-    MP_STATE_CTX(cpu_limit_level) = 0;
 #endif
 }
 
 #if MICROPY_LIMIT_CPU
 
-void mp_cpu_set_limit(mp_uint_t maximum_opcodes_executeable){
-    MP_STATE_VM(maximum_opcodes_executeable) = maximum_opcodes_executeable;
+void mp_cpu_set_limit(mp_uint_t total_opcodes_executeable){
+    MP_STATE_VM(cpu_max_opcodes_executeable) = total_opcodes_executeable;
 }
 
 mp_uint_t mp_cpu_get_limit(void){
-    return MP_STATE_VM(maximum_opcodes_executeable);
+    return MP_STATE_VM(cpu_max_opcodes_executeable);
+}
+
+void mp_cpu_set_soft_limit(mp_uint_t total_opcodes_executeable){
+    MP_STATE_VM(cpu_min_opcodes_executeable) = total_opcodes_executeable;
+}
+
+mp_uint_t mp_cpu_get_soft_limit(void){
+    return MP_STATE_VM(cpu_min_opcodes_executeable);
 }
 
 void mp_cpu_set_usage(mp_uint_t current_opcodes_executed){
-    MP_STATE_VM(current_opcodes_executed) = current_opcodes_executed;
+    MP_STATE_VM(cpu_current_opcodes_executed) = current_opcodes_executed;
 }
 
 void mp_cpu_clear_usage(void){
@@ -58,15 +82,7 @@ void mp_cpu_clear_usage(void){
 }
 
 mp_uint_t mp_cpu_usage(void){
-    return MP_STATE_VM(current_opcodes_executed);    
-}
-
-inline void mp_cpu_opcode_executed(void){
-    MP_STATE_VM(current_opcodes_executed)++;
-}
-
-inline bool mp_cpu_is_limited(void){
-    return MP_STATE_VM(maximum_opcodes_executeable) <= MP_STATE_VM(current_opcodes_executed);
+    return MP_STATE_VM(cpu_current_opcodes_executed);    
 }
 
 /* TODO: should be limit

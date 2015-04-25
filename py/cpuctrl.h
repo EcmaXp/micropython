@@ -32,22 +32,39 @@ void mp_cpu_ctrl_init(void);
 
 #if MICROPY_LIMIT_CPU
 
-#define MP_CPU_SOFT_CHECK() (true)
-// (true) => (mp_cpu_is_soft_limited())
-#define MP_CPU_CHECK() (mp_cpu_opcode_executed(), mp_cpu_is_limited())
+#define MP_CPU_EXECUTED() (_mp_cpu_opcode_executed())
+#define MP_CPU_SOFT_CHECK() (!_mp_cpu_is_soft_limited())
+#define MP_CPU_CHECK() (!_mp_cpu_is_limited())
 
-void mp_cpu_set_limit(mp_uint_t maximum_opcodes_executeable);
+void mp_cpu_set_limit(mp_uint_t total_opcodes_executeable);
 mp_uint_t mp_cpu_get_limit(void);
+
+void mp_cpu_set_soft_limit(mp_uint_t total_opcodes_executeable);
+mp_uint_t mp_cpu_get_soft_limit(void);
 
 void mp_cpu_set_usage(mp_uint_t current_opcodes_executed);
 void mp_cpu_clear_usage(void);
 mp_uint_t mp_cpu_usage(void);
 
-inline void mp_cpu_opcode_executed(void);
-inline bool mp_cpu_is_limited(void);
+// inline void _mp_cpu_opcode_executed(void);
+// inline bool _mp_cpu_is_limited(mp_uint_t cpu_current_opcodes_executed);
+// inline bool _mp_cpu_is_soft_limited(mp_uint_t cpu_current_opcodes_executed);
+
+inline void _mp_cpu_opcode_executed(void){
+    MP_STATE_VM(cpu_current_opcodes_executed)++;
+}
+
+inline bool _mp_cpu_is_limited(){
+    return MP_STATE_VM(cpu_max_opcodes_executeable) <= MP_STATE_VM(cpu_current_opcodes_executed); // cpu_current_opcodes_executed;
+}
+
+inline bool _mp_cpu_is_soft_limited(){
+    return MP_STATE_VM(cpu_min_opcodes_executeable) <= MP_STATE_VM(cpu_current_opcodes_executed); // cpu_current_opcodes_executed;
+}
 
 #else // MICROPY_LIMIT_CPU
 
+#define MP_CPU_EXECUTED()
 #define MP_CPU_SOFT_CHECK() (true)
 #define MP_CPU_CHECK() (true)
 

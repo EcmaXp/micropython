@@ -36,23 +36,7 @@
 #include "py/runtime.h"
 #include "py/bc0.h"
 #include "py/bc.h"
-
-#if MICROPY_KEEP_LAST_CODE_STATE
-#define UPDATE_LAST_CODE_STATE() first_code_state->current = code_state;
-#else
-#define UPDATE_LAST_CODE_STATE()
-#endif
-
-/* check chance level;
-  first chance: if trying enter iter, special method, etc.
-  second chance: ?.
-  VM_IS_PAUSEABLE will used for MP_CPU_SOFT_CHECK()?
-*/
-#define MP_LIMIT_CPU() do { \
-    if (!MP_CPU_CHECK(){ \
-        assert(0); \
-    } \
-} while (0)
+#include "py/cpuctrl.h"
 
 #if 0
 #define TRACE(ip) printf("sp=" INT_FMT " ", sp - code_state->sp); mp_bytecode_print2(ip, 1);
@@ -109,21 +93,53 @@ typedef enum {
     exc_sp--; /* pop back to previous exception handler */
 
 #if MICROPY_ALLOW_PAUSE_VM
-#define VM_PAUSE_POINT() do { \
+#define VM_PAUSE(return_value) do { \
+    code_state->ip = ip; \
+    code_state->sp = sp; \
+    code_state->exc_sp = MP_TAGPTR_MAKE(exc_sp, currently_in_except_block); \
+    UPDATE_LAST_CODE_STATE(); \
+    nlr_pop(); \
+    return (return_value); \
+} while (0)
+
+#define VM_PAUSE_POINT do { \
     if (sp[0] == mp_const__vm_pause){ \
-        code_state->ip = ip; \
-        code_state->sp = sp; \
-        code_state->exc_sp = MP_TAGPTR_MAKE(exc_sp, currently_in_except_block); \
-        UPDATE_LAST_CODE_STATE(); \
-        nlr_pop(); \
-        return MP_VM_RETURN_PAUSE; \
+        VM_PAUSE(MP_VM_RETURN_PAUSE); \
     } \
 } while (0)
 #define VM_IS_PAUSEABLE() (is_pauseable)
 // in _mp_execute_bytecode
 #else
-#define VM_PAUSE_POINT()
+#define VM_PAUSE(return_value) assert(0);
 #define VM_IS_PAUSEABLE() (false)
+#endif
+
+#if MICROPY_KEEP_LAST_CODE_STATE
+#define UPDATE_LAST_CODE_STATE() first_code_state->current = code_state;
+#else
+#define UPDATE_LAST_CODE_STATE()
+#endif
+
+#if MICROPY_ALLOW_PAUSE_VM && MICROPY_LIMIT_CPU
+#define VM_SOFT_PAUSE_POINT do { \
+    if (VM_IS_PAUSEABLE() && !MP_CPU_SOFT_CHECK()) {\
+        VM_PAUSE(MP_VM_RETURN_FORCE_PAUSE); \
+    } \
+} while (0)
+#else
+#define VM_SOFT_PAUSE_POINT
+#endif
+
+#if MICROPY_LIMIT_CPU
+#define VM_CPU_LIMIT() do { \
+    MP_CPU_EXECUTED(); \
+    if (!MP_CPU_CHECK()){ \
+        VM_SOFT_PAUSE_POINT; \
+        assert(0); \
+    } \
+} while (0)
+#else
+#define VM_CPU_LIMIT()
 #endif
 
 // fastn has items in reverse order (fastn[0] is local[0], fastn[-1] is local[1], etc)
@@ -134,6 +150,7 @@ typedef enum {
 //  MP_VM_RETURN_EXCEPTION, exception in fastn[0]
 #if MICROPY_ALLOW_PAUSE_VM
 //  MP_VM_RETURN_PAUSE, sp vaild, *sp accept resume value
+//  MP_VM_RETURN_FORCE_PAUSE, require execute library event processer (before resume)
     #if !MICROPY_KEEP_LAST_CODE_STATE
         #error MICROPY_ALLOW_PAUSE_VM require MICROPY_KEEP_LAST_CODE_STATE
     #endif
@@ -156,6 +173,7 @@ mp_vm_return_kind_t mp_execute_bytecode(mp_code_state *code_state, volatile mp_o
         case MP_VM_RETURN_EXCEPTION:
             return kind;
         case MP_VM_RETURN_PAUSE:
+        case MP_VM_RETURN_FORCE_PAUSE:
             exc = mp_obj_new_exception_msg(&mp_type_SystemError, "VM can't pauseable");
             nlr_raise(exc);
         default:
@@ -183,7 +201,7 @@ mp_vm_return_kind_t _mp_execute_bytecode(bool is_pauseable, mp_code_state *first
 #if MICROPY_OPT_COMPUTED_GOTO
     #include "py/vmentrytable.h"
     #define DISPATCH() do { \
-        MP_CPU_CHECK(); \
+        VM_CPU_LIMIT(); \
         TRACE(ip); \
         MARK_EXC_IP_GLOBAL(); \
         goto *entry_table[*ip++]; \
@@ -252,7 +270,7 @@ dispatch_loop:
 #if MICROPY_OPT_COMPUTED_GOTO
                 DISPATCH();
 #else
-                MP_CPU_CHECK();
+                VM_CPU_LIMIT();
                 TRACE(ip);
                 MARK_EXC_IP_GLOBAL();
                 switch (*ip++) {
@@ -975,7 +993,7 @@ unwind_jump:;
                     }
                     #endif
                     SET_TOP(mp_call_function_n_kw(*sp, unum & 0xff, (unum >> 8) & 0xff, sp + 1));
-                    VM_PAUSE_POINT();
+                    VM_PAUSE_POINT;
                     DISPATCH();
                 }
 
@@ -1014,7 +1032,7 @@ unwind_jump:;
                     }
                     #endif
                     SET_TOP(mp_call_method_n_kw_var(false, unum, sp));
-                    VM_PAUSE_POINT();
+                    VM_PAUSE_POINT;
                     DISPATCH();
                 }
 
@@ -1050,7 +1068,7 @@ unwind_jump:;
                     }
                     #endif
                     SET_TOP(mp_call_method_n_kw(unum & 0xff, (unum >> 8) & 0xff, sp));
-                    VM_PAUSE_POINT();
+                    VM_PAUSE_POINT;
                     DISPATCH();
                 }
 
@@ -1089,7 +1107,7 @@ unwind_jump:;
                     }
                     #endif
                     SET_TOP(mp_call_method_n_kw_var(true, unum, sp));
-                    VM_PAUSE_POINT();
+                    VM_PAUSE_POINT;
                     DISPATCH();
                 }
 

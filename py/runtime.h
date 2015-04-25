@@ -35,6 +35,7 @@ typedef enum {
     MP_VM_RETURN_EXCEPTION,
 #if MICROPY_ALLOW_PAUSE_VM
     MP_VM_RETURN_PAUSE,
+    MP_VM_RETURN_FORCE_PAUSE,
 #endif
 } mp_vm_return_kind_t;
 

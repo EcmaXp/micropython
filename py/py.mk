@@ -49,6 +49,7 @@ PY_O_BASENAME = \
 	emitglue.o \
 	runtime.o \
 	nativeglue.o \
+	cpuctrl.o \
 	stackctrl.o \
 	argcheck.o \
 	warning.o \
@@ -156,6 +157,9 @@ $(PY_BUILD)/emitnthumb.o: py/emitnative.c
 $(PY_BUILD)/emitnarm.o: CFLAGS += -DN_ARM
 $(PY_BUILD)/emitnarm.o: py/emitnative.c
 	$(call compile_c)
+
+# optimising cpuctrl for speed. (really?)
+$(PY_BUILD)/cpuctrl.o: CFLAGS += $(CSUPEROPT)
 
 # optimising gc for speed; 5ms down to 4ms on pybv2
 $(PY_BUILD)/gc.o: CFLAGS += $(CSUPEROPT)
