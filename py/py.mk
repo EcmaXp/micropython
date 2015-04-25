@@ -56,6 +56,7 @@ PY_O_BASENAME = \
 	map.o \
 	obj.o \
 	objarray.o \
+	objattrtuple.o \
 	objbool.o \
 	objboundmeth.o \
 	objcell.o \

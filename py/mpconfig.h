@@ -186,6 +186,11 @@
 #define MICROPY_EMIT_INLINE_THUMB (0)
 #endif
 
+// Whether to enable float support in the Thumb2 inline assembler
+#ifndef MICROPY_EMIT_INLINE_THUMB_FLOAT
+#define MICROPY_EMIT_INLINE_THUMB_FLOAT (1)
+#endif
+
 // Whether to emit ARM native code
 #ifndef MICROPY_EMIT_ARM
 #define MICROPY_EMIT_ARM (0)
@@ -495,6 +500,12 @@ typedef double mp_float_t;
 // This is rarely used, but adds ~0.5K of code.
 #ifndef MICROPY_PY_ARRAY_SLICE_ASSIGN
 #define MICROPY_PY_ARRAY_SLICE_ASSIGN (0)
+#endif
+
+// Whether to support attrtuple type (MicroPython extension)
+// It provides space-efficient tuples with attribute access
+#ifndef MICROPY_PY_ATTRTUPLE
+#define MICROPY_PY_ATTRTUPLE (1)
 #endif
 
 // Whether to provide "collections" module
