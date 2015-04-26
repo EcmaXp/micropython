@@ -106,8 +106,6 @@ STATIC mp_microthread_t *new_microthread_from_file(const char *threadname, const
     #if MICROPY_PY___FILE__
     MP_ENTER_MICROTHREAD(microthread);
     mp_store_global(MP_QSTR___file__, MP_OBJ_NEW_QSTR(qstr_from_str(filename)));
-    // TODO: find what cause error when throw MP_OBJ_NEW_QSTR(lex->source_name)?
-    // ERROR: MP_OBJ_NEW_QSTR(lex->source_name) == MP_OBJ_NEW_QSTR(qstr_from_str(filename))?
     MP_EXIT_MICROTHREAD(microthread);
     #endif
 
@@ -144,36 +142,56 @@ STATIC int do_file(const char *filename) {
     }
 }
 
+
+STATIC mp_microthread_t *new_microthread_auto(const char *name) {
+    // SECURITY DANGEROUS!
+    // what function will free module_path?
+    /* vstr_t *module_path = vstr_new();
+    vstr_add_str(module_path, "../../mpoc-rom/");
+    vstr_add_str(module_path, name);
+    vstr_add_str(module_path, ".py");
+    char *module_path = vstr_str(module_path);
+    */
+    
+    char *module_path = "../../mpoc-rom/bios.py";
+
+    mp_microthread_t *microthread = new_microthread_from_file(name, module_path);
+    if (microthread == NULL){
+        // TODO: change message later.
+        mp_obj_t exc = mp_obj_new_exception_msg(&mp_type_SystemError, "Make new microthread are failed.");
+        nlr_raise(exc);
+    }
+    
+    return microthread;
+} 
+
 STATIC int run_bios(void) {
     nlr_buf_t nlr;
     if (nlr_push(&nlr) == 0) {
-        // execute it
+        // bios
+        mp_microthread_t *thread_bios = new_microthread_auto("bios");
 
-        mp_microthread_t *thread_biosA = new_microthread_from_file("bios", "../../mpoc-rom/bios.py");
-        if (thread_biosA == NULL){
-            nlr_pop();
-            return 1;
-        }
+        // main file
+        mp_microthread_t *thread_main = new_microthread_auto("main");
         
-        mp_microthread_t *thread_biosB = new_microthread_from_file("biosB", "../../mpoc-rom/bios.py");
-        if (thread_biosB == NULL){
-            nlr_pop();
-            return 1;
-        }
+        // dev (opencom dev)
+        mp_microthread_t *thread_dev = new_microthread_auto("dev");
+        
+        mp_microthread_t *current_thread = thread_bios;
 
-        mp_microthread_t *current_thread = thread_biosA;
-
-        while (true){ // it will be mainloop.
+        while (true){
             mp_code_state *code_state = current_thread->code_state;
             mp_vm_return_kind_t kind = mp_resume_microthread(current_thread);
             
             // it will replace by custom manager.
-            if (current_thread == thread_biosA){
-                current_thread = thread_biosB;
-            } else {
-                current_thread = thread_biosA;
+            if (current_thread == thread_bios) {
+                current_thread = thread_main;
+            } else if (current_thread == thread_main) {
+                current_thread = thread_dev;
+            } else if (current_thread == thread_dev) {
+                current_thread = thread_bios;
             }
-             
+            
             if (kind == MP_VM_RETURN_PAUSE){
                 mp_cpu_clear_usage();
                 // TODO: change object to throw event?
@@ -261,7 +279,7 @@ int main(int argc, char **argv) {
         } else {
             if (a + 1 <= argc){
                 set_sys_argv(argv, argc, a);
-                if (strcmp(argv[a], "bios!!")){
+                if (strcmp(argv[a], "run!") == 0){
                     ret = run_bios();                
                 } else {
                     ret = do_file(argv[a]);

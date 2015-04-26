@@ -50,6 +50,7 @@ typedef struct _mp_microthread_t {
     /* any value in MP_STATE_xxx(...) */
 } mp_microthread_t;
 
+mp_microthread_t *mp_current_microthread;
 mp_microthread_t *_mp_fallback_microthread;
 
 mp_microthread_t *mp_new_microthread(const char *thread_name, mp_obj_t fun_bc);

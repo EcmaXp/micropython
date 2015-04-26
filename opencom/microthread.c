@@ -80,9 +80,11 @@ void mp_init_microthread(void){
     fallback_thread->cpu_current_opcodes_executed = MP_STATE_VM(cpu_current_opcodes_executed);
     
     _mp_fallback_microthread = fallback_thread;
+    mp_current_microthread = _mp_fallback_microthread;
 }
 
 void mp_load_microthread(mp_microthread_t *microthread){
+    mp_current_microthread = microthread;
     MP_STATE_CTX(dict_locals) = microthread->dict_locals;
     MP_STATE_CTX(dict_globals) = microthread->dict_globals;
     MP_STATE_VM(cpu_max_opcodes_executeable) = microthread->cpu_max_opcodes_executeable;
