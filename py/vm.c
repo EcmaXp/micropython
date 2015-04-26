@@ -103,7 +103,7 @@ typedef enum {
 } while (0)
 
 #define VM_PAUSE_POINT do { \
-    if (sp[0] == mp_const__vm_pause){ \
+    if (sp[0] == MP_OBJ_PAUSE_VM){ \
         VM_PAUSE(MP_VM_RETURN_PAUSE); \
     } \
 } while (0)
@@ -1344,8 +1344,6 @@ exception_handler:
             // with selective ip, we store the ip 1 byte past the opcode, so move ptr back
             code_state->ip -= 1;
             #endif
-
-            /* TODO: mp_const__vm_pause to VMPauseException */
 
             // check if it's a StopIteration within a for block
             if (*code_state->ip == MP_BC_FOR_ITER && mp_obj_is_subclass_fast(mp_obj_get_type(nlr.ret_val), &mp_type_StopIteration)) {
