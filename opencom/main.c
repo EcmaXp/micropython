@@ -44,6 +44,7 @@
 #include "py/bc.h"
 #include "py/cpuctrl.h"
 #include "py/stackctrl.h"
+#include "microthread.h"
 #include "genhdr/py-version.h"
 
 // Command line options, with their defaults
@@ -71,107 +72,106 @@ STATIC int handle_uncaught_exception(mp_obj_t exc) {
     return 1;
 }
 
-typedef struct _mp_microthread_t {
-    mp_code_state *code_state;
-    mp_vm_return_kind_t last_kind;
+STATIC mp_obj_t new_module_from_lexer(mp_lexer_t *lex) {
+    qstr source_name = lex->source_name;
 
-    mp_obj_dict_t *dict_locals;
-    mp_obj_dict_t *dict_globals;
+    mp_parse_node_t pn = mp_parse(lex, MP_PARSE_FILE_INPUT);
+    /* if (pn == NULL){
+        return NULL;
+    } */
+    
+    mp_obj_t module_fun = mp_compile(pn, source_name, emit_opt, false);
+    /* if (module_fun == NULL){
+        return NULL;
+    } */
+    
+    return module_fun;
+}
 
-    #if MICROPY_LIMIT_CPU
-    mp_uint_t cpu_max_opcodes_executeable;
-    mp_uint_t cpu_min_opcodes_executeable;
-    mp_uint_t cpu_current_opcodes_executed;
+STATIC mp_microthread_t *new_microthread_from_file(const char *threadname, const char *filename) {
+    mp_lexer_t *lex = mp_lexer_new_from_file(filename);
+    if (lex == NULL) {
+        printf("MemoryError: lexer could not allocate memory\n");
+        return NULL;
+    }
+    
+    mp_obj_t module_fun = new_module_from_lexer(lex);
+    if (module_fun == NULL) {
+        printf("MemoryError: new_module_from_lexer could not allocate memory\n");
+        return NULL;
+    }
+    
+    mp_microthread_t *microthread = mp_new_microthread(threadname, module_fun);
+    
+    #if MICROPY_PY___FILE__
+    MP_ENTER_MICROTHREAD(microthread);
+    mp_store_global(MP_QSTR___file__, MP_OBJ_NEW_QSTR(qstr_from_str(filename)));
+    // TODO: find what cause error when throw MP_OBJ_NEW_QSTR(lex->source_name)?
+    // ERROR: MP_OBJ_NEW_QSTR(lex->source_name) == MP_OBJ_NEW_QSTR(qstr_from_str(filename))?
+    MP_EXIT_MICROTHREAD(microthread);
     #endif
-    
-    /* any value in MP_STATE_xxx(...) */
-} mp_microthread_t;
 
-STATIC mp_microthread_t *mp_new_microthread(mp_obj_t module_fun){
-    mp_code_state *code_state = mp_obj_fun_bc_prepare_codestate(module_fun, 0, 0, NULL);
-    code_state->current = code_state;
-    
-    mp_microthread_t *microthread = m_new_obj(mp_microthread_t);
-    microthread->code_state = code_state;
-    microthread->last_kind = MP_VM_RETURN_PAUSE;
-    microthread->dict_locals = MP_STATE_CTX(dict_locals);
-    microthread->dict_globals = MP_STATE_CTX(dict_globals);
-    microthread->cpu_max_opcodes_executeable = MP_STATE_VM(cpu_max_opcodes_executeable);
-    microthread->cpu_min_opcodes_executeable = MP_STATE_VM(cpu_min_opcodes_executeable);
-    microthread->cpu_current_opcodes_executed = 0;
     return microthread;
 }
 
-STATIC void mp_load_microthread(mp_microthread_t *microthread){
-    MP_STATE_CTX(dict_locals) = microthread->dict_locals;
-    MP_STATE_CTX(dict_globals) = microthread->dict_globals;
-    MP_STATE_VM(cpu_max_opcodes_executeable) = microthread->cpu_max_opcodes_executeable;
-    MP_STATE_VM(cpu_min_opcodes_executeable) = microthread->cpu_min_opcodes_executeable; 
-    MP_STATE_VM(cpu_current_opcodes_executed) = microthread->cpu_current_opcodes_executed;
-}
-
-STATIC void mp_store_microthread(mp_microthread_t *microthread){
-    microthread->dict_locals = MP_STATE_CTX(dict_locals);
-    microthread->dict_globals = MP_STATE_CTX(dict_globals);
-    microthread->cpu_max_opcodes_executeable = MP_STATE_VM(cpu_max_opcodes_executeable);
-    microthread->cpu_min_opcodes_executeable = MP_STATE_VM(cpu_min_opcodes_executeable);
-    microthread->cpu_current_opcodes_executed = microthread->cpu_current_opcodes_executed;
-}
-
-
-STATIC mp_vm_return_kind_t mp_resume_microthread(mp_microthread_t *microthread){
-    mp_load_microthread(microthread);
-
-    mp_code_state *code_state = microthread->code_state;
-    mp_vm_return_kind_t kind = mp_resume_bytecode(code_state, code_state->current, MP_OBJ_NULL);
-    microthread->last_kind = kind;
-
-    mp_store_microthread(microthread);
-
-    return kind;
-}
-
-
-// Returns standard error codes: 0 for success, 1 for all other errors,
-// except if FORCED_EXIT bit is set then script raised SystemExit and the
-// value of the exit is in the lower 8 bits of the return value
-STATIC int execute_from_lexer(mp_lexer_t *lex) {
-    if (lex == NULL) {
-        printf("MemoryError: lexer could not allocate memory\n");
-        return 1;
-    }
-
+STATIC int do_file(const char *filename) {
     nlr_buf_t nlr;
     if (nlr_push(&nlr) == 0) {
-        qstr source_name = lex->source_name;
-
+        mp_lexer_t *lex = mp_lexer_new_from_file(filename);
+        if (lex == NULL) {
+            printf("MemoryError: lexer could not allocate memory\n");
+            return 1;
+        }
+        
+        mp_obj_t module_fun = new_module_from_lexer(lex);
+        if (module_fun == NULL) {
+            printf("MemoryError: new_module_from_lexer could not allocate memory\n");
+            return 1;
+        }
+        
         #if MICROPY_PY___FILE__
-        mp_store_global(MP_QSTR___file__, MP_OBJ_NEW_QSTR(source_name));
+        mp_store_global(MP_QSTR___file__, MP_OBJ_NEW_QSTR(lex->source_name));
         #endif
 
-        mp_parse_node_t pn = mp_parse(lex, MP_PARSE_FILE_INPUT);
-        mp_obj_t module_fun = mp_compile(pn, source_name, emit_opt, false);
-
         // execute it
-        // mp_call_function_0(module_fun);
-        // mp_call_function_0(module_fun) are changed to:
-        mp_code_state *code_state = NULL;
-        mp_vm_return_kind_t kind = MP_VM_RETURN_PAUSE;
+        mp_call_function_0(module_fun);
         
-        mp_microthread_t *current_thread = NULL;
-        mp_microthread_t *threadA = mp_new_microthread(module_fun);
-        mp_microthread_t *threadB = mp_new_microthread(module_fun);
-        current_thread = threadA;
+        nlr_pop();
+        return 0;
+    } else {
+        // uncaught exception
+        return handle_uncaught_exception((mp_obj_t)nlr.ret_val);
+    }
+}
+
+STATIC int run_bios(void) {
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) == 0) {
+        // execute it
+
+        mp_microthread_t *thread_biosA = new_microthread_from_file("bios", "../../mpoc-rom/bios.py");
+        if (thread_biosA == NULL){
+            nlr_pop();
+            return 1;
+        }
+        
+        mp_microthread_t *thread_biosB = new_microthread_from_file("biosB", "../../mpoc-rom/bios.py");
+        if (thread_biosB == NULL){
+            nlr_pop();
+            return 1;
+        }
+
+        mp_microthread_t *current_thread = thread_biosA;
 
         while (true){ // it will be mainloop.
-            code_state = current_thread->code_state;
-            kind = mp_resume_microthread(current_thread);
+            mp_code_state *code_state = current_thread->code_state;
+            mp_vm_return_kind_t kind = mp_resume_microthread(current_thread);
             
             // it will replace by custom manager.
-            if (current_thread == threadA){
-                current_thread = threadB;
+            if (current_thread == thread_biosA){
+                current_thread = thread_biosB;
             } else {
-                current_thread = threadA;
+                current_thread = thread_biosA;
             }
              
             if (kind == MP_VM_RETURN_PAUSE){
@@ -185,13 +185,12 @@ STATIC int execute_from_lexer(mp_lexer_t *lex) {
                 return 1;
             } else {
                 assert(code_state == code_state);
+                code_state->current = NULL;
                 // maybe yield or return?
                 break;
             }
         }
-        
-        code_state->current = NULL;
-        
+
         nlr_pop();
         return 0;
     } else {
@@ -200,10 +199,6 @@ STATIC int execute_from_lexer(mp_lexer_t *lex) {
     }
 }
 
-STATIC int do_file(const char *file) {
-    mp_lexer_t *lex = mp_lexer_new_from_file(file);
-    return execute_from_lexer(lex);
-}
 
 STATIC void set_sys_argv(char *argv[], int argc, int start_arg) {
     for (int i = start_arg; i < argc; i++) {
@@ -212,7 +207,7 @@ STATIC void set_sys_argv(char *argv[], int argc, int start_arg) {
 }
 
 STATIC int usage(char **argv) {
-    printf("usage: ./micropython [-X emit=bytecode] file [arg ...]\n");
+    printf("usage: ./micropython [-X emit=bytecode] file|bios!! [arg ...]\n");
     return 1;
 }
 
@@ -252,6 +247,7 @@ int main(int argc, char **argv) {
     mp_obj_list_init(mp_sys_argv, 0);
     mp_cpu_set_limit(0xFFFFF);
     mp_cpu_set_soft_limit(mp_cpu_get_limit() >> 2);
+    mp_init_microthread();
 
     const int NOTHING_EXECUTED = -2;
     int ret = NOTHING_EXECUTED;
@@ -265,10 +261,13 @@ int main(int argc, char **argv) {
         } else {
             if (a + 1 <= argc){
                 set_sys_argv(argv, argc, a);
-                ret = do_file(argv[a]);
+                if (strcmp(argv[a], "bios!!")){
+                    ret = run_bios();                
+                } else {
+                    ret = do_file(argv[a]);
+                }
             } else {
-                // TODO: get bios path?
-                return usage(argv);
+                exit(usage(argv));
             }
         }
     }

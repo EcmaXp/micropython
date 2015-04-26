@@ -67,6 +67,7 @@ SRC_C = \
 	file.c \
 	modos.c \
 	modmpoc.c \
+	microthread.c \
 	$(SRC_MOD)
 
 
