@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2015 EcmaXp
+ * Copyright (c) 2015 sigsrv
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -49,8 +49,8 @@ void mp_cpu_ctrl_init(void) {
     
     - hard: cpu_max_opcodes_executeable
     - soft: cpu_min_opcodes_executeable
-    - error: ?
-    
+    - error: cpu_exc_opcodes_executeable
+    - inf mode: cpu_limit_level?
     */
 #endif
 }

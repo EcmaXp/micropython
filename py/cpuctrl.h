@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2015 EcmaXp
+ * Copyright (c) 2015 sigsrv
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -46,20 +46,16 @@ void mp_cpu_set_usage(mp_uint_t current_opcodes_executed);
 void mp_cpu_clear_usage(void);
 mp_uint_t mp_cpu_usage(void);
 
-// inline void _mp_cpu_opcode_executed(void);
-// inline bool _mp_cpu_is_limited(mp_uint_t cpu_current_opcodes_executed);
-// inline bool _mp_cpu_is_soft_limited(mp_uint_t cpu_current_opcodes_executed);
-
 inline void _mp_cpu_opcode_executed(void){
     MP_STATE_VM(cpu_current_opcodes_executed)++;
 }
 
 inline bool _mp_cpu_is_limited(){
-    return MP_STATE_VM(cpu_max_opcodes_executeable) <= MP_STATE_VM(cpu_current_opcodes_executed); // cpu_current_opcodes_executed;
+    return MP_STATE_VM(cpu_max_opcodes_executeable) <= MP_STATE_VM(cpu_current_opcodes_executed);
 }
 
 inline bool _mp_cpu_is_soft_limited(){
-    return MP_STATE_VM(cpu_min_opcodes_executeable) <= MP_STATE_VM(cpu_current_opcodes_executed); // cpu_current_opcodes_executed;
+    return MP_STATE_VM(cpu_min_opcodes_executeable) <= MP_STATE_VM(cpu_current_opcodes_executed);
 }
 
 #else // MICROPY_LIMIT_CPU
