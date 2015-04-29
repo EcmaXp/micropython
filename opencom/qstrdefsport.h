@@ -81,3 +81,13 @@ Q(SO_REUSEADDR)
 Q(mpoc)
 Q(test)
 Q(pause)
+
+// microthread
+Q(microthread)
+Q(umicrothread)
+Q(MicroThread)
+Q(new_microthread)
+Q(init)
+Q(init_microthread)
+Q(resume)
+Q(resume_microthread)

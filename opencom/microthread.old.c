@@ -43,7 +43,7 @@ mp_microthread_t *mp_new_microthread(const char *thread_name, mp_obj_t fun_bc){
     
     vstr_t *vstr_module_name = vstr_new();
     vstr_printf(vstr_module_name, "_microthread_%s", thread_name);
-    qstr qstr_module_name = qstr_from_str(vstr_str(vstr_module_name));
+    qstr qstr_module_name = qstr_from_str(vstr_null_terminated_str(vstr_module_name));
 
     mp_obj_t module_obj = mp_obj_new_module(qstr_module_name);
     mp_obj_module_t *module = (mp_obj_module_t *)module_obj;

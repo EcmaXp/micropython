@@ -30,6 +30,10 @@ else
 COPT = -Os #-DNDEBUG
 endif
 
+# msgpack (used for communicate with OpenComputers)
+# question: just static link with msgpack? (maybe no)
+LDFLAGS_MOD += -lmsgpack
+
 # On OSX, 'gcc' is a symlink to clang unless a real gcc is installed.
 # The unix port of micropython on OSX must be compiled with clang,
 # while cross-compile ports require gcc, so we test here for OSX and 
@@ -67,11 +71,11 @@ SRC_C = \
 	file.c \
 	modos.c \
 	modmpoc.c \
-	microthread.c \
+	modmicrothread.c \
 	$(SRC_MOD)
 
 
-OBJ = $(PY_O) $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
+OBJ = $(PY_O) $(addprefix $(BUILD)/, $(SRC_C:.c=.o)) 
 
 include ../py/mkrules.mk
 

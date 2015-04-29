@@ -27,12 +27,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include <msgpack.h>
+
 #include "py/nlr.h"
 #include "py/runtime.h"
 #include "py/objtuple.h"
-#include "microthread.h"
-
-// TODO: registered microthread will be here?
 
 STATIC mp_obj_t mod_mpoc_pause(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
     return MP_OBJ_PAUSE_VM;
@@ -52,6 +51,35 @@ STATIC const mp_type_fun_special_t mod_mpoc_pause_obj = {{&mp_type_fun_special}}
 
 
 STATIC mp_obj_t mod_mpoc_test(mp_obj_t asdf) {
+    /* msgpack::sbuffer is a simple buffer implementation. */
+    msgpack_sbuffer sbuf;
+    msgpack_sbuffer_init(&sbuf);
+
+    /* serialize values into the buffer using msgpack_sbuffer_write callback function. */
+    msgpack_packer pk;
+    msgpack_packer_init(&pk, &sbuf, msgpack_sbuffer_write);
+
+    msgpack_pack_array(&pk, 3);
+    msgpack_pack_int(&pk, 1);
+    msgpack_pack_true(&pk);
+    msgpack_pack_str(&pk, 7);
+    msgpack_pack_str_body(&pk, "example", 7);
+
+    /* deserialize the buffer into msgpack_object instance. */
+    /* deserialized object is valid during the msgpack_zone instance alive. */
+    msgpack_zone mempool;
+    msgpack_zone_init(&mempool, 2048);
+
+    msgpack_object deserialized;
+    msgpack_unpack(sbuf.data, sbuf.size, NULL, &mempool, &deserialized);
+
+    /* print the deserialized object. */
+    msgpack_object_print(stdout, deserialized);
+    puts("");
+
+    msgpack_zone_destroy(&mempool);
+    msgpack_sbuffer_destroy(&sbuf);
+
     return mp_const_none;
 }
 

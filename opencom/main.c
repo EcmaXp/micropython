@@ -44,8 +44,7 @@
 #include "py/bc.h"
 #include "py/cpuctrl.h"
 #include "py/stackctrl.h"
-#include "microthread.h"
-#include "genhdr/py-version.h"
+#include "genhdr/mpversion.h"
 
 // Command line options, with their defaults
 STATIC uint emit_opt = MP_EMIT_OPT_NONE;
@@ -88,7 +87,7 @@ STATIC mp_obj_t new_module_from_lexer(mp_lexer_t *lex) {
     return module_fun;
 }
 
-STATIC mp_microthread_t *new_microthread_from_file(const char *threadname, const char *filename) {
+STATIC mp_obj_t *new_module_from_file(const char *filename) {
     mp_lexer_t *lex = mp_lexer_new_from_file(filename);
     if (lex == NULL) {
         printf("MemoryError: lexer could not allocate memory\n");
@@ -101,35 +100,22 @@ STATIC mp_microthread_t *new_microthread_from_file(const char *threadname, const
         return NULL;
     }
     
-    mp_microthread_t *microthread = mp_new_microthread(threadname, module_fun);
+/*
+    build module in here.
     
     #if MICROPY_PY___FILE__
-    MP_ENTER_MICROTHREAD(microthread);
-    mp_store_global(MP_QSTR___file__, MP_OBJ_NEW_QSTR(qstr_from_str(filename)));
-    MP_EXIT_MICROTHREAD(microthread);
+    mp_store_global(MP_QSTR___file__, MP_OBJ_NEW_QSTR(lex->source_name));
     #endif
-
-    return microthread;
+*/
+    
+    return module_fun;
 }
 
 STATIC int do_file(const char *filename) {
     nlr_buf_t nlr;
     if (nlr_push(&nlr) == 0) {
-        mp_lexer_t *lex = mp_lexer_new_from_file(filename);
-        if (lex == NULL) {
-            printf("MemoryError: lexer could not allocate memory\n");
-            return 1;
-        }
-        
-        mp_obj_t module_fun = new_module_from_lexer(lex);
-        if (module_fun == NULL) {
-            printf("MemoryError: new_module_from_lexer could not allocate memory\n");
-            return 1;
-        }
-        
-        #if MICROPY_PY___FILE__
-        mp_store_global(MP_QSTR___file__, MP_OBJ_NEW_QSTR(lex->source_name));
-        #endif
+        // new module
+        mp_obj_t module_fun = new_module_from_file(filename);
 
         // execute it
         mp_call_function_0(module_fun);
@@ -142,72 +128,13 @@ STATIC int do_file(const char *filename) {
     }
 }
 
-
-STATIC mp_microthread_t *new_microthread_auto(const char *name) {
-    // SECURITY DANGEROUS!
-    // what function will free module_path?
-    /* vstr_t *module_path = vstr_new();
-    vstr_add_str(module_path, "../../mpoc-rom/");
-    vstr_add_str(module_path, name);
-    vstr_add_str(module_path, ".py");
-    char *module_path = vstr_str(module_path);
-    */
-    
-    char *module_path = "../../mpoc-rom/bios.py";
-
-    mp_microthread_t *microthread = new_microthread_from_file(name, module_path);
-    if (microthread == NULL){
-        // TODO: change message later.
-        mp_obj_t exc = mp_obj_new_exception_msg(&mp_type_SystemError, "Make new microthread are failed.");
-        nlr_raise(exc);
-    }
-    
-    return microthread;
-} 
-
 STATIC int run_bios(void) {
+    // TODO: run_bios will replace as pure python module like umicrothread
+
     nlr_buf_t nlr;
     if (nlr_push(&nlr) == 0) {
-        // bios
-        mp_microthread_t *thread_bios = new_microthread_auto("bios");
-
-        // main file
-        mp_microthread_t *thread_main = new_microthread_auto("main");
-        
-        // dev (opencom dev)
-        mp_microthread_t *thread_dev = new_microthread_auto("dev");
-        
-        mp_microthread_t *current_thread = thread_bios;
-
-        while (true){
-            mp_code_state *code_state = current_thread->code_state;
-            mp_vm_return_kind_t kind = mp_resume_microthread(current_thread);
-            
-            // it will replace by custom manager.
-            if (current_thread == thread_bios) {
-                current_thread = thread_main;
-            } else if (current_thread == thread_main) {
-                current_thread = thread_dev;
-            } else if (current_thread == thread_dev) {
-                current_thread = thread_bios;
-            }
-            
-            if (kind == MP_VM_RETURN_PAUSE){
-                mp_cpu_clear_usage();
-                // TODO: change object to throw event?
-                *(code_state->sp) = mp_const_true;
-            } else if (kind == MP_VM_RETURN_FORCE_PAUSE) {
-                mp_cpu_clear_usage();
-            } else if (kind == MP_VM_RETURN_EXCEPTION) {
-                nlr_raise(code_state->state[code_state->n_state - 1]);
-                return 1;
-            } else {
-                assert(code_state == code_state);
-                code_state->current = NULL;
-                // maybe yield or return?
-                break;
-            }
-        }
+        mp_obj_t module_fun = new_module_from_file("../../mpoc-rom/bios.py");
+        mp_call_function_0(module_fun);
 
         nlr_pop();
         return 0;
@@ -225,7 +152,7 @@ STATIC void set_sys_argv(char *argv[], int argc, int start_arg) {
 }
 
 STATIC int usage(char **argv) {
-    printf("usage: ./micropython [-X emit=bytecode] file|bios!! [arg ...]\n");
+    printf("usage: ./micropython [-X emit=bytecode] file|run! [arg ...]\n");
     return 1;
 }
 
@@ -262,10 +189,10 @@ int main(int argc, char **argv) {
 #endif
     
     mp_init();
+    mp_obj_list_init(mp_sys_path, 0);
     mp_obj_list_init(mp_sys_argv, 0);
     mp_cpu_set_limit(0xFFFFF);
     mp_cpu_set_soft_limit(mp_cpu_get_limit() >> 2);
-    mp_init_microthread();
 
     const int NOTHING_EXECUTED = -2;
     int ret = NOTHING_EXECUTED;
