@@ -36,9 +36,13 @@
 #ifdef MICROPY_HAL_H
 #include MICROPY_HAL_H
 #endif
+#if defined(USE_DEVICE_MODE)
+#include "irq.h"
+#include "usb.h"
+#endif
 #include "readline.h"
 #include "pyexec.h"
-#include "genhdr/py-version.h"
+#include "genhdr/mpversion.h"
 
 pyexec_mode_kind_t pyexec_mode_kind = PYEXEC_MODE_FRIENDLY_REPL;
 STATIC bool repl_display_debugging_info = 0;
@@ -181,14 +185,13 @@ friendly_repl_t repl;
 void pyexec_friendly_repl_init(void) {
     vstr_init(&repl.line, 32);
     repl.cont_line = false;
-    readline_init(&repl.line);
-    mp_hal_stdout_tx_str(">>> ");
+    readline_init(&repl.line, ">>> ");
 }
 
-void pyexec_friendly_repl_reset() {
-    repl.cont_line = false;
+void pyexec_friendly_repl_reset(void) {
     vstr_reset(&repl.line);
-    readline_init(&repl.line);
+    repl.cont_line = false;
+    readline_init(&repl.line, ">>> ");
 }
 
 int pyexec_friendly_repl_process_char(int c) {
@@ -229,8 +232,7 @@ int pyexec_friendly_repl_process_char(int c) {
 
         vstr_add_byte(&repl.line, '\n');
         repl.cont_line = true;
-        mp_hal_stdout_tx_str("... ");
-        readline_note_newline();
+        readline_note_newline("... ");
         return 0;
 
     } else {
@@ -251,8 +253,7 @@ int pyexec_friendly_repl_process_char(int c) {
 
         if (mp_repl_continue_with_input(vstr_null_terminated_str(&repl.line))) {
             vstr_add_byte(&repl.line, '\n');
-            mp_hal_stdout_tx_str("... ");
-            readline_note_newline();
+            readline_note_newline("... ");
             return 0;
         }
 
@@ -270,7 +271,6 @@ exec: ;
 friendly_repl_reset: // TODO
 input_restart:
         pyexec_friendly_repl_reset();
-        mp_hal_stdout_tx_str(">>> ");
         return 0;
     }
 }
@@ -311,6 +311,20 @@ friendly_repl_reset:
 
     for (;;) {
     input_restart:
+
+        #if defined(USE_DEVICE_MODE)
+        if (usb_vcp_is_enabled()) {
+            // If the user gets to here and interrupts are disabled then
+            // they'll never see the prompt, traceback etc. The USB REPL needs
+            // interrupts to be enabled or no transfers occur. So we try to
+            // do the user a favor and reenable interrupts.
+            if (query_irq() == IRQ_STATE_DISABLED) {
+                enable_irq(IRQ_STATE_ENABLED);
+                mp_hal_stdout_tx_str("PYB: enabling IRQs\r\n");
+            }
+        }
+        #endif
+
         vstr_reset(&line);
         int ret = readline(&line, ">>> ");
 

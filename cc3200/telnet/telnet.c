@@ -35,7 +35,7 @@
 #include "debug.h"
 #include "mpexception.h"
 #include "serverstask.h"
-#include "genhdr/py-version.h"
+#include "genhdr/mpversion.h"
 
 /******************************************************************************
  DEFINE PRIVATE CONSTANTS
@@ -128,6 +128,7 @@ static void telnet_send_and_proceed (void *data, _i16 Len, telnet_connected_subs
 static telnet_result_t telnet_send_non_blocking (void *data, _i16 Len);
 static telnet_result_t telnet_recv_text_non_blocking (void *buff, _i16 Maxlen, _i16 *rxLen);
 static void telnet_process (void);
+static int telnet_process_credential (char *credential, _i16 rxLen);
 static void telnet_parse_input (uint8_t *str, int16_t *len);
 static bool telnet_send_with_retries (int16_t sd, const void *pBuf, int16_t len);
 static void telnet_reset (void);
@@ -170,12 +171,14 @@ void telnet_run (void) {
                 telnet_send_and_proceed((void *)telnet_request_user, strlen(telnet_request_user), E_TELNET_STE_SUB_GET_USER);
                 break;
             case E_TELNET_STE_SUB_GET_USER:
-                if (E_TELNET_RESULT_OK == telnet_recv_text_non_blocking(telnet_data.rxBuffer, TELNET_RX_BUFFER_SIZE, &rxLen)) {
-                    // Skip /r/n
-                    if (rxLen < 2 || memcmp(servers_user, (const char *)telnet_data.rxBuffer, MAX((rxLen - 2), strlen(servers_user)))) {
-                        telnet_data.credentialsValid = false;
+                if (E_TELNET_RESULT_OK == telnet_recv_text_non_blocking(telnet_data.rxBuffer + telnet_data.rxWindex,
+                                                                        TELNET_RX_BUFFER_SIZE - telnet_data.rxWindex,
+                                                                        &rxLen)) {
+                    int result;
+                    if ((result = telnet_process_credential (servers_user, rxLen))) {
+                        telnet_data.credentialsValid = result > 0 ? true : false;
+                        telnet_data.substate.connected = E_TELNET_STE_SUB_REQ_PASSWORD;
                     }
-                    telnet_data.substate.connected = E_TELNET_STE_SUB_REQ_PASSWORD;
                 }
                 break;
             case E_TELNET_STE_SUB_REQ_PASSWORD:
@@ -187,16 +190,17 @@ void telnet_run (void) {
                 telnet_send_and_proceed((void *)telnet_options_pass, sizeof(telnet_options_pass), E_TELNET_STE_SUB_GET_PASSWORD);
                 break;
             case E_TELNET_STE_SUB_GET_PASSWORD:
-                if (E_TELNET_RESULT_OK == telnet_recv_text_non_blocking(telnet_data.rxBuffer, TELNET_RX_BUFFER_SIZE, &rxLen)) {
-                    // skip /r/n
-                    if (rxLen < 2 || memcmp(servers_pass, (const char *)telnet_data.rxBuffer, MAX((rxLen - 2), strlen(servers_pass)))) {
-                        telnet_data.credentialsValid = false;
-                    }
-                    if (telnet_data.credentialsValid) {
-                        telnet_data.substate.connected = E_TELNET_STE_SUB_SND_REPL_OPTIONS;
-                    }
-                    else {
-                        telnet_data.substate.connected = E_TELNET_STE_SUB_INVALID_LOGGIN;
+                if (E_TELNET_RESULT_OK == telnet_recv_text_non_blocking(telnet_data.rxBuffer + telnet_data.rxWindex,
+                                                                        TELNET_RX_BUFFER_SIZE - telnet_data.rxWindex,
+                                                                        &rxLen)) {
+                    int result;
+                    if ((result = telnet_process_credential (servers_pass, rxLen))) {
+                        if ((telnet_data.credentialsValid = telnet_data.credentialsValid && (result > 0 ? true : false))) {
+                            telnet_data.substate.connected = E_TELNET_STE_SUB_SND_REPL_OPTIONS;
+                        }
+                        else {
+                            telnet_data.substate.connected = E_TELNET_STE_SUB_INVALID_LOGGIN;
+                        }
                     }
                 }
                 break;
@@ -426,6 +430,26 @@ static void telnet_process (void) {
     }
 }
 
+static int telnet_process_credential (char *credential, _i16 rxLen) {
+    telnet_data.rxWindex += rxLen;
+    if (telnet_data.rxWindex >= SERVERS_USER_PASS_LEN_MAX) {
+        telnet_data.rxWindex = SERVERS_USER_PASS_LEN_MAX;
+    }
+
+    uint8_t *p = telnet_data.rxBuffer + SERVERS_USER_PASS_LEN_MAX;
+    // if a '\r' is found, or the length exceeds the max username length
+    if ((p = memchr(telnet_data.rxBuffer, '\r', telnet_data.rxWindex)) || (telnet_data.rxWindex >= SERVERS_USER_PASS_LEN_MAX)) {
+        uint8_t len = p - telnet_data.rxBuffer;
+
+        telnet_data.rxWindex = 0;
+        if ((len > 0) && (memcmp(credential, telnet_data.rxBuffer, MAX(len, strlen(credential))) == 0)) {
+            return 1;
+        }
+        return -1;
+    }
+    return 0;
+}
+
 static void telnet_parse_input (uint8_t *str, int16_t *len) {
     int16_t b_len = *len;
     uint8_t *b_str = str;
@@ -443,8 +467,9 @@ static void telnet_parse_input (uint8_t *str, int16_t *len) {
             }
         }
         else {
-            _str += 3;
-            *len -= 3;
+            // in case we have received an incomplete telnet option, unlikely, but possible
+            _str += MIN(3, *len);
+            *len -= MIN(3, *len);
         }
     }
 }

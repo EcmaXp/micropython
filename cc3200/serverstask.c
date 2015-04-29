@@ -25,15 +25,14 @@
  */
 
 #include <stdint.h>
+#include <string.h>
 
 #include "py/mpconfig.h"
 #include MICROPY_HAL_H
 #include "py/misc.h"
-#include "simplelink.h"
 #include "serverstask.h"
-#include "modwlan.h"
+#include "simplelink.h"
 #include "debug.h"
-#include "mpexception.h"
 #include "telnet.h"
 #include "ftp.h"
 #include "pybwdt.h"
@@ -67,8 +66,8 @@ static servers_Data_t servers_data = {.enabled = false, .do_disable = false, .do
 /******************************************************************************
  DECLARE PUBLIC DATA
  ******************************************************************************/
-char *servers_user;
-char *servers_pass;
+char servers_user[SERVERS_USER_PASS_LEN_MAX + 1];
+char servers_pass[SERVERS_USER_PASS_LEN_MAX + 1];
 
 /******************************************************************************
  DECLARE PUBLIC FUNCTIONS
@@ -77,8 +76,6 @@ void TASK_Servers (void *pvParameters) {
 
     bool cycle = false;
 
-    ASSERT ((servers_user = mem_Malloc(SERVERS_USER_LEN_MAX + 1)) != NULL);
-    ASSERT ((servers_pass = mem_Malloc(SERVERS_PASS_LEN_MAX + 1)) != NULL);
     strcpy (servers_user, SERVERS_DEF_USER);
     strcpy (servers_pass, SERVERS_DEF_PASS);
 
@@ -87,31 +84,30 @@ void TASK_Servers (void *pvParameters) {
 
     for ( ;; ) {
 
-        if (servers_data.enabled) {
-            if (servers_data.do_disable) {
-                // disable network services
-                telnet_disable();
-                ftp_disable();
-                // now clear the flags
-                servers_data.do_disable = false;
-                servers_data.enabled = false;
-            }
-            else {
-                if (cycle) {
-                    telnet_run();
-                }
-                else {
-                    ftp_run();
-                }
-            }
-        }
-        else if (servers_data.do_enable) {
+        if (servers_data.do_enable) {
             // enable network services
             telnet_enable();
             ftp_enable();
             // now set/clear the flags
             servers_data.enabled = true;
             servers_data.do_enable = false;
+            servers_data.do_disable = false;
+        }
+        else if (servers_data.enabled && servers_data.do_disable) {
+            // disable network services
+            telnet_disable();
+            ftp_disable();
+            // now clear the flags
+            servers_data.do_disable = false;
+            servers_data.enabled = false;
+            servers_data.do_enable = false;
+        }
+
+        if (cycle) {
+            telnet_run();
+        }
+        else {
+            ftp_run();
         }
 
         // move to the next cycle
@@ -125,6 +121,7 @@ void TASK_Servers (void *pvParameters) {
 void servers_start (void) {
     servers_data.do_disable = false;
     servers_data.do_enable = true;
+    HAL_Delay (SERVERS_CYCLE_TIME_MS * 5);
 }
 
 void servers_stop (void) {
@@ -133,6 +130,7 @@ void servers_stop (void) {
     do {
         HAL_Delay (SERVERS_CYCLE_TIME_MS);
     } while (servers_are_enabled());
+    HAL_Delay (SERVERS_CYCLE_TIME_MS * 5);
 }
 
 bool servers_are_enabled (void) {
@@ -147,8 +145,8 @@ void servers_close_socket (int16_t *sd) {
 }
 
 void servers_set_login (char *user, char *pass) {
-    memcpy(servers_user, user, SERVERS_USER_LEN_MAX);
-    memcpy(servers_pass, pass, SERVERS_PASS_LEN_MAX);
+    memcpy(servers_user, user, SERVERS_USER_PASS_LEN_MAX);
+    memcpy(servers_pass, pass, SERVERS_USER_PASS_LEN_MAX);
 }
 
 /******************************************************************************
