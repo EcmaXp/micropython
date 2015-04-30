@@ -91,3 +91,13 @@ Q(init)
 Q(init_microthread)
 Q(resume)
 Q(resume_microthread)
+
+Q(send_value)
+Q(last_kind)
+Q(last_result)
+
+#if MICROPY_LIMIT_CPU
+Q(cpu_hard_limit)
+Q(cpu_soft_limit)
+Q(cpu_current_executed)
+#endif
