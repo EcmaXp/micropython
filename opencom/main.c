@@ -100,13 +100,9 @@ STATIC mp_obj_t *new_module_from_file(const char *filename) {
         return NULL;
     }
     
-/*
-    build module in here.
-    
     #if MICROPY_PY___FILE__
     mp_store_global(MP_QSTR___file__, MP_OBJ_NEW_QSTR(lex->source_name));
     #endif
-*/
     
     return module_fun;
 }
@@ -127,23 +123,6 @@ STATIC int do_file(const char *filename) {
         return handle_uncaught_exception((mp_obj_t)nlr.ret_val);
     }
 }
-
-STATIC int run_bios(void) {
-    // TODO: run_bios will replace as pure python module like umicrothread
-
-    nlr_buf_t nlr;
-    if (nlr_push(&nlr) == 0) {
-        mp_obj_t module_fun = new_module_from_file("../../mpoc-rom/bios.py");
-        mp_call_function_0(module_fun);
-
-        nlr_pop();
-        return 0;
-    } else {
-        // uncaught exception
-        return handle_uncaught_exception((mp_obj_t)nlr.ret_val);
-    }
-}
-
 
 STATIC void set_sys_argv(char *argv[], int argc, int start_arg) {
     for (int i = start_arg; i < argc; i++) {
@@ -191,8 +170,8 @@ int main(int argc, char **argv) {
     mp_init();
     mp_obj_list_init(mp_sys_path, 0);
     mp_obj_list_init(mp_sys_argv, 0);
-    mp_cpu_set_limit(0xFFFFF);
-    mp_cpu_set_soft_limit(mp_cpu_get_limit() >> 2);
+    mp_cpu_set_limit(0);
+    mp_cpu_set_soft_limit(0);
 
     const int NOTHING_EXECUTED = -2;
     int ret = NOTHING_EXECUTED;
@@ -206,11 +185,7 @@ int main(int argc, char **argv) {
         } else {
             if (a + 1 <= argc){
                 set_sys_argv(argv, argc, a);
-                if (strcmp(argv[a], "run!") == 0){
-                    ret = run_bios();                
-                } else {
-                    ret = do_file(argv[a]);
-                }
+                ret = do_file(argv[a]);
             } else {
                 exit(usage(argv));
             }
