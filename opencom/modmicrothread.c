@@ -195,17 +195,21 @@ void mp_store_microthread(mp_obj_microthread_t *microthread) {
 }
 
 
-mp_obj_t mod_microthread_resume(mp_obj_t microthread_obj) {
+STATIC mp_obj_t microthread_attr_resume(mp_obj_t microthread_obj) {
     mp_obj_microthread_t *thread = MP_OBJ_CAST(microthread_obj);
 
     mp_code_state *code_state = thread->code_state;
     mp_vm_return_kind_t kind = thread->last_kind;
+    thread->last_result = mp_const_none;
+
+    // TODO: if thread are not started then something do?
+    //      (like arg fill)
 
     MP_ENTER_MICROTHREAD(thread);
     
-    if (kind == MP_VM_RETURN_PAUSE){
+    if (kind == MP_VM_RETURN_PAUSE && thread->send_value != MP_OBJ_NULL){
         code_state->current->sp[0] = thread->send_value;
-        thread->send_value = mp_const_none;
+        thread->send_value = MP_OBJ_NULL;
     }
     
     nlr_buf_t nlr;
@@ -244,7 +248,7 @@ mp_obj_t mod_microthread_resume(mp_obj_t microthread_obj) {
     return mp_const_true;
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_microthread_resume_obj, mod_microthread_resume);
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(microthread_attr_resume_obj, microthread_attr_resume);
 
 STATIC void microthread_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     mp_obj_microthread_t *self = MP_OBJ_CAST(self_in);
@@ -280,6 +284,10 @@ STATIC void microthread_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
     bool is_store = (dest[0] == MP_OBJ_SENTINEL && dest[1] != MP_OBJ_NULL);
     // bool is_del = (dest[0] == MP_OBJ_SENTINEL && dest[1] == MP_OBJ_NULL);
     
+    if (attr == MP_QSTR_resume && is_load) {
+        dest[0] = (mp_obj_t)&microthread_attr_resume_obj;
+        goto METHOD_OK;
+    }
     if (attr == MP_QSTR_name && is_load) {
         dest[0] = thread->name;
         goto LOAD_OK;
@@ -298,7 +306,12 @@ STATIC void microthread_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
     }
     if (attr == MP_QSTR_send_value) {
         if (is_load) {
-            dest[0] = thread->send_value;
+            if (thread->send_value != MP_OBJ_NULL){
+                dest[0] = thread->send_value;              
+            } else {
+                dest[0] = mp_const_none;
+            }
+
             goto LOAD_OK;
         } else if (is_store) {
             thread->send_value = dest[1];
@@ -351,7 +364,11 @@ LOAD_OK:
 STORE_OK:
     dest[0] = MP_OBJ_NULL;
     return;
-    
+
+METHOD_OK:
+    dest[1] = self_in;
+    return;
+
 FAIL_NOT_INT:
     nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "that is not int. (TODO: fix this message)"));
 
@@ -420,7 +437,6 @@ const mp_obj_type_t mp_type_microthread = {
 STATIC const mp_map_elem_t mp_module_microthread_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_microthread) },
     { MP_OBJ_NEW_QSTR(MP_QSTR_init), (mp_obj_t)&mod_microthread_init_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_resume), (mp_obj_t)&mod_microthread_resume_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_MicroThread), (mp_obj_t)&mp_type_microthread },
 };
 
