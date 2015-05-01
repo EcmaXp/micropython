@@ -142,7 +142,7 @@ typedef enum {
     MP_CPU_EXECUTED(); \
     if (!MP_CPU_CHECK()){ \
         VM_SOFT_PAUSE_POINT; \
-        assert(0); \
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_SystemError, "VM are hard limited.")); \
     } \
 } while (0)
 #else

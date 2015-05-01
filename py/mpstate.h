@@ -147,9 +147,10 @@ typedef struct _mp_state_vm_t {
     #endif
     
     #if MICROPY_LIMIT_CPU
-    mp_uint_t cpu_max_opcodes_executeable;
-    mp_uint_t cpu_min_opcodes_executeable;
-    mp_uint_t cpu_current_opcodes_executed;
+    mp_uint_t cpu_max_opcodes_executeable; // as cpu_hard_limit?
+    mp_uint_t cpu_min_opcodes_executeable; // as cpu_soft_limit?
+    // and cpu_exc_limit?
+    mp_uint_t cpu_current_opcodes_executed; // as cpu_currect_executed?
     #endif    
 } mp_state_vm_t;
 

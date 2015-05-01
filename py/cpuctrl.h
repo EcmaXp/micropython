@@ -51,11 +51,13 @@ inline void _mp_cpu_opcode_executed(void){
 }
 
 inline bool _mp_cpu_is_limited(){
-    return MP_STATE_VM(cpu_max_opcodes_executeable) <= MP_STATE_VM(cpu_current_opcodes_executed);
+    return MP_STATE_VM(cpu_max_opcodes_executeable) && \
+        (MP_STATE_VM(cpu_max_opcodes_executeable) <= MP_STATE_VM(cpu_current_opcodes_executed));
 }
 
 inline bool _mp_cpu_is_soft_limited(){
-    return MP_STATE_VM(cpu_min_opcodes_executeable) <= MP_STATE_VM(cpu_current_opcodes_executed);
+    return MP_STATE_VM(cpu_min_opcodes_executeable) && \
+        (MP_STATE_VM(cpu_min_opcodes_executeable) <= MP_STATE_VM(cpu_current_opcodes_executed));
 }
 
 #else // MICROPY_LIMIT_CPU
