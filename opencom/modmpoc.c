@@ -34,7 +34,14 @@
 #include "py/objtuple.h"
 
 STATIC mp_obj_t mod_mpoc_pause(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+#if MICROPY_ALLOW_PAUSE_VM
     return MP_OBJ_PAUSE_VM;
+#else
+    // TODO: raise exception
+    nlr_raise(MP_OBJ_NULL);
+    return mp_const_none;
+#endif
+    
 }
 
 typedef struct _mp_type_fun_special_t {

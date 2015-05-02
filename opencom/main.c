@@ -94,15 +94,15 @@ STATIC mp_obj_t *new_module_from_file(const char *filename) {
         return NULL;
     }
     
+    #if MICROPY_PY___FILE__
+    mp_store_global(MP_QSTR___file__, MP_OBJ_NEW_QSTR(lex->source_name));
+    #endif
+    
     mp_obj_t module_fun = new_module_from_lexer(lex);
     if (module_fun == NULL) {
         printf("MemoryError: new_module_from_lexer could not allocate memory\n");
         return NULL;
     }
-    
-    #if MICROPY_PY___FILE__
-    mp_store_global(MP_QSTR___file__, MP_OBJ_NEW_QSTR(lex->source_name));
-    #endif
     
     return module_fun;
 }
@@ -162,7 +162,7 @@ int main(int argc, char **argv) {
 #if MICROPY_ENABLE_GC
     // Heap size of GC heap (if enabled)
     // Make it larger on a 64 bit machine, because pointers are larger.
-    long heap_size = 128 * 1024 * (BYTES_PER_WORD / 4);
+    long heap_size = 256 * 1024 * (BYTES_PER_WORD / 4);
     char *heap = malloc(heap_size);
     gc_init(heap, heap + heap_size);
 #endif
@@ -170,9 +170,7 @@ int main(int argc, char **argv) {
     mp_init();
     mp_obj_list_init(mp_sys_path, 0);
     mp_obj_list_init(mp_sys_argv, 0);
-    mp_cpu_set_limit(0);
-    mp_cpu_set_soft_limit(0);
-
+    
     const int NOTHING_EXECUTED = -2;
     int ret = NOTHING_EXECUTED;
     for (int a = 1; a < argc; a++) {

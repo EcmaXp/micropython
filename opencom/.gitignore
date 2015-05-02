@@ -4,4 +4,3 @@ build-minimal
 micropython
 micropython_fast
 micropython_minimal
-*.py

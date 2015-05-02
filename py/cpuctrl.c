@@ -32,10 +32,10 @@
 void mp_cpu_ctrl_init(void) {
 #if MICROPY_LIMIT_CPU
     // hard limit
-    MP_STATE_VM(cpu_max_opcodes_executeable) = -1;
+    MP_STATE_VM(cpu_max_opcodes_executeable) = 0;
     
-    // soft limit = hard limit / 2
-    MP_STATE_VM(cpu_min_opcodes_executeable) = MP_STATE_VM(cpu_max_opcodes_executeable) >> 1;
+    // soft limit
+    MP_STATE_VM(cpu_min_opcodes_executeable) = 0;
 
     // executed opcodes: zero!
     MP_STATE_VM(cpu_current_opcodes_executed) = 0;

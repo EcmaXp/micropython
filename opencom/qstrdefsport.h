@@ -80,17 +80,19 @@ Q(SO_REUSEADDR)
 // mpoc
 Q(mpoc)
 Q(test)
-Q(pause)
+Q(test1)
+Q(test2)
+Q(test3)
+Q(test4)
 
 // microthread
 Q(microthread)
 Q(umicrothread)
 Q(MicroThread)
-Q(new_microthread)
+Q(_MicroThread)
 Q(init)
-Q(init_microthread)
 Q(resume)
-Q(resume_microthread)
+Q(pause)
 
 Q(send_value)
 Q(last_kind)

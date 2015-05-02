@@ -26,6 +26,7 @@
 #ifndef __MICROPY_INCLUDED_PY_CPUCTRL_H__
 #define __MICROPY_INCLUDED_PY_CPUCTRL_H__
 
+#include <stdio.h>
 #include "py/mpconfig.h"
 
 void mp_cpu_ctrl_init(void);
@@ -51,12 +52,12 @@ inline void _mp_cpu_opcode_executed(void){
 }
 
 inline bool _mp_cpu_is_limited(){
-    return MP_STATE_VM(cpu_max_opcodes_executeable) && \
+    return (MP_STATE_VM(cpu_max_opcodes_executeable) > 0) && \
         (MP_STATE_VM(cpu_max_opcodes_executeable) <= MP_STATE_VM(cpu_current_opcodes_executed));
 }
 
 inline bool _mp_cpu_is_soft_limited(){
-    return MP_STATE_VM(cpu_min_opcodes_executeable) && \
+    return (MP_STATE_VM(cpu_min_opcodes_executeable) > 0) && \
         (MP_STATE_VM(cpu_min_opcodes_executeable) <= MP_STATE_VM(cpu_current_opcodes_executed));
 }
 

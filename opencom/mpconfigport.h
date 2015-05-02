@@ -26,7 +26,6 @@
 
 // for OpenComptuers
 #define MICROPY_KEEP_LAST_CODE_STATE (1)
-#define MICROPY_ALLOW_PAUSE_VM      (1)
 #define MICROPY_LIMIT_CPU           (1)
 
 // options to control how Micro Python is built
@@ -52,8 +51,8 @@
 #define MICROPY_FLOAT_IMPL          (MICROPY_FLOAT_IMPL_DOUBLE)
 #define MICROPY_LONGINT_IMPL        (MICROPY_LONGINT_IMPL_LONGLONG) // Default: MICROPY_LONGINT_IMPL_MPZ
 #define MICROPY_STREAMS_NON_BLOCK   (1)
-#define MICROPY_OPT_COMPUTED_GOTO   (0) // Default: 1
-#define MICROPY_OPT_CACHE_MAP_LOOKUP_IN_BYTECODE (0) // Default: 1
+#define MICROPY_OPT_COMPUTED_GOTO   (1) // Default: 1
+#define MICROPY_OPT_CACHE_MAP_LOOKUP_IN_BYTECODE (1) // Default: 1
 #define MICROPY_CAN_OVERRIDE_BUILTINS (1)
 #define MICROPY_PY_FUNCTION_ATTRS   (1)
 #define MICROPY_PY_DESCRIPTORS      (1)
@@ -122,16 +121,23 @@ extern const struct _mp_obj_module_t mp_module_microthread;
 #else
 #define MICROPY_PY_SOCKET_DEF
 #endif
+#if MICROPY_ALLOW_PAUSE_VM
+#define MICROPY_PY_MICROTHREAD_DEF { MP_OBJ_NEW_QSTR(MP_QSTR_umicrothread), (mp_obj_t)&mp_module_microthread },
+#else
+#define MICROPY_PY_MICROTHREAD_DEF
+#endif
 
 #define MICROPY_PY_END_DEF
 
 #define MICROPY_PORT_BUILTIN_MODULES \
     MICROPY_PY_TIME_DEF \
     MICROPY_PY_SOCKET_DEF \
+    MICROPY_PY_MICROTHREAD_DEF \
     { MP_OBJ_NEW_QSTR(MP_QSTR_mpoc), (mp_obj_t)&mp_module_mpoc }, \
     { MP_OBJ_NEW_QSTR(MP_QSTR__os), (mp_obj_t)&mp_module_os }, \
-    { MP_OBJ_NEW_QSTR(MP_QSTR_umicrothread), (mp_obj_t)&mp_module_microthread }, \
     MICROPY_PY_END_DEF
+
+//     
 
 // type definitions for the specific machine
 
