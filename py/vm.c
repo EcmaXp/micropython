@@ -117,6 +117,7 @@ typedef enum {
 #define VM_IS_PAUSEABLE() (is_pauseable)
 // in _mp_execute_bytecode
 #else
+#define VM_PAUSE_POINT
 #define VM_PAUSE(return_value) assert(0);
 #define VM_IS_PAUSEABLE() (false)
 #endif
@@ -140,9 +141,12 @@ typedef enum {
 #if MICROPY_LIMIT_CPU
 #define VM_CPU_LIMIT() do { \
     MP_CPU_EXECUTED(); \
-    if (!MP_CPU_CHECK()){ \
-        VM_SOFT_PAUSE_POINT; \
-        nlr_raise(mp_obj_new_exception_msg(&mp_type_SystemError, "VM are hard limited.")); \
+    if (!MP_CPU_CHECK()) { \
+        if (VM_IS_PAUSEABLE()) { \
+            VM_PAUSE(MP_VM_RETURN_FORCE_PAUSE); \
+        } else { \
+            RAISE(mp_obj_new_exception_msg(&mp_type_SystemError, "VM are hard limited.")); \
+        } \
     } \
 } while (0)
 #else
@@ -278,6 +282,7 @@ dispatch_loop:
                 DISPATCH();
 #else
                 VM_CPU_LIMIT();
+                VM_SOFT_PAUSE_POINT;
                 TRACE(ip);
                 MARK_EXC_IP_GLOBAL();
                 switch (*ip++) {
