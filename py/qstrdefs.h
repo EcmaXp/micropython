@@ -152,6 +152,11 @@ Q(ZeroDivisionError)
 #if MICROPY_PY_BUILTINS_STR_UNICODE
 Q(UnicodeError)
 #endif
+#if MICROPY_ALLOW_PAUSE_VM
+Q(SystemLimit)
+Q(SystemSoftLimit)
+Q(SystemHardLimit)
+#endif
 
 Q(None)
 Q(False)

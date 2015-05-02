@@ -251,6 +251,13 @@ MP_DEFINE_EXCEPTION(Exception, BaseException)
       MP_DEFINE_EXCEPTION(TabError, IndentationError)
       */
   MP_DEFINE_EXCEPTION(SystemError, Exception)
+#if MICROPY_ALLOW_PAUSE_VM
+    MP_DEFINE_EXCEPTION_BASE(SystemError)
+    MP_DEFINE_EXCEPTION(SystemLimit, SystemError)
+      MP_DEFINE_EXCEPTION_BASE(SystemLimit)
+      MP_DEFINE_EXCEPTION(SystemSoftLimit, SystemLimit)
+      MP_DEFINE_EXCEPTION(SystemHardLimit, SystemLimit)
+#endif
   MP_DEFINE_EXCEPTION(TypeError, Exception)
 #if MICROPY_EMIT_NATIVE
     MP_DEFINE_EXCEPTION_BASE(TypeError)

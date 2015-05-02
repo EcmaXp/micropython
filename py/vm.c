@@ -142,10 +142,10 @@ typedef enum {
 #define VM_CPU_LIMIT() do { \
     MP_CPU_EXECUTED(); \
     if (!MP_CPU_CHECK()) { \
-        if (VM_IS_PAUSEABLE()) { \
+        if (VM_IS_PAUSEABLE() && false) { \
             VM_PAUSE(MP_VM_RETURN_FORCE_PAUSE); \
         } else { \
-            RAISE(mp_obj_new_exception_msg(&mp_type_SystemError, "VM are hard limited.")); \
+            RAISE(mp_obj_new_exception(&mp_type_SystemHardLimit)); \
         } \
     } \
 } while (0)
@@ -213,6 +213,7 @@ mp_vm_return_kind_t _mp_execute_bytecode(bool is_pauseable, mp_code_state *first
     #include "py/vmentrytable.h"
     #define DISPATCH() do { \
         VM_CPU_LIMIT(); \
+        VM_SOFT_PAUSE_POINT; \
         TRACE(ip); \
         MARK_EXC_IP_GLOBAL(); \
         goto *entry_table[*ip++]; \
