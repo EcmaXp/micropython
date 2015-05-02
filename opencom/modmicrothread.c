@@ -64,29 +64,29 @@ const mp_obj_type_t mp_type_range = {
 */
 /******************************************************************************/
 
+// typedef struct _mp_microthread_context_t {
+// } mp_microthread_context_t;
+
 typedef struct _mp_obj_microthread_t {
     mp_obj_base_t base;
-    
-    // name
+
     mp_obj_t name;
-    
-    // function
     mp_obj_t fun_bc;
     
-    // code_state
     mp_code_state *code_state;
     
-    // send_value
     mp_obj_t send_value;
-    
-    // last_kind
     mp_vm_return_kind_t last_kind;
-
-    // last_result
     mp_obj_t last_result;
-
+    
+    // context
+    
     mp_obj_dict_t *dict_locals;
     mp_obj_dict_t *dict_globals;
+
+    #if MICROPY_PY_SYS_EXC_INFO
+    // cur_exception;
+    #endif
 
     #if MICROPY_LIMIT_CPU
     mp_uint_t cpu_max_opcodes_executeable;
@@ -95,41 +95,44 @@ typedef struct _mp_obj_microthread_t {
     #endif
 } mp_obj_microthread_t;
 
-mp_obj_microthread_t *mp_current_microthread;
-mp_obj_microthread_t *mp_fallback_microthread;
+STATIC mp_obj_microthread_t *mp_current_microthread;
+STATIC mp_obj_microthread_t mp_fallback_microthread;
 
 const mp_obj_type_t mp_type_microthread;
 
 #define MP_ENTER_MICROTHREAD(microthread) do { \
-    mp_store_microthread(mp_fallback_microthread); \
+    mp_store_microthread(&mp_fallback_microthread); \
     mp_load_microthread((microthread)); \
 } while(0)
 
 #define MP_EXIT_MICROTHREAD(microthread) do { \
     mp_store_microthread((microthread)); \
-    mp_load_microthread(mp_fallback_microthread); \
+    mp_load_microthread(&mp_fallback_microthread); \
 } while(0)
 
 STATIC mp_obj_t mod_microthread_init(void) {
-    mp_obj_microthread_t *fallback_thread = m_new_obj(mp_obj_microthread_t);
+    mp_obj_microthread_t *thread = &mp_fallback_microthread;
+    
+    thread->base.type = &mp_type_microthread;
 
-    fallback_thread->base.type = &mp_type_microthread;
-    fallback_thread->name = (mp_obj_t)NULL;
-    fallback_thread->fun_bc = (mp_obj_t)NULL;
-    fallback_thread->code_state = (mp_code_state *)NULL;
-    fallback_thread->send_value = mp_const_none;
-    fallback_thread->last_kind = MP_VM_RETURN_NORMAL;
-    fallback_thread->last_result = mp_const_none;
-    fallback_thread->dict_locals = MP_STATE_CTX(dict_locals);
-    fallback_thread->dict_globals = MP_STATE_CTX(dict_globals);
+    thread->name = (mp_obj_t)NULL;
+    thread->fun_bc = (mp_obj_t)NULL;
+    
+    thread->code_state = (mp_code_state *)NULL;
+    thread->send_value = mp_const_none;
+    thread->last_kind = MP_VM_RETURN_NORMAL;
+    thread->last_result = mp_const_none;
+    
+    thread->dict_locals = MP_STATE_CTX(dict_locals);
+    thread->dict_globals = MP_STATE_CTX(dict_globals);
+    
 #if MICROPY_LIMIT_CPU
-    fallback_thread->cpu_max_opcodes_executeable = MP_STATE_VM(cpu_max_opcodes_executeable);
-    fallback_thread->cpu_min_opcodes_executeable = MP_STATE_VM(cpu_min_opcodes_executeable);
-    fallback_thread->cpu_current_opcodes_executed = MP_STATE_VM(cpu_current_opcodes_executed);
+    thread->cpu_max_opcodes_executeable = MP_STATE_VM(cpu_max_opcodes_executeable);
+    thread->cpu_min_opcodes_executeable = MP_STATE_VM(cpu_min_opcodes_executeable);
+    thread->cpu_current_opcodes_executed = MP_STATE_VM(cpu_current_opcodes_executed);
 #endif
     
-    mp_fallback_microthread = fallback_thread;
-    mp_current_microthread = mp_fallback_microthread;
+    mp_current_microthread = &mp_fallback_microthread;
     
     return mp_const_true;
 }
@@ -139,7 +142,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_microthread_init_obj, mod_microthread_init)
 STATIC mp_obj_t microthread_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 2, 2, false);
     
-    if (mp_fallback_microthread == NULL) {
+    if (mp_fallback_microthread.base.type == MP_OBJ_NULL) {
         mod_microthread_init();
     }
     
@@ -156,42 +159,51 @@ STATIC mp_obj_t microthread_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint
     
     mp_obj_microthread_t *thread = m_new_obj(mp_obj_microthread_t);
     thread->base.type = &mp_type_microthread;
+
     thread->name = name_obj;
     thread->fun_bc = fun_bc_obj;
+
     thread->code_state = code_state;
     thread->send_value = mp_const_none;
     thread->last_kind = MP_VM_RETURN_FORCE_PAUSE;
     thread->last_result = mp_const_none;
+
     thread->dict_locals = mp_obj_new_dict(0);    
     thread->dict_globals = fun_bc->globals;
+
 #if MICROPY_LIMIT_CPU
-    thread->cpu_max_opcodes_executeable = MP_STATE_VM(cpu_max_opcodes_executeable);
-    thread->cpu_min_opcodes_executeable = MP_STATE_VM(cpu_min_opcodes_executeable);
+    thread->cpu_max_opcodes_executeable = 0;
+    thread->cpu_min_opcodes_executeable = 0;
     thread->cpu_current_opcodes_executed = 0;
 #endif
 
     return thread;
 }
 
-void mp_load_microthread(mp_obj_microthread_t *microthread) {
-    mp_current_microthread = microthread;
-    MP_STATE_CTX(dict_locals) = microthread->dict_locals;
-    MP_STATE_CTX(dict_globals) = microthread->dict_globals;
+void mp_load_microthread(mp_obj_microthread_t *thread) {
+    mp_current_microthread = thread;
+
+    MP_STATE_CTX(dict_locals) = thread->dict_locals;
+    MP_STATE_CTX(dict_globals) = thread->dict_globals;
+
 #if MICROPY_LIMIT_CPU
-    MP_STATE_VM(cpu_max_opcodes_executeable) = microthread->cpu_max_opcodes_executeable;
-    MP_STATE_VM(cpu_min_opcodes_executeable) = microthread->cpu_min_opcodes_executeable; 
-    MP_STATE_VM(cpu_current_opcodes_executed) = microthread->cpu_current_opcodes_executed;
+    MP_STATE_VM(cpu_max_opcodes_executeable) = thread->cpu_max_opcodes_executeable;
+    MP_STATE_VM(cpu_min_opcodes_executeable) = thread->cpu_min_opcodes_executeable; 
+    MP_STATE_VM(cpu_current_opcodes_executed) = thread->cpu_current_opcodes_executed;
 #endif
+
 }
 
-void mp_store_microthread(mp_obj_microthread_t *microthread) {
-    microthread->dict_locals = MP_STATE_CTX(dict_locals);
-    microthread->dict_globals = MP_STATE_CTX(dict_globals);
+void mp_store_microthread(mp_obj_microthread_t *thread) {
+    thread->dict_locals = MP_STATE_CTX(dict_locals);
+    thread->dict_globals = MP_STATE_CTX(dict_globals);
+    
 #if MICROPY_LIMIT_CPU
-    microthread->cpu_max_opcodes_executeable = MP_STATE_VM(cpu_max_opcodes_executeable);
-    microthread->cpu_min_opcodes_executeable = MP_STATE_VM(cpu_min_opcodes_executeable);
-    microthread->cpu_current_opcodes_executed = MP_STATE_VM(cpu_current_opcodes_executed);
+    thread->cpu_max_opcodes_executeable = MP_STATE_VM(cpu_max_opcodes_executeable);
+    thread->cpu_min_opcodes_executeable = MP_STATE_VM(cpu_min_opcodes_executeable);
+    thread->cpu_current_opcodes_executed = MP_STATE_VM(cpu_current_opcodes_executed);
 #endif
+
 }
 
 
@@ -218,7 +230,7 @@ STATIC mp_obj_t microthread_attr_resume(mp_obj_t microthread_obj) {
         nlr_pop();
     } else {
         kind = MP_VM_RETURN_EXCEPTION;
-        code_state->state[0] = &nlr.ret_val;
+        code_state->current->state[code_state->current->n_state - 1] = &nlr.ret_val;
     }
 
     MP_EXIT_MICROTHREAD(thread);
@@ -235,13 +247,16 @@ STATIC mp_obj_t microthread_attr_resume(mp_obj_t microthread_obj) {
             thread->last_result = mp_const_none;
             break;
         case MP_VM_RETURN_EXCEPTION:
-            printf("hello2\n");
-            thread->last_result = (mp_obj_t)code_state->current->state[0];
+            thread->last_result = (mp_obj_t)code_state->current->state[code_state->current->n_state - 1];
             break;
         case MP_VM_RETURN_PAUSE:
+            // pause function set thread->last_result
+            // TODO: should another behavor require?
+            break;
         case MP_VM_RETURN_FORCE_PAUSE:
         default:
             thread->last_result = mp_const_none;
+
     }
     
     // TODO: kind to number?
@@ -249,6 +264,35 @@ STATIC mp_obj_t microthread_attr_resume(mp_obj_t microthread_obj) {
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(microthread_attr_resume_obj, microthread_attr_resume);
+
+STATIC mp_obj_t microthread_attr_del(mp_obj_t microthread_obj) {
+    printf("killed\n");
+    return mp_const_none;
+}
+
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(microthread_attr_del_obj, microthread_attr_del);
+
+STATIC mp_obj_t mod_mpoc_pause(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+    mp_arg_check_num(n_args, n_kw, 0, 1, false);
+    
+    if (1 <= n_args) {
+        mp_current_microthread->last_result = args[0];
+    }
+    
+    return MP_OBJ_PAUSE_VM;
+}
+
+typedef struct _mp_type_fun_pause_t {
+    mp_obj_base_t base;
+} mp_type_fun_pause_t;
+
+const mp_obj_type_t mp_type_fun_pause = {
+    { &mp_type_type },
+    .name = MP_QSTR_function,
+    .call = mod_mpoc_pause,
+};
+
+STATIC const mp_type_fun_pause_t mod_microthread_pause_obj = {{&mp_type_fun_pause}};
 
 STATIC void microthread_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     mp_obj_microthread_t *self = MP_OBJ_CAST(self_in);
@@ -288,22 +332,6 @@ STATIC void microthread_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
         dest[0] = (mp_obj_t)&microthread_attr_resume_obj;
         goto METHOD_OK;
     }
-    if (attr == MP_QSTR_name && is_load) {
-        dest[0] = thread->name;
-        goto LOAD_OK;
-    }
-    if (attr == MP_QSTR_function && is_load) {
-        dest[0] = thread->fun_bc;
-        goto LOAD_OK;
-    }
-    if (attr == MP_QSTR_last_kind && is_load) {
-        dest[0] = mp_obj_new_int((mp_int_t)thread->last_kind);
-        goto LOAD_OK;
-    }
-    if (attr == MP_QSTR_last_result && is_load) {
-        dest[0] = thread->last_result;
-        goto LOAD_OK;
-    }
     if (attr == MP_QSTR_send_value) {
         if (is_load) {
             if (thread->send_value != MP_OBJ_NULL){
@@ -311,12 +339,32 @@ STATIC void microthread_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
             } else {
                 dest[0] = mp_const_none;
             }
-
             goto LOAD_OK;
         } else if (is_store) {
             thread->send_value = dest[1];
             goto STORE_OK;
         }
+    }
+    if (attr == MP_QSTR_last_kind && is_load) {
+        dest[0] = mp_obj_new_int((mp_int_t)thread->last_kind);
+        goto LOAD_OK;
+    }
+    if (attr == MP_QSTR_last_result) {
+        if (is_load){
+            dest[0] = thread->last_result;            
+            goto LOAD_OK;
+        } else if (is_store) {
+            thread->last_result = dest[1];
+            goto STORE_OK;
+        }
+    }
+    if (attr == MP_QSTR_name && is_load) {
+        dest[0] = thread->name;
+        goto LOAD_OK;
+    }
+    if (attr == MP_QSTR_function && is_load) {
+        dest[0] = thread->fun_bc;
+        goto LOAD_OK;
     }
 #if MICROPY_LIMIT_CPU
     if (attr == MP_QSTR_cpu_hard_limit) {
@@ -369,8 +417,10 @@ METHOD_OK:
     dest[1] = self_in;
     return;
 
+#if MICROPY_LIMIT_CPU
 FAIL_NOT_INT:
     nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "that is not int. (TODO: fix this message)"));
+#endif
 
 }
 
@@ -425,7 +475,7 @@ struct _mp_obj_type_t {
 
 const mp_obj_type_t mp_type_microthread = {
     { &mp_type_type },
-    .name = MP_QSTR_MicroThread,
+    .name = MP_QSTR__MicroThread,
     .make_new = microthread_make_new,
     .print = microthread_print,
     .attr = microthread_attr,
@@ -438,6 +488,7 @@ STATIC const mp_map_elem_t mp_module_microthread_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_microthread) },
     { MP_OBJ_NEW_QSTR(MP_QSTR_init), (mp_obj_t)&mod_microthread_init_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_MicroThread), (mp_obj_t)&mp_type_microthread },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_pause), (mp_obj_t)&mod_microthread_pause_obj },
 };
 
 STATIC MP_DEFINE_CONST_DICT(mp_module_microthread_globals, mp_module_microthread_globals_table);
