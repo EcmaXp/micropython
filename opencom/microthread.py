@@ -1,44 +1,24 @@
 import umicrothread
-from umicrothread import MicroThread as _MicroThread, pause
+from umicrothread import MicroThread as _MicroThread
+from umicrothread import *
 
-# TODO: check this const is correct
-_MP_VM_RETURN_NORMAL = 0
-_MP_VM_RETURN_YIELD = 1
-_MP_VM_RETURN_EXCEPTION = 2
-_MP_VM_RETURN_PAUSE = 3
-_MP_VM_RETURN_FORCE_PAUSE = 4
+assert umicrothread._init()
 
-RETURN_NORMAL = "return"
-RETURN_YIELD = "yield"
-RETURN_EXCEPTION = "exception"
-RETURN_PAUSE = "pause"
-RETURN_FORCE_PAUSE = "force_pause"
-
-_result_map = {
-    _MP_VM_RETURN_NORMAL: RETURN_NORMAL,
-    _MP_VM_RETURN_YIELD: RETURN_YIELD,
-    _MP_VM_RETURN_EXCEPTION: RETURN_EXCEPTION,
-    _MP_VM_RETURN_PAUSE: RETURN_PAUSE,
-    _MP_VM_RETURN_FORCE_PAUSE: RETURN_FORCE_PAUSE,
-}
-
-assert umicrothread.init()
-
-def auto(func):
-    return MicroThread(func.__name__, func)
-
+def auto(*args, **kwargs):
+    def warp(func):
+        return MicroThread(func.__name__, func, *args, **kwargs)
+    return warp
+    
 _current_thread = None
 
 def current_thread():
     return _current_thread
 
-
 INVAILD = object()
 
-
 class MicroThread():
-    def __init__(self, name, function):
-        self._thread = _MicroThread(name, function)
+    def __init__(self, name, function, *args, **kwargs):
+        self._thread = _MicroThread(name, function, *args, **kwargs)
         
     def __repr__(self):
         return "<%s name=%r, function=%r>" % (type(self).__name__, self.name, self.function)
@@ -94,12 +74,8 @@ class MicroThread():
 
         try:
             _current_thread = thread
-            thread.resume()
+            kind, result = thread.resume()
         finally:
             _current_thread = None
         
-        kind = thread.last_kind
-        result = thread.last_result
-        
-        kind_of_result = _result_map[kind]
-        return kind_of_result, result
+        return kind, result

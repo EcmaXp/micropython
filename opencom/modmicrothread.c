@@ -34,6 +34,7 @@
 #include "py/obj.h"
 #include "py/objfun.h"
 #include "py/objint.h"
+#include "py/objtuple.h"
 #include "py/objmodule.h"
 #include "py/runtime.h"
 #include "py/bc.h"
@@ -66,6 +67,13 @@ const mp_obj_type_t mp_type_range = {
 
 // typedef struct _mp_microthread_context_t {
 // } mp_microthread_context_t;
+
+typedef enum _mp_pause_type {
+    MP_PAUSE_NONE = 0,
+    MP_PAUSE_SOFT = 1,
+    MP_PAUSE_EXCEPTION = 2,
+    MP_PAUSE_HARD = 3,
+} mp_pause_type;
 
 typedef struct _mp_obj_microthread_t {
     mp_obj_base_t base;
@@ -140,7 +148,7 @@ STATIC mp_obj_t mod_microthread_init(void) {
 STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_microthread_init_obj, mod_microthread_init);
 
 STATIC mp_obj_t microthread_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
-    mp_arg_check_num(n_args, n_kw, 2, 2, false);
+    mp_arg_check_num(n_args, n_kw, 2, n_args, true);
     
     if (mp_fallback_microthread.base.type == MP_OBJ_NULL) {
         mod_microthread_init();
@@ -154,7 +162,7 @@ STATIC mp_obj_t microthread_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint
     assert(MP_OBJ_IS_FUN(fun_bc_obj));
     // assert as nlr_raise?
     
-    mp_code_state *code_state = mp_obj_fun_bc_prepare_codestate(fun_bc_obj, 0, 0, NULL);
+    mp_code_state *code_state = mp_obj_fun_bc_prepare_codestate(fun_bc_obj, n_args - 2, n_kw, &args[2]);
     code_state->current = code_state;
     
     mp_obj_microthread_t *thread = m_new_obj(mp_obj_microthread_t);
@@ -212,6 +220,7 @@ STATIC mp_obj_t microthread_attr_resume(mp_obj_t microthread_obj) {
 
     mp_code_state *code_state = thread->code_state;
     mp_vm_return_kind_t kind = thread->last_kind;
+    qstr kind_qstr;
     thread->last_result = mp_const_none;
 
     // TODO: if thread are not started then something do?
@@ -240,27 +249,55 @@ STATIC mp_obj_t microthread_attr_resume(mp_obj_t microthread_obj) {
 
     switch (kind){
         case MP_VM_RETURN_NORMAL:
+            kind_qstr = MP_QSTR_normal;
             thread->last_result = (mp_obj_t)code_state->current->sp[0];
             break;
         case MP_VM_RETURN_YIELD:
             // TODO: get yielded value
+            kind_qstr = MP_QSTR_yield;
             thread->last_result = mp_const_none;
             break;
         case MP_VM_RETURN_EXCEPTION:
+            kind_qstr = MP_QSTR_exception;
             thread->last_result = (mp_obj_t)code_state->current->state[code_state->current->n_state - 1];
+
+            if (mp_obj_exception_match(thread->last_result, &mp_type_SystemHardLimit)) {
+                kind_qstr = MP_QSTR_force_pause;
+                thread->last_kind = MP_VM_RETURN_FORCE_PAUSE;
+                thread->last_result = MP_OBJ_NEW_QSTR(MP_QSTR_pause_hard);
+            } else if (mp_obj_exception_match(thread->last_result, &mp_type_SystemSoftLimit)) {
+                kind_qstr = MP_QSTR_force_pause;
+                thread->last_kind = MP_VM_RETURN_FORCE_PAUSE;
+                thread->last_result = MP_OBJ_NEW_QSTR(MP_QSTR_pause_exception);
+            } else {
+                // TODO: get traceback?
+                // mp_obj_exception_get_traceback
+                // or just new traceback?
+            }
+            
             break;
         case MP_VM_RETURN_PAUSE:
             // pause function set thread->last_result
             // TODO: should another behavor require?
+            kind_qstr = MP_QSTR_pause;
             break;
         case MP_VM_RETURN_FORCE_PAUSE:
+            kind_qstr = MP_QSTR_force_pause;
+            if (thread->last_result == mp_const_none) {
+                thread->last_result = MP_OBJ_NEW_QSTR(MP_QSTR_pause_soft);
+            }
+            
+            break;
         default:
+            kind_qstr = MP_QSTR_unknown;
             thread->last_result = mp_const_none;
-
     }
     
-    // TODO: kind to number?
-    return mp_const_true;
+    mp_obj_t *items = m_new(mp_obj_t, 2);
+    items[0] = MP_OBJ_NEW_QSTR(kind_qstr);
+    items[1] = (mp_obj_t)thread->last_result;
+    
+    return mp_obj_new_tuple(2, items);
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(microthread_attr_resume_obj, microthread_attr_resume);
@@ -342,19 +379,6 @@ STATIC void microthread_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
             goto LOAD_OK;
         } else if (is_store) {
             thread->send_value = dest[1];
-            goto STORE_OK;
-        }
-    }
-    if (attr == MP_QSTR_last_kind && is_load) {
-        dest[0] = mp_obj_new_int((mp_int_t)thread->last_kind);
-        goto LOAD_OK;
-    }
-    if (attr == MP_QSTR_last_result) {
-        if (is_load){
-            dest[0] = thread->last_result;            
-            goto LOAD_OK;
-        } else if (is_store) {
-            thread->last_result = dest[1];
             goto STORE_OK;
         }
     }
@@ -486,9 +510,20 @@ const mp_obj_type_t mp_type_microthread = {
 
 STATIC const mp_map_elem_t mp_module_microthread_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_microthread) },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_init), (mp_obj_t)&mod_microthread_init_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR__init), (mp_obj_t)&mod_microthread_init_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_MicroThread), (mp_obj_t)&mp_type_microthread },
     { MP_OBJ_NEW_QSTR(MP_QSTR_pause), (mp_obj_t)&mod_microthread_pause_obj },
+
+#define C(x, y) { MP_OBJ_NEW_QSTR(MP_QSTR_##x), MP_OBJ_NEW_QSTR(MP_QSTR_##y) }
+    C(RETURN_NORMAL, normal),
+    C(RETURN_YIELD, yield),
+    C(RETURN_EXCEPTION, exception),
+    C(RETURN_PAUSE, pause),
+    C(RETURN_FORCE_PAUSE, force_pause),
+    C(PAUSE_SOFT, pause_soft),
+    C(PAUSE_EXCEPTION, pause_exception),
+    C(PAUSE_HARD, pause_hard),
+#undef C
 };
 
 STATIC MP_DEFINE_CONST_DICT(mp_module_microthread_globals, mp_module_microthread_globals_table);
