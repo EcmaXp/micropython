@@ -60,6 +60,9 @@ class MicroThread():
     def cpu_current_executed(self, value):
         self._thread.cpu_current_executed = value
     
+    # del cpu_* value will set zero and unlimited.
+    # assign with zero is not allowed?
+    
     def __call__(self, value=INVAILD):
         return self.resume(value)
     

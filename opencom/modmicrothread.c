@@ -277,9 +277,8 @@ STATIC mp_obj_t microthread_attr_resume(mp_obj_t microthread_obj) {
             
             break;
         case MP_VM_RETURN_PAUSE:
-            // pause function set thread->last_result
-            // TODO: should another behavor require?
             kind_qstr = MP_QSTR_pause;
+            // pause function set thread->last_result
             break;
         case MP_VM_RETURN_FORCE_PAUSE:
             kind_qstr = MP_QSTR_force_pause;
@@ -363,7 +362,7 @@ STATIC void microthread_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
     
     bool is_load = (dest[0] == MP_OBJ_NULL);
     bool is_store = (dest[0] == MP_OBJ_SENTINEL && dest[1] != MP_OBJ_NULL);
-    // bool is_del = (dest[0] == MP_OBJ_SENTINEL && dest[1] == MP_OBJ_NULL);
+    bool is_del = (dest[0] == MP_OBJ_SENTINEL && dest[1] == MP_OBJ_NULL);
     
     if (attr == MP_QSTR_resume && is_load) {
         dest[0] = (mp_obj_t)&microthread_attr_resume_obj;
@@ -401,29 +400,38 @@ STATIC void microthread_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
             }
             thread->cpu_max_opcodes_executeable = (mp_uint_t)mp_obj_int_get_truncated(dest[1]);
             goto STORE_OK;
+        } else if (is_del) {
+            thread->cpu_max_opcodes_executeable = 0;
+            goto DEL_OK;
         }
     }
     if (attr == MP_QSTR_cpu_soft_limit) {
         if (is_load) {
             dest[0] = mp_obj_new_int_from_uint(thread->cpu_min_opcodes_executeable);
-        } else {
+        } else if (is_store) {
             if (!MP_OBJ_IS_INT(dest[1])) {
                 goto FAIL_NOT_INT;
             }
             thread->cpu_min_opcodes_executeable = (mp_uint_t)mp_obj_int_get_truncated(dest[1]);
             goto STORE_OK;
+        } else if (is_del) {
+            thread->cpu_min_opcodes_executeable = 0;
+            goto DEL_OK;
         }
     }
     if (attr == MP_QSTR_cpu_current_executed) {
         if (is_load) {
             dest[0] = mp_obj_new_int_from_uint(thread->cpu_current_opcodes_executed);
             goto LOAD_OK;
-        } else {
+        } else if (is_store) {
             if (!MP_OBJ_IS_INT(dest[1])) {
                 goto FAIL_NOT_INT;
             }
             thread->cpu_current_opcodes_executed = (mp_uint_t)mp_obj_int_get_truncated(dest[1]);
             goto STORE_OK;
+        } else if (is_del) {
+            thread->cpu_current_opcodes_executed = 0;
+            goto DEL_OK;
         }
     }
 
@@ -439,6 +447,11 @@ STORE_OK:
 
 METHOD_OK:
     dest[1] = self_in;
+    return;
+
+DEL_OK:
+    // TODO: write DEL_OK
+    assert(0);
     return;
 
 #if MICROPY_LIMIT_CPU
