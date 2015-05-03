@@ -39,8 +39,14 @@
 #include "py/objstr.h"
 #include "py/objlist.h"
 #include "py/objtuple.h"
+#include "py/stackctrl.h"
 
 #define MP_MSGPACK_EXT_TYPE_REPR 'r'
+
+/*
+TODO: ?
+
+*/
 
 /*
 typedef struct _mp_obj_socket_t {
@@ -49,7 +55,7 @@ typedef struct _mp_obj_socket_t {
 } mp_obj_socket_t;
 */
 
-STATIC const mp_int_t MSGPACK_DEFAULT_RECURSE_LIMIT = 511;
+// STATIC const mp_int_t MSGPACK_DEFAULT_RECURSE_LIMIT = 511;
 
 STATIC const mp_obj_type_t usocket_type;
 
@@ -73,14 +79,14 @@ STATIC const mp_obj_type_t usocket_type;
 #elif mp_int_t == int64_t
 #define PACK_INT(x) msgpack_pack_int64(pk, x)
 #endif
-#define PACK_LIST_BY(x) _mod_msgpack_listpack(pk, o, limit, &x)
-#define PACK_OBJECT(x) _mod_msgpack_pack(pk, (x), limit)
+#define PACK_LIST_BY(x) _mod_msgpack_listpack(pk, o, &x)
+#define PACK_OBJECT(x) _mod_msgpack_pack(pk, (x))
 /******************************************************************************/
 
 typedef void (*list_get_f)(mp_obj_t o, mp_uint_t *len, mp_obj_t **items);
-STATIC void _mod_msgpack_pack(msgpack_packer *pk, mp_obj_t o, mp_int_t limit);
+STATIC void _mod_msgpack_pack(msgpack_packer *pk, mp_obj_t o);
 
-STATIC void _mod_msgpack_listpack(msgpack_packer *pk, mp_obj_t o, mp_int_t limit, list_get_f list_get) {
+STATIC void _mod_msgpack_listpack(msgpack_packer *pk, mp_obj_t o, list_get_f list_get) {
     mp_uint_t len = 0;
     mp_obj_t *items = NULL;
 
@@ -94,10 +100,8 @@ STATIC void _mod_msgpack_listpack(msgpack_packer *pk, mp_obj_t o, mp_int_t limit
 
 
 // https://github.com/msgpack/msgpack-python/blob/master/msgpack/_packer.pyx
-STATIC void _mod_msgpack_pack(msgpack_packer *pk, mp_obj_t o, mp_int_t limit) {
-    assert(limit > 0);
-    limit--;
-    // there is a object pool?
+STATIC void _mod_msgpack_pack(msgpack_packer *pk, mp_obj_t o) {
+    MP_STACK_CHECK();
     
     PACK_START
     PACK_CONST(mp_const_none, msgpack_pack_nil)
@@ -196,13 +200,12 @@ STATIC void _mod_msgpack_pack(msgpack_packer *pk, mp_obj_t o, mp_int_t limit) {
     assert(0); \
 }
 
-#define UNPACK_OBJECT(x) _mod_msgpack_unpack((x), limit)
+#define UNPACK_OBJECT(x) _mod_msgpack_unpack((x))
 /******************************************************************************/
 
 // https://github.com/msgpack/msgpack-python/blob/master/msgpack/_unpacker.pyx
-STATIC mp_obj_t _mod_msgpack_unpack(msgpack_object mo, mp_int_t limit) {
-    assert(limit > 0);
-    limit--;
+STATIC mp_obj_t _mod_msgpack_unpack(msgpack_object mo) {
+    MP_STACK_CHECK();
 
     UNPACK_START
     UNPACK(MSGPACK_OBJECT_NIL) {
@@ -270,7 +273,7 @@ STATIC mp_obj_t mod_msgpack_pack(mp_obj_t object){
     msgpack_packer pk;
     msgpack_packer_init(&pk, &sbuf, msgpack_sbuffer_write);
     
-    _mod_msgpack_pack(&pk, object, MSGPACK_DEFAULT_RECURSE_LIMIT);
+    _mod_msgpack_pack(&pk, object);
     
     mp_obj_t buffer_obj = mp_obj_new_bytes((const byte *)sbuf.data, sbuf.size);
     
@@ -299,7 +302,7 @@ STATIC mp_obj_t mod_msgpack_unpack(mp_obj_t buffer_obj){
     msgpack_object deserialized;
     msgpack_unpack(sbuf.data, sbuf.size, NULL, &mempool, &deserialized);
 
-    mp_obj_t object = _mod_msgpack_unpack(deserialized, MSGPACK_DEFAULT_RECURSE_LIMIT);
+    mp_obj_t object = _mod_msgpack_unpack(deserialized);
 
     msgpack_zone_destroy(&mempool);
     msgpack_sbuffer_destroy(&sbuf);
