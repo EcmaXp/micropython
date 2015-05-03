@@ -522,7 +522,7 @@ const mp_obj_type_t mp_type_microthread = {
 
 
 STATIC const mp_map_elem_t mp_module_microthread_globals_table[] = {
-    { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_microthread) },
+    { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_umicrothread) },
     { MP_OBJ_NEW_QSTR(MP_QSTR__init), (mp_obj_t)&mod_microthread_init_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_MicroThread), (mp_obj_t)&mp_type_microthread },
     { MP_OBJ_NEW_QSTR(MP_QSTR_pause), (mp_obj_t)&mod_microthread_pause_obj },

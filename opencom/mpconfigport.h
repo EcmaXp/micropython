@@ -108,8 +108,9 @@
 extern const struct _mp_obj_module_t mp_module_os;
 extern const struct _mp_obj_module_t mp_module_time;
 extern const struct _mp_obj_module_t mp_module_socket;
-extern const struct _mp_obj_module_t mp_module_mpoc;
+extern const struct _mp_obj_module_t mp_module_msgpack;
 extern const struct _mp_obj_module_t mp_module_microthread;
+extern const struct _mp_obj_module_t mp_module_mpoc;
 
 #if MICROPY_PY_TIME
 #define MICROPY_PY_TIME_DEF { MP_OBJ_NEW_QSTR(MP_QSTR_utime), (mp_obj_t)&mp_module_time },
@@ -121,21 +122,25 @@ extern const struct _mp_obj_module_t mp_module_microthread;
 #else
 #define MICROPY_PY_SOCKET_DEF
 #endif
+#if MICROPY_PY_MSGPACK
+#define MICROPY_PY_MSGPACK_DEF { MP_OBJ_NEW_QSTR(MP_QSTR_umsgpack), (mp_obj_t)&mp_module_msgpack },
+#else
+#define MICROPY_PY_MSGPACK_DEF
+#endif
 #if MICROPY_ALLOW_PAUSE_VM
 #define MICROPY_PY_MICROTHREAD_DEF { MP_OBJ_NEW_QSTR(MP_QSTR_umicrothread), (mp_obj_t)&mp_module_microthread },
 #else
 #define MICROPY_PY_MICROTHREAD_DEF
 #endif
 
-#define MICROPY_PY_END_DEF
-
 #define MICROPY_PORT_BUILTIN_MODULES \
     MICROPY_PY_TIME_DEF \
     MICROPY_PY_SOCKET_DEF \
+    MICROPY_PY_MSGPACK_DEF \
     MICROPY_PY_MICROTHREAD_DEF \
     { MP_OBJ_NEW_QSTR(MP_QSTR_mpoc), (mp_obj_t)&mp_module_mpoc }, \
     { MP_OBJ_NEW_QSTR(MP_QSTR__os), (mp_obj_t)&mp_module_os }, \
-    MICROPY_PY_END_DEF
+    {}
 
 //     
 

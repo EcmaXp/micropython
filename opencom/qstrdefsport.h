@@ -120,3 +120,14 @@ Q(cpu_hard_limit)
 Q(cpu_soft_limit)
 Q(cpu_current_executed)
 #endif
+
+// msgpack
+Q(msgpack)
+Q(umsgpack)
+Q(pack)
+Q(unpack)
+Q(test)
+Q(test1)
+Q(test2)
+Q(test3)
+Q(test4)
