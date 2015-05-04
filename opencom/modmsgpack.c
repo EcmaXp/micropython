@@ -266,7 +266,7 @@ STATIC mp_obj_t _mod_msgpack_unpack(msgpack_object mo) {
     return mp_const_none;
 }
 
-STATIC mp_obj_t mod_msgpack_pack(mp_obj_t object){
+STATIC mp_obj_t mod_msgpack_dumps(mp_obj_t object){
     msgpack_sbuffer sbuf;
     msgpack_sbuffer_init(&sbuf);
 
@@ -282,9 +282,9 @@ STATIC mp_obj_t mod_msgpack_pack(mp_obj_t object){
     return buffer_obj;
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_msgpack_pack_obj, mod_msgpack_pack);
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_msgpack_dumps_obj, mod_msgpack_dumps);
 
-STATIC mp_obj_t mod_msgpack_unpack(mp_obj_t buffer_obj){
+STATIC mp_obj_t mod_msgpack_loads(mp_obj_t buffer_obj){
     if (!MP_OBJ_IS_TYPE(buffer_obj, &mp_type_bytes)) {
         nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "it is not bytes"));
     }
@@ -300,17 +300,47 @@ STATIC mp_obj_t mod_msgpack_unpack(mp_obj_t buffer_obj){
     msgpack_zone_init(&mempool, 2048);
 
     msgpack_object deserialized;
-    msgpack_unpack(sbuf.data, sbuf.size, NULL, &mempool, &deserialized);
+    msgpack_unpack_return unpack_result = msgpack_unpack(sbuf.data, sbuf.size, NULL, &mempool, &deserialized);
 
-    mp_obj_t object = _mod_msgpack_unpack(deserialized);
+    mp_obj_t object = MP_OBJ_NULL;
+    mp_obj_t exc = MP_OBJ_NULL;
+
+    switch (unpack_result) {
+        case MSGPACK_UNPACK_SUCCESS:
+            object = _mod_msgpack_unpack(deserialized);
+            break;
+        case MSGPACK_UNPACK_EXTRA_BYTES:
+            // TODO: replace exception message
+            exc = mp_obj_new_exception_msg(&mp_type_ValueError, "padding are exists");
+            break;
+        case MSGPACK_UNPACK_CONTINUE:
+            // TODO: replace exception message
+            exc = mp_obj_new_exception_msg(&mp_type_ValueError, "requrie more bytes");
+            break;
+        case MSGPACK_UNPACK_PARSE_ERROR:
+            // TODO: replace exception message
+            exc = mp_obj_new_exception_msg(&mp_type_ValueError, "parse error");
+            break;
+        case MSGPACK_UNPACK_NOMEM_ERROR:
+            exc = (mp_obj_t)&mp_const_MemoryError_obj;
+            break;
+        default:
+            printf("%d\n", unpack_result);
+            assert(0);
+    }
 
     msgpack_zone_destroy(&mempool);
     msgpack_sbuffer_destroy(&sbuf);
     
-    return object;
+    if (object != MP_OBJ_NULL) {
+        return object;
+    } else {
+        nlr_raise(exc);
+        return mp_const_none;
+    }
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_msgpack_unpack_obj, mod_msgpack_unpack);
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_msgpack_loads_obj, mod_msgpack_loads);
 
 STATIC mp_obj_t mod_msgpack_test2(mp_obj_t asdf) {
     /* msgpack::sbuffer is a simple buffer implementation. */
@@ -350,8 +380,8 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_msgpack_test2_obj, mod_msgpack_test2);
 
 STATIC const mp_map_elem_t mp_module_msgpack_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_umsgpack) },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_pack), (mp_obj_t)&mod_msgpack_pack_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_unpack), (mp_obj_t)&mod_msgpack_unpack_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_dumps), (mp_obj_t)&mod_msgpack_dumps_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_loads), (mp_obj_t)&mod_msgpack_loads_obj },
 //    { MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&mod_msgpack_test_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_test2), (mp_obj_t)&mod_msgpack_test2_obj },
 };

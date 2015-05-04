@@ -4,6 +4,17 @@ from umicrothread import *
 
 assert umicrothread._init()
 
+assert STATUS_NORMAL
+assert STATUS_YIELD
+assert STATUS_EXCEPTION
+assert STATUS_LIMIT
+assert STATUS_PAUSE
+assert STATUS_FORCE_PAUSE
+assert STATUS_STOP
+assert LIMIT_SOFT
+assert LIMIT_HARD
+
+
 def auto(*args, **kwargs):
     def warp(func):
         return MicroThread(func.__name__, func, *args, **kwargs)
@@ -13,8 +24,6 @@ _current_thread = None
 
 def current_thread():
     return _current_thread
-
-INVAILD = object()
 
 class MicroThread():
     def __init__(self, name, function, *args, **kwargs):
@@ -63,22 +72,17 @@ class MicroThread():
     # del cpu_* value will set zero and unlimited.
     # assign with zero is not allowed?
     
-    def __call__(self, value=INVAILD):
+    def __call__(self, value=None):
         return self.resume(value)
     
-    def resume(self, value=INVAILD):
+    def resume(self, value=None):
         global _current_thread
         thread = self._thread
-        
-        if value is INVAILD:
-            thread.send_value = None
-        else:
-            thread.send_value = value
 
         try:
             _current_thread = thread
-            kind, result = thread.resume()
+            status, result = thread.resume(value)
         finally:
             _current_thread = None
         
-        return kind, result
+        return status, result
