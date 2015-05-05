@@ -76,7 +76,8 @@
 #define MICROPY_PY_GC_COLLECT_RETVAL (1)
 
 #define MICROPY_STACKLESS           (1) // Default: 0
-#define MICROPY_STACKLESS_STRICT    (1) // Default: 0
+#define MICROPY_STACKLESS_STRICT    (0) // Default: 0
+#define MICROPY_STACKLESS_EXTRA     (1) // Default: NULL
 
 #define MICROPY_PY_UCTYPES          (1)
 #define MICROPY_PY_UZLIB            (1)
