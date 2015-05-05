@@ -3,7 +3,8 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2013, 2014 Damien P. George
+ * Copyright (c) 2015 Josef Gajdusek
+ * Copyright (c) 2015 Paul Sokolovsky
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,30 +24,27 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#ifndef __MICROPY_INCLUDED_PY_OBJTYPE_H__
-#define __MICROPY_INCLUDED_PY_OBJTYPE_H__
 
+#include "py/runtime.h"
 #include "py/obj.h"
+#include "py/nlr.h"
 
-// instance object
-// creating an instance of a class makes one of these objects
-typedef struct _mp_obj_instance_t {
-    mp_obj_base_t base;
-    mp_map_t members;
-    mp_obj_t subobj[];
-    // TODO maybe cache __getattr__ and __setattr__ for efficient lookup of them
-} mp_obj_instance_t;
+mp_obj_t call_function_1_protected(mp_obj_t fun, mp_obj_t arg) {
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) == 0) {
+        return mp_call_function_1(fun, arg);
+    } else {
+        mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
+        return (mp_obj_t)nlr.ret_val;
+    }
+}
 
-// this needs to be exposed for MICROPY_OPT_CACHE_MAP_LOOKUP_IN_BYTECODE to work
-void mp_obj_instance_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest);
-
-// these need to be exposed so mp_obj_is_callable can work correctly
-bool mp_obj_instance_is_callable(mp_obj_t self_in);
-mp_obj_t mp_obj_instance_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args);
-
-#define mp_obj_is_instance_type(type) ((type)->make_new == mp_obj_instance_make_new)
-#define mp_obj_is_native_type(type) ((type)->make_new != mp_obj_instance_make_new)
-// this needs to be exposed for the above macros to work correctly
-mp_obj_t mp_obj_instance_make_new(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args);
-
-#endif // __MICROPY_INCLUDED_PY_OBJTYPE_H__
+mp_obj_t call_function_2_protected(mp_obj_t fun, mp_obj_t arg1, mp_obj_t arg2) {
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) == 0) {
+        return mp_call_function_2(fun, arg1, arg2);
+    } else {
+        mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
+        return (mp_obj_t)nlr.ret_val;
+    }
+}

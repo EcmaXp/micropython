@@ -484,6 +484,11 @@ typedef double mp_float_t;
 #define MICROPY_PY_BUILTINS_REVERSED (1)
 #endif
 
+// Whether to define "NotImplemented" special constant
+#ifndef MICROPY_PY_BUILTINS_NOTIMPLEMENTED
+#define MICROPY_PY_BUILTINS_NOTIMPLEMENTED (0)
+#endif
+
 // Whether to set __file__ for imported modules
 #ifndef MICROPY_PY___FILE__
 #define MICROPY_PY___FILE__ (1)
@@ -623,6 +628,10 @@ typedef double mp_float_t;
 
 #ifndef MICROPY_PY_UBINASCII
 #define MICROPY_PY_UBINASCII (0)
+#endif
+
+#ifndef MICROPY_PY_MACHINE
+#define MICROPY_PY_MACHINE (0)
 #endif
 
 /*****************************************************************************/

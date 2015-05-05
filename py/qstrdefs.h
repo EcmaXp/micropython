@@ -115,6 +115,9 @@ Q(builtins)
 
 Q(Ellipsis)
 Q(StopIteration)
+#if MICROPY_PY_BUILTINS_NOTIMPLEMENTED
+Q(NotImplemented)
+#endif
 
 Q(BaseException)
 Q(ArithmeticError)
@@ -187,9 +190,6 @@ Q(memoryview)
 #endif
 Q(bytes)
 Q(callable)
-#if MICROPY_PY_STRUCT
-Q(calcsize)
-#endif
 Q(chr)
 Q(classmethod)
 Q(_collections)
@@ -470,13 +470,15 @@ Q(print_exception)
 #endif
 
 #if MICROPY_PY_STRUCT
-Q(struct)
+Q(ustruct)
 Q(pack)
 Q(unpack)
+Q(calcsize)
 #endif
 
 #if MICROPY_PY_UCTYPES
 Q(uctypes)
+Q(struct)
 Q(sizeof)
 Q(addressof)
 Q(bytes_at)
@@ -588,4 +590,12 @@ Q(sha256)
 #if MICROPY_PY_UBINASCII
 Q(ubinascii)
 Q(hexlify)
+#endif
+
+#if MICROPY_PY_MACHINE
+Q(machine)
+Q(mem)
+Q(mem8)
+Q(mem16)
+Q(mem32)
 #endif

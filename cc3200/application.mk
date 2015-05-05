@@ -20,6 +20,7 @@ APP_INC += -I$(BUILD)
 APP_INC += -I$(BUILD)/genhdr
 APP_INC += -I../lib/fatfs
 APP_INC += -I../lib/mp-readline
+APP_INC += -I../lib/netutils
 APP_INC += -I../stmhal
 
 APP_CPPDEFINES = -Dgcc -DTARGET_IS_CC3200 -DSL_FULL -DUSE_FREERTOS
@@ -80,7 +81,6 @@ APP_MISC_SRC_C = $(addprefix misc/,\
 	mperror.c \
 	mpexception.c \
 	mpsystick.c \
-	pin_defs_cc3200.c \
 	)
 
 APP_MODS_SRC_C = $(addprefix mods/,\
@@ -143,6 +143,7 @@ APP_LIB_SRC_C = $(addprefix lib/,\
 	fatfs/option/ccsbcs.c \
 	libc/string0.c \
 	mp-readline/readline.c \
+	netutils/netutils.c \
 	)
 	
 APP_STM_SRC_C = $(addprefix stmhal/,\
