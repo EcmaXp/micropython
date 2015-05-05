@@ -29,12 +29,7 @@
 #include "py/obj.h"
 #include "py/runtime.h"
 #include "py/bc.h"
-
-typedef struct _mp_obj_bound_meth_t {
-    mp_obj_base_t base;
-    mp_obj_t meth;
-    mp_obj_t self;
-} mp_obj_bound_meth_t;
+#include "py/objboundmeth.h"
 
 #if MICROPY_ERROR_REPORTING == MICROPY_ERROR_REPORTING_DETAILED
 STATIC void bound_meth_print(const mp_print_t *print, mp_obj_t o_in, mp_print_kind_t kind) {
@@ -105,7 +100,7 @@ STATIC void bound_meth_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
 }
 #endif
 
-STATIC const mp_obj_type_t mp_type_bound_meth = {
+const mp_obj_type_t mp_type_bound_meth = {
     { &mp_type_type },
     .name = MP_QSTR_bound_method,
 #if MICROPY_ERROR_REPORTING == MICROPY_ERROR_REPORTING_DETAILED

@@ -29,13 +29,7 @@
 #include "py/obj.h"
 #include "py/runtime.h"
 #include "py/bc.h"
-
-typedef struct _mp_obj_closure_t {
-    mp_obj_base_t base;
-    mp_obj_t fun;
-    mp_uint_t n_closed;
-    mp_obj_t closed[];
-} mp_obj_closure_t;
+#include "py/objclosure.h"
 
 STATIC mp_obj_t closure_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
     mp_obj_closure_t *self = self_in;
@@ -114,7 +108,7 @@ STATIC void closure_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
 }
 #endif
 
-const mp_obj_type_t closure_type = {
+const mp_obj_type_t mp_type_closure = {
     { &mp_type_type },
     .name = MP_QSTR_closure,
 #if MICROPY_ERROR_REPORTING == MICROPY_ERROR_REPORTING_DETAILED
@@ -131,7 +125,7 @@ const mp_obj_type_t closure_type = {
 
 mp_obj_t mp_obj_new_closure(mp_obj_t fun, mp_uint_t n_closed_over, const mp_obj_t *closed) {
     mp_obj_closure_t *o = m_new_obj_var(mp_obj_closure_t, mp_obj_t, n_closed_over);
-    o->base.type = &closure_type;
+    o->base.type = &mp_type_closure;
     o->fun = fun;
     o->n_closed = n_closed_over;
     memcpy(o->closed, closed, n_closed_over * sizeof(mp_obj_t));

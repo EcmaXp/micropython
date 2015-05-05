@@ -31,50 +31,57 @@
 
 void mp_cpu_ctrl_init(void) {
 #if MICROPY_LIMIT_CPU
-    // hard limit
-    MP_STATE_VM(cpu_max_opcodes_executeable) = 0;
+    MP_STATE_VM(cpu_hard_limit) = 0;
+    MP_STATE_VM(cpu_soft_limit) = 0;
+    MP_STATE_VM(cpu_safe_limit) = 0;
     
-    // soft limit
-    MP_STATE_VM(cpu_min_opcodes_executeable) = 0;
+    MP_STATE_VM(cpu_current_executed) = 0;
 
-    // executed opcodes: zero!
-    MP_STATE_VM(cpu_current_opcodes_executed) = 0;
-    
-    /* TODO: limit level
-            PAUSE ALLOWED / PAUSE DISALLOWED
-    - soft: just pause      continue execute
-    - hard: just pause      force stop
-    - error: raise error    raise error
-    error mode are not defined yet.
-    
-    - hard: cpu_max_opcodes_executeable
-    - soft: cpu_min_opcodes_executeable
-    - error: cpu_exc_opcodes_executeable
-    - inf mode: cpu_limit_level?
-    */
+    // when soft_limit reach; it will raise error.
+    MP_STATE_VM(cpu_soft_limit_executed) = false;
 #endif
 }
 
 #if MICROPY_LIMIT_CPU
 
-void mp_cpu_set_limit(mp_uint_t total_opcodes_executeable){
-    MP_STATE_VM(cpu_max_opcodes_executeable) = total_opcodes_executeable;
+void mp_cpu_set_hard_limit(mp_uint_t hard_limit){
+    MP_STATE_VM(cpu_hard_limit) = hard_limit;
 }
 
-mp_uint_t mp_cpu_get_limit(void){
-    return MP_STATE_VM(cpu_max_opcodes_executeable);
+void mp_cpu_set_soft_limit(mp_uint_t soft_limit){
+    MP_STATE_VM(cpu_soft_limit) = soft_limit;
 }
 
-void mp_cpu_set_soft_limit(mp_uint_t total_opcodes_executeable){
-    MP_STATE_VM(cpu_min_opcodes_executeable) = total_opcodes_executeable;
+void mp_cpu_set_soft_limited(void){
+    MP_STATE_VM(cpu_soft_limit_executed) = true;
+}
+
+void mp_cpu_clear_soft_limited(void){
+    MP_STATE_VM(cpu_soft_limit_executed) = false;
+}
+
+void mp_cpu_set_limit(mp_uint_t safe_limit){
+    MP_STATE_VM(cpu_safe_limit) = safe_limit;
+}
+
+mp_uint_t mp_cpu_get_hard_limit(void){
+    return MP_STATE_VM(cpu_hard_limit);
 }
 
 mp_uint_t mp_cpu_get_soft_limit(void){
-    return MP_STATE_VM(cpu_min_opcodes_executeable);
+    return MP_STATE_VM(cpu_soft_limit);
 }
 
-void mp_cpu_set_usage(mp_uint_t current_opcodes_executed){
-    MP_STATE_VM(cpu_current_opcodes_executed) = current_opcodes_executed;
+bool mp_cpu_get_soft_limited(void){
+    return MP_STATE_VM(cpu_soft_limit_executed);
+}
+
+mp_uint_t mp_cpu_get_safe_limit(void){
+    return MP_STATE_VM(cpu_safe_limit);
+}
+
+void mp_cpu_set_usage(mp_uint_t cpu_current_executed){
+    MP_STATE_VM(cpu_current_executed) = cpu_current_executed;
 }
 
 void mp_cpu_clear_usage(void){
@@ -82,7 +89,16 @@ void mp_cpu_clear_usage(void){
 }
 
 mp_uint_t mp_cpu_usage(void){
-    return MP_STATE_VM(cpu_current_opcodes_executed);    
+    return MP_STATE_VM(cpu_current_executed);    
+}
+
+void mp_cpu_exc_hard_limit(void) {
+    nlr_raise(mp_obj_new_exception(&mp_type_SystemHardLimit));
+}
+
+void mp_cpu_exc_soft_limit(void) {
+    MP_STATE_VM(cpu_soft_limit_executed) = true;
+    nlr_raise(mp_obj_new_exception(&mp_type_SystemSoftLimit));
 }
 
 /* TODO: should be limit

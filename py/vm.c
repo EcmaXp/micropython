@@ -154,24 +154,22 @@ typedef enum {
 #endif
 
 #if MICROPY_ALLOW_PAUSE_VM && MICROPY_LIMIT_CPU
-#define VM_SOFT_PAUSE_POINT do { \
-    if (VM_IS_PAUSEABLE() && !MP_CPU_SOFT_CHECK()) {\
+#define VM_SAFE_PAUSE_POINT do { \
+    if (VM_IS_PAUSEABLE() && !MP_CPU_SAFE_CHECK()) {\
         VM_PAUSE(MP_VM_RETURN_FORCE_PAUSE); \
     } \
 } while (0)
 #else
-#define VM_SOFT_PAUSE_POINT
+#define VM_SAFE_PAUSE_POINT
 #endif
 
 #if MICROPY_LIMIT_CPU
 #define VM_CPU_LIMIT() do { \
     MP_CPU_EXECUTED(); \
-    if (!MP_CPU_CHECK()) { \
-        if (VM_IS_PAUSEABLE() && false) { \
-            VM_PAUSE(MP_VM_RETURN_FORCE_PAUSE); \
-        } else { \
-            RAISE(mp_obj_new_exception(&mp_type_SystemHardLimit)); \
-        } \
+    if (!MP_CPU_HARD_CHECK()) { \
+        mp_cpu_exc_hard_limit(); \
+    } else if (!MP_CPU_SOFT_CHECK()) { \
+        mp_cpu_exc_soft_limit(); \
     } \
 } while (0)
 #else
@@ -238,7 +236,7 @@ mp_vm_return_kind_t _mp_execute_bytecode(bool is_pauseable, mp_code_state *first
     #include "py/vmentrytable.h"
     #define DISPATCH() do { \
         VM_CPU_LIMIT(); \
-        VM_SOFT_PAUSE_POINT; \
+        VM_SAFE_PAUSE_POINT; \
         TRACE(ip); \
         MARK_EXC_IP_GLOBAL(); \
         goto *entry_table[*ip++]; \
@@ -308,7 +306,7 @@ dispatch_loop:
                 DISPATCH();
 #else
                 VM_CPU_LIMIT();
-                VM_SOFT_PAUSE_POINT;
+                VM_SAFE_PAUSE_POINT;
                 TRACE(ip);
                 MARK_EXC_IP_GLOBAL();
                 switch (*ip++) {
@@ -1461,3 +1459,8 @@ unwind_loop:
         }
     }
 }
+
+// flatcall is just a mecro
+#if MICROPY_STACKLESS && !MICROPY_STACKLESS_EXTRA
+#undef flatcall
+#endif
