@@ -14,7 +14,6 @@ assert STATUS_STOP
 assert LIMIT_SOFT
 assert LIMIT_HARD
 
-
 def auto(*args, **kwargs):
     def warp(func):
         return MicroThread(func.__name__, func, *args, **kwargs)
@@ -60,6 +59,14 @@ class MicroThread():
     @cpu_soft_limit.setter
     def cpu_soft_limit(self, value):
         self._thread.cpu_soft_limit = value
+
+    @property
+    def cpu_safe_limit(self):
+        return self._thread.cpu_safe_limit
+    
+    @cpu_safe_limit.setter
+    def cpu_safe_limit(self, value):
+        self._thread.cpu_safe_limit = value
     
     @property
     def cpu_current_executed(self):

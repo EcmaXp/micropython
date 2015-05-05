@@ -119,6 +119,7 @@ Q(LIMIT_HARD)
 #if MICROPY_LIMIT_CPU
 Q(cpu_hard_limit)
 Q(cpu_soft_limit)
+Q(cpu_safe_limit)
 Q(cpu_current_executed)
 #endif
 
