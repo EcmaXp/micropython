@@ -28,6 +28,7 @@
 
 #include "py/obj.h"
 #include "py/runtime.h"
+#include "py/bc.h"
 
 typedef struct _mp_obj_closure_t {
     mp_obj_base_t base;
@@ -59,6 +60,28 @@ STATIC mp_obj_t closure_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw,
     }
 }
 
+#if MICROPY_STACKLESS_EXTRA
+mp_code_state_ptr closure_flatcall(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+    mp_obj_closure_t *self = self_in;
+
+    mp_flatcall_fun_t flatcall = mp_obj_get_type(self->fun)->flatcall;
+    if (flatcall == NULL) {
+        return NULL;
+    }
+
+    // need to concatenate closed-over-vars and args
+
+    mp_uint_t n_total = self->n_closed + n_args + 2 * n_kw;
+    // use heap to allocate temporary args array
+    mp_obj_t *args2 = m_new(mp_obj_t, n_total);
+    memcpy(args2, self->closed, self->n_closed * sizeof(mp_obj_t));
+    memcpy(args2 + self->n_closed, args, (n_args + 2 * n_kw) * sizeof(mp_obj_t));
+    mp_code_state *res = flatcall(self->fun, self->n_closed + n_args, n_kw, args2);
+    m_del(mp_obj_t, args2, n_total);
+    return res;
+}
+#endif
+
 #if MICROPY_ERROR_REPORTING == MICROPY_ERROR_REPORTING_DETAILED
 STATIC void closure_print(const mp_print_t *print, mp_obj_t o_in, mp_print_kind_t kind) {
     (void)kind;
@@ -78,6 +101,19 @@ STATIC void closure_print(const mp_print_t *print, mp_obj_t o_in, mp_print_kind_
 }
 #endif
 
+#if MICROPY_PY_FUNCTION_ATTRS
+STATIC void closure_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
+    if (dest[0] != MP_OBJ_NULL) {
+        // not load attribute
+        return;
+    }
+    if (attr == MP_QSTR___name__) {
+        mp_obj_closure_t *self = self_in;
+        dest[0] = MP_OBJ_NEW_QSTR(mp_obj_fun_get_name(self->fun));
+    }
+}
+#endif
+
 const mp_obj_type_t closure_type = {
     { &mp_type_type },
     .name = MP_QSTR_closure,
@@ -85,6 +121,12 @@ const mp_obj_type_t closure_type = {
     .print = closure_print,
 #endif
     .call = closure_call,
+#if MICROPY_STACKLESS_EXTRA
+    .flatcall = closure_flatcall,
+#endif
+#if MICROPY_PY_FUNCTION_ATTRS
+    .attr = closure_attr,
+#endif
 };
 
 mp_obj_t mp_obj_new_closure(mp_obj_t fun, mp_uint_t n_closed_over, const mp_obj_t *closed) {

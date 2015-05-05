@@ -99,11 +99,42 @@ typedef enum {
     exc_sp--; /* pop back to previous exception handler */ \
     CLEAR_SYS_EXC_INFO() /* just clear sys.exc_info(), not compliant, but it shouldn't be used in 1st place */
 
-#if MICROPY_ALLOW_PAUSE_VM
-#define VM_PAUSE(return_value) do { \
+#define UPDATE_CODE_STATE() do { \
     code_state->ip = ip; \
     code_state->sp = sp; \
     code_state->exc_sp = MP_TAGPTR_MAKE(exc_sp, currently_in_except_block); \
+} while (0)
+
+#if MICROPY_KEEP_LAST_CODE_STATE
+#define UPDATE_LAST_CODE_STATE() first_code_state->current = code_state;
+#else
+#define UPDATE_LAST_CODE_STATE()
+#endif
+
+#if MICROPY_STACKLESS
+#define PUSH_CODE_STATE(new_state) do { \
+    (new_state)->prev = code_state; \
+    code_state = (new_state); \
+    UPDATE_LAST_CODE_STATE(); \
+    nlr_pop(); \
+} while (0)
+#endif
+
+#if MICROPY_STACKLESS
+#if MICROPY_STACKLESS_EXTRA
+#define IF_STACKLESS_CALL_ALLOWED() \
+    mp_flatcall_fun_t flatcall = mp_obj_get_type(TOP())->flatcall; \
+    if (flatcall != NULL)
+#else
+#define IF_STACKLESS_CALL_ALLOWED() \
+    if (mp_obj_get_type(TOP()) == &mp_type_fun_bc)
+#define flatcall mp_obj_fun_bc_prepare_codestate
+#endif
+#endif
+
+#if MICROPY_ALLOW_PAUSE_VM
+#define VM_PAUSE(return_value) do { \
+    UPDATE_CODE_STATE(); \
     UPDATE_LAST_CODE_STATE(); \
     nlr_pop(); \
     return (return_value); \
@@ -120,12 +151,6 @@ typedef enum {
 #define VM_PAUSE_POINT
 #define VM_PAUSE(return_value) assert(0);
 #define VM_IS_PAUSEABLE() (false)
-#endif
-
-#if MICROPY_KEEP_LAST_CODE_STATE
-#define UPDATE_LAST_CODE_STATE() first_code_state->current = code_state;
-#else
-#define UPDATE_LAST_CODE_STATE()
 #endif
 
 #if MICROPY_ALLOW_PAUSE_VM && MICROPY_LIMIT_CPU
@@ -999,16 +1024,11 @@ unwind_jump:;
                     // (unum >> 8) & 0xff == n_keyword
                     sp -= (unum & 0xff) + ((unum >> 7) & 0x1fe);
                     #if MICROPY_STACKLESS
-                    if (mp_obj_get_type(*sp) == &mp_type_fun_bc) {
-                        code_state->ip = ip;
-                        code_state->sp = sp;
-                        code_state->exc_sp = MP_TAGPTR_MAKE(exc_sp, currently_in_except_block);
-                        mp_code_state *new_state = mp_obj_fun_bc_prepare_codestate(*sp, unum & 0xff, (unum >> 8) & 0xff, sp + 1);
+                    IF_STACKLESS_CALL_ALLOWED() {
+                        UPDATE_CODE_STATE();
+                        mp_code_state *new_state = flatcall(*sp, unum & 0xff, (unum >> 8) & 0xff, sp + 1);
                         if (new_state) {
-                            new_state->prev = code_state;
-                            code_state = new_state;
-                            UPDATE_LAST_CODE_STATE();
-                            nlr_pop();
+                            PUSH_CODE_STATE(new_state);
                             goto run_code_state;
                         }
                         #if MICROPY_STACKLESS_STRICT
@@ -1033,22 +1053,16 @@ unwind_jump:;
                     // fun arg0 arg1 ... kw0 val0 kw1 val1 ... seq dict <- TOS
                     sp -= (unum & 0xff) + ((unum >> 7) & 0x1fe) + 2;
                     #if MICROPY_STACKLESS
-                    if (mp_obj_get_type(*sp) == &mp_type_fun_bc) {
-                        code_state->ip = ip;
-                        code_state->sp = sp;
-                        code_state->exc_sp = MP_TAGPTR_MAKE(exc_sp, currently_in_except_block);
-
+                    IF_STACKLESS_CALL_ALLOWED() {
+                        UPDATE_CODE_STATE();
                         mp_call_args_t out_args;
                         mp_call_prepare_args_n_kw_var(false, unum, sp, &out_args);
 
-                        mp_code_state *new_state = mp_obj_fun_bc_prepare_codestate(out_args.fun,
+                        mp_code_state *new_state = flatcall(out_args.fun,
                             out_args.n_args, out_args.n_kw, out_args.args);
                         m_del(mp_obj_t, out_args.args, out_args.n_alloc);
                         if (new_state) {
-                            new_state->prev = code_state;
-                            code_state = new_state;
-                            UPDATE_LAST_CODE_STATE();
-                            nlr_pop();
+                            PUSH_CODE_STATE(new_state);
                             goto run_code_state;
                         }
                         #if MICROPY_STACKLESS_STRICT
@@ -1070,21 +1084,16 @@ unwind_jump:;
                     // (unum >> 8) & 0xff == n_keyword
                     sp -= (unum & 0xff) + ((unum >> 7) & 0x1fe) + 1;
                     #if MICROPY_STACKLESS
-                    if (mp_obj_get_type(*sp) == &mp_type_fun_bc) {
-                        code_state->ip = ip;
-                        code_state->sp = sp;
-                        code_state->exc_sp = MP_TAGPTR_MAKE(exc_sp, currently_in_except_block);
-
+                    IF_STACKLESS_CALL_ALLOWED() {
+                        UPDATE_CODE_STATE();
+                        
                         mp_uint_t n_args = unum & 0xff;
                         mp_uint_t n_kw = (unum >> 8) & 0xff;
                         int adjust = (sp[1] == NULL) ? 0 : 1;
 
-                        mp_code_state *new_state = mp_obj_fun_bc_prepare_codestate(*sp, n_args + adjust, n_kw, sp + 2 - adjust);
+                        mp_code_state *new_state = flatcall(*sp, n_args + adjust, n_kw, sp + 2 - adjust);
                         if (new_state) {
-                            new_state->prev = code_state;
-                            code_state = new_state;
-                            UPDATE_LAST_CODE_STATE();
-                            nlr_pop();
+                            PUSH_CODE_STATE(new_state);
                             goto run_code_state;
                         }
                         #if MICROPY_STACKLESS_STRICT
@@ -1108,22 +1117,17 @@ unwind_jump:;
                     // fun self arg0 arg1 ... kw0 val0 kw1 val1 ... seq dict <- TOS
                     sp -= (unum & 0xff) + ((unum >> 7) & 0x1fe) + 3;
                     #if MICROPY_STACKLESS
-                    if (mp_obj_get_type(*sp) == &mp_type_fun_bc) {
-                        code_state->ip = ip;
-                        code_state->sp = sp;
-                        code_state->exc_sp = MP_TAGPTR_MAKE(exc_sp, currently_in_except_block);
-
+                    IF_STACKLESS_CALL_ALLOWED() {
+                        UPDATE_CODE_STATE();
+                        
                         mp_call_args_t out_args;
                         mp_call_prepare_args_n_kw_var(true, unum, sp, &out_args);
 
-                        mp_code_state *new_state = mp_obj_fun_bc_prepare_codestate(out_args.fun,
+                        mp_code_state *new_state = flatcall(out_args.fun,
                             out_args.n_args, out_args.n_kw, out_args.args);
                         m_del(mp_obj_t, out_args.args, out_args.n_alloc);
                         if (new_state) {
-                            new_state->prev = code_state;
-                            code_state = new_state;
-                            UPDATE_LAST_CODE_STATE();
-                            nlr_pop();
+                            PUSH_CODE_STATE(new_state);
                             goto run_code_state;
                         }
                         #if MICROPY_STACKLESS_STRICT
@@ -1200,9 +1204,7 @@ unwind_return:
                 ENTRY(MP_BC_YIELD_VALUE):
 yield:
                     nlr_pop();
-                    code_state->ip = ip;
-                    code_state->sp = sp;
-                    code_state->exc_sp = MP_TAGPTR_MAKE(exc_sp, currently_in_except_block);
+                    UPDATE_CODE_STATE();
                     return MP_VM_RETURN_YIELD;
 
                 ENTRY(MP_BC_YIELD_FROM): {

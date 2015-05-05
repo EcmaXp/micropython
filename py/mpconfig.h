@@ -157,6 +157,11 @@
 #define MICROPY_STACKLESS_STRICT (0)
 #endif
 
+// Avoid using C stack even if that is closure or bound meth.
+#ifndef MICROPY_STACKLESS_EXTRA
+#define MICROPY_STACKLESS_EXTRA (0)
+#endif
+
 /*****************************************************************************/
 /* Micro Python emitters                                                     */
 

@@ -28,6 +28,7 @@
 
 #include "py/obj.h"
 #include "py/runtime.h"
+#include "py/bc.h"
 
 typedef struct _mp_obj_bound_meth_t {
     mp_obj_base_t base;
@@ -70,6 +71,27 @@ STATIC mp_obj_t bound_meth_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_
     }
 }
 
+#if MICROPY_STACKLESS_EXTRA
+mp_code_state_ptr bound_meth_flatcall(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+    mp_obj_bound_meth_t *self = self_in;
+
+    mp_flatcall_fun_t flatcall = mp_obj_get_type(self->meth)->flatcall;
+    if (flatcall == NULL) {
+        return NULL;
+    }
+    // need to insert self->self before all other args and then call self->meth
+
+    mp_uint_t n_total = n_args + 2 * n_kw;
+    // use heap to allocate temporary args array
+    mp_obj_t *args2 = m_new(mp_obj_t, 1 + n_total);
+    args2[0] = self->self;
+    memcpy(args2 + 1, args, n_total * sizeof(mp_obj_t));
+    mp_code_state *res = flatcall(self->meth, n_args + 1, n_kw, &args2[0]);
+    m_del(mp_obj_t, args2, 1 + n_total);
+    return res;
+}
+#endif
+
 #if MICROPY_PY_FUNCTION_ATTRS
 STATIC void bound_meth_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
     if (dest[0] != MP_OBJ_NULL) {
@@ -90,6 +112,9 @@ STATIC const mp_obj_type_t mp_type_bound_meth = {
     .print = bound_meth_print,
 #endif
     .call = bound_meth_call,
+#if MICROPY_STACKLESS_EXTRA
+    .flatcall = bound_meth_flatcall,
+#endif
 #if MICROPY_PY_FUNCTION_ATTRS
     .attr = bound_meth_attr,
 #endif

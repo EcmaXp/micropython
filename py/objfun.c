@@ -295,6 +295,12 @@ STATIC mp_obj_t fun_bc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, 
     }
 }
 
+#if MICROPY_STACKLESS_EXTRA
+mp_code_state_ptr fun_bc_flatcall(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+    return mp_obj_fun_bc_prepare_codestate(self_in, n_args, n_kw, args);
+}
+#endif
+
 #if MICROPY_PY_FUNCTION_ATTRS
 STATIC void fun_bc_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
     if (dest[0] != MP_OBJ_NULL) {
@@ -314,6 +320,9 @@ const mp_obj_type_t mp_type_fun_bc = {
     .print = fun_bc_print,
 #endif
     .call = fun_bc_call,
+#if MICROPY_STACKLESS_EXTRA
+    .flatcall = fun_bc_flatcall,
+#endif
 #if MICROPY_PY_FUNCTION_ATTRS
     .attr = fun_bc_attr,
 #endif

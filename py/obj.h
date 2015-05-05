@@ -37,6 +37,10 @@
 typedef machine_ptr_t mp_obj_t;
 typedef machine_const_ptr_t mp_const_obj_t;
 
+#if MICROPY_STACKLESS_EXTRA
+typedef mp_obj_t mp_code_state_ptr;
+#endif
+
 // Anything that wants to be a Micro Python object must have
 // mp_obj_base_t as its first member (except small ints and qstrs)
 
@@ -274,6 +278,10 @@ typedef mp_obj_t (*mp_binary_op_fun_t)(mp_uint_t op, mp_obj_t, mp_obj_t);
 typedef void (*mp_attr_fun_t)(mp_obj_t self_in, qstr attr, mp_obj_t *dest);
 typedef mp_obj_t (*mp_subscr_fun_t)(mp_obj_t self_in, mp_obj_t index, mp_obj_t value);
 
+#if MICROPY_STACKLESS_EXTRA
+typedef mp_code_state_ptr (*mp_flatcall_fun_t)(mp_obj_t fun, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args);
+#endif
+
 typedef struct _mp_method_t {
     qstr name;
     mp_const_obj_t fun;
@@ -332,6 +340,9 @@ struct _mp_obj_type_t {
     mp_make_new_fun_t make_new;     // to make an instance of the type
 
     mp_call_fun_t call;
+#if MICROPY_STACKLESS_EXTRA
+    mp_flatcall_fun_t flatcall;     // if stackless enabled, vm can use that.
+#endif
     mp_unary_op_fun_t unary_op;     // can return MP_OBJ_NULL if op not supported
     mp_binary_op_fun_t binary_op;   // can return MP_OBJ_NULL if op not supported
 
