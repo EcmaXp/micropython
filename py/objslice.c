@@ -32,27 +32,6 @@
 #include "py/runtime0.h"
 
 /******************************************************************************/
-/* ellipsis object, a singleton                                               */
-
-typedef struct _mp_obj_ellipsis_t {
-    mp_obj_base_t base;
-} mp_obj_ellipsis_t;
-
-STATIC void ellipsis_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
-    (void)self_in;
-    (void)kind;
-    mp_print_str(print, "Ellipsis");
-}
-
-const mp_obj_type_t mp_type_ellipsis = {
-    { &mp_type_type },
-    .name = MP_QSTR_Ellipsis,
-    .print = ellipsis_print,
-};
-
-const mp_obj_ellipsis_t mp_const_ellipsis_obj = {{&mp_type_ellipsis}};
-
-/******************************************************************************/
 /* slice object                                                               */
 
 #if MICROPY_PY_BUILTINS_SLICE

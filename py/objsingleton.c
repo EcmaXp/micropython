@@ -24,20 +24,34 @@
  * THE SOFTWARE.
  */
 
-typedef enum {
-    PYEXEC_MODE_RAW_REPL,
-    PYEXEC_MODE_FRIENDLY_REPL,
-} pyexec_mode_kind_t;
+#include <stdlib.h>
+#include <assert.h>
 
-extern pyexec_mode_kind_t pyexec_mode_kind;
+#include "py/nlr.h"
+#include "py/obj.h"
+#include "py/runtime0.h"
 
-#define PYEXEC_FORCED_EXIT (0x100)
-#define PYEXEC_SWITCH_MODE (0x200)
+/******************************************************************************/
+/* singleton objects defined by Python                                        */
 
-int pyexec_raw_repl(void);
-int pyexec_friendly_repl(void);
-int pyexec_file(const char *filename);
-void pyexec_event_repl_init(void);
-int pyexec_event_repl_process_char(int c);
+typedef struct _mp_obj_singleton_t {
+    mp_obj_base_t base;
+    qstr name;
+} mp_obj_singleton_t;
 
-MP_DECLARE_CONST_FUN_OBJ(pyb_set_repl_info_obj);
+STATIC void singleton_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
+    (void)kind;
+    mp_obj_singleton_t *self = self_in;
+    mp_printf(print, "%q", self->name);
+}
+
+const mp_obj_type_t mp_type_singleton = {
+    { &mp_type_type },
+    .name = MP_QSTR_,
+    .print = singleton_print,
+};
+
+const mp_obj_singleton_t mp_const_ellipsis_obj = {{&mp_type_singleton}, MP_QSTR_Ellipsis};
+#if MICROPY_PY_BUILTINS_NOTIMPLEMENTED
+const mp_obj_singleton_t mp_const_notimplemented_obj = {{&mp_type_singleton}, MP_QSTR_NotImplemented};
+#endif

@@ -83,6 +83,7 @@ PY_O_BASENAME = \
 	objrange.o \
 	objreversed.o \
 	objset.o \
+	objsingleton.o \
 	objslice.o \
 	objstr.o \
 	objstrunicode.o \
