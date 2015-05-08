@@ -155,6 +155,12 @@ STATIC void pre_process_options(int argc, char **argv) {
     }
 }
 
+#ifdef _WIN32
+#define PATHLIST_SEP_CHAR ';'
+#else
+#define PATHLIST_SEP_CHAR ':'
+#endif
+
 int main(int argc, char **argv) {
     pre_process_options(argc, argv);
     mp_stack_set_limit(40 * 1024 * (BYTES_PER_WORD / 4));
@@ -168,7 +174,43 @@ int main(int argc, char **argv) {
 #endif
     
     mp_init();
-    mp_obj_list_init(mp_sys_path, 0);
+
+    char *home = getenv("HOME");
+    char *path = getenv("MICROPYPATH");
+    if (path == NULL) {
+        path = "~/.micropython/lib:/usr/lib/micropython";
+    }
+    mp_uint_t path_num = 1; // [0] is for current dir (or base dir of the script)
+    for (char *p = path; p != NULL; p = strchr(p, PATHLIST_SEP_CHAR)) {
+        path_num++;
+        if (p != NULL) {
+            p++;
+        }
+    }
+    mp_obj_list_init(mp_sys_path, path_num);
+    mp_obj_t *path_items;
+    mp_obj_list_get(mp_sys_path, &path_num, &path_items);
+    path_items[0] = MP_OBJ_NEW_QSTR(MP_QSTR_);
+    {
+    char *p = path;
+    for (mp_uint_t i = 1; i < path_num; i++) {
+        char *p1 = strchr(p, PATHLIST_SEP_CHAR);
+        if (p1 == NULL) {
+            p1 = p + strlen(p);
+        }
+        if (p[0] == '~' && p[1] == '/' && home != NULL) {
+            // Expand standalone ~ to $HOME
+            CHECKBUF(buf, PATH_MAX);
+            CHECKBUF_APPEND(buf, home, strlen(home));
+            CHECKBUF_APPEND(buf, p + 1, (size_t)(p1 - p - 1));
+            path_items[i] = MP_OBJ_NEW_QSTR(qstr_from_strn(buf, CHECKBUF_LEN(buf)));
+        } else {
+            path_items[i] = MP_OBJ_NEW_QSTR(qstr_from_strn(p, p1 - p));
+        }
+        p = p1 + 1;
+    }
+    }
+
     mp_obj_list_init(mp_sys_argv, 0);
     
     const int NOTHING_EXECUTED = -2;

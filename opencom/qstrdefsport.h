@@ -131,3 +131,12 @@ Q(loads)
 Q(test)
 Q(test1)
 Q(test2)
+
+// persist
+Q(persist)
+Q(upersist)
+Q(dumps)
+Q(loads)
+Q(test)
+Q(test1)
+Q(test2)

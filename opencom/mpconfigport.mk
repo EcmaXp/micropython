@@ -12,5 +12,8 @@ MICROPY_PY_SOCKET = 1
 # Subset of msgpack module
 MICROPY_PY_MSGPACK = 1
 
+# Subset of persist module
+MICROPY_PY_PERSIST = 1
+
 # Allow pause Virtual Machine
 MICROPY_ALLOW_PAUSE_VM = 1

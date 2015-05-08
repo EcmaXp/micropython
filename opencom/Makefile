@@ -67,6 +67,10 @@ ifeq ($(MICROPY_PY_MSGPACK),1)
 CFLAGS_MOD += -DMICROPY_PY_MSGPACK=1
 SRC_MOD += modmsgpack.c
 endif
+ifeq ($(MICROPY_PY_PERSIST),1)
+CFLAGS_MOD += -DMICROPY_PY_PERSIST=1
+SRC_MOD += modpersist.c
+endif
 ifeq ($(MICROPY_ALLOW_PAUSE_VM),1)
 CFLAGS_MOD += -DMICROPY_ALLOW_PAUSE_VM=1
 SRC_MOD += modmicrothread.c

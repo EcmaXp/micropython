@@ -61,6 +61,7 @@
 #define MICROPY_PY_BUILTINS_MEMORYVIEW (1)
 #define MICROPY_PY_BUILTINS_FROZENSET (1)
 #define MICROPY_PY_BUILTINS_COMPILE (1)
+#define MICROPY_PY_BUILTINS_NOTIMPLEMENTED (0)
 #define MICROPY_PY_MICROPYTHON_MEM_INFO (1)
 #define MICROPY_PY_ALL_SPECIAL_METHODS (1)
 #define MICROPY_PY_ARRAY_SLICE_ASSIGN (1)
@@ -86,6 +87,7 @@
 #define MICROPY_PY_UHEAPQ           (1)
 #define MICROPY_PY_UHASHLIB         (1)
 #define MICROPY_PY_UBINASCII        (1)
+#define MICROPY_PY_MACHINE          (1)
 
 // Define to MICROPY_ERROR_REPORTING_DETAILED to get function, etc.
 // names in exception messages (may require more RAM).
@@ -111,6 +113,7 @@ extern const struct _mp_obj_module_t mp_module_time;
 extern const struct _mp_obj_module_t mp_module_socket;
 extern const struct _mp_obj_module_t mp_module_msgpack;
 extern const struct _mp_obj_module_t mp_module_microthread;
+extern const struct _mp_obj_module_t mp_module_persist;
 extern const struct _mp_obj_module_t mp_module_mpoc;
 
 #if MICROPY_PY_TIME
@@ -128,6 +131,11 @@ extern const struct _mp_obj_module_t mp_module_mpoc;
 #else
 #define MICROPY_PY_MSGPACK_DEF
 #endif
+#if MICROPY_PY_PERSIST
+#define MICROPY_PY_PERSIST_DEF { MP_OBJ_NEW_QSTR(MP_QSTR_upersist), (mp_obj_t)&mp_module_persist },
+#else
+#define MICROPY_PY_PERSIST_DEF
+#endif
 #if MICROPY_ALLOW_PAUSE_VM
 #define MICROPY_PY_MICROTHREAD_DEF { MP_OBJ_NEW_QSTR(MP_QSTR_umicrothread), (mp_obj_t)&mp_module_microthread },
 #else
@@ -139,11 +147,11 @@ extern const struct _mp_obj_module_t mp_module_mpoc;
     MICROPY_PY_SOCKET_DEF \
     MICROPY_PY_MSGPACK_DEF \
     MICROPY_PY_MICROTHREAD_DEF \
+    MICROPY_PY_PERSIST_DEF \
     { MP_OBJ_NEW_QSTR(MP_QSTR_mpoc), (mp_obj_t)&mp_module_mpoc }, \
     { MP_OBJ_NEW_QSTR(MP_QSTR__os), (mp_obj_t)&mp_module_os }, \
     {}
 
-//     
 
 // type definitions for the specific machine
 

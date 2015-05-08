@@ -23,3 +23,45 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+
+/* TODO: ?
+
+like the gc. find all that relative from thing.
+how to persist object on stack?
+
+WTF
+
+*/
+
+#include <stdio.h>
+#include <msgpack.h>
+#include "opencom/modmicrothread.h"
+
+void _mod_msgpack_pack(msgpack_packer *pk, mp_obj_t o);
+void _mod_msgpack_unpack(msgpack_packer *pk, mp_obj_t o);
+
+STATIC mp_obj_t mod_persist_test(mp_obj_t test) {
+    
+    return mp_const_none;
+}
+
+
+
+MP_DEFINE_CONST_FUN_OBJ_0(mod_persist_test_obj, mod_persist_test);
+
+
+STATIC const mp_map_elem_t mp_module_persist_globals_table[] = {
+    { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_upersist) },
+//    { MP_OBJ_NEW_QSTR(MP_QSTR_dumps), (mp_obj_t)&mod_persist_dumps_obj },
+//    { MP_OBJ_NEW_QSTR(MP_QSTR_loads), (mp_obj_t)&mod_persist_loads_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&mod_persist_test_obj },
+//    { MP_OBJ_NEW_QSTR(MP_QSTR_test2), (mp_obj_t)&mod_persist_test2_obj },
+};
+
+STATIC MP_DEFINE_CONST_DICT(mp_module_persist_globals, mp_module_persist_globals_table);
+
+const mp_obj_module_t mp_module_persist = {
+    .base = { &mp_type_module },
+    .name = MP_QSTR_upersist,
+    .globals = (mp_obj_dict_t*)&mp_module_persist_globals,
+};
