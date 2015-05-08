@@ -356,6 +356,13 @@ int main(int argc, char **argv) {
 
     mp_obj_list_init(mp_sys_argv, 0);
 
+    #if defined(MICROPY_UNIX_COVERAGE)
+    {
+        MP_DECLARE_CONST_FUN_OBJ(extra_coverage_obj);
+        mp_store_global(QSTR_FROM_STR_STATIC("extra_coverage"), (mp_obj_t)&extra_coverage_obj);
+    }
+    #endif
+
     // Here is some example code to create a class and instance of that class.
     // First is the Python, then the C code.
     //

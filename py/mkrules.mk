@@ -35,8 +35,9 @@ $(ECHO) "CC $<"
 $(Q)$(CC) $(CFLAGS) -c -MD -o $@ $<
 @# The following fixes the dependency file.
 @# See http://make.paulandlesley.org/autodep.html for details.
+@# Regex adjusted from the above to play better with Windows paths, etc.
 @$(CP) $(@:.o=.d) $(@:.o=.P); \
-  $(SED) -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
+  $(SED) -e 's/#.*//' -e 's/^.*:  *//' -e 's/ *\\$$//' \
       -e '/^$$/ d' -e 's/$$/ :/' < $(@:.o=.d) >> $(@:.o=.P); \
   $(RM) -f $(@:.o=.d)
 endef

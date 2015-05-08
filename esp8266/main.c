@@ -32,6 +32,7 @@
 #include "py/runtime0.h"
 #include "py/runtime.h"
 #include "py/stackctrl.h"
+#include "py/frozenmod.h"
 #include "py/gc.h"
 #include "pyexec.h"
 #include "gccollect.h"
@@ -43,10 +44,13 @@ STATIC void mp_reset(void) {
     mp_stack_set_limit(10240);
     mp_hal_init();
     gc_init(heap, heap + sizeof(heap));
-    gc_collect_init();
     mp_init();
     mp_obj_list_init(mp_sys_path, 0);
     mp_obj_list_init(mp_sys_argv, 0);
+#if MICROPY_MODULE_FROZEN
+    mp_lexer_t *lex = mp_find_frozen_module("main", 4);
+    mp_parse_compile_execute(lex, MP_PARSE_FILE_INPUT, mp_globals_get(), mp_locals_get());
+#endif
 }
 
 void soft_reset(void) {
