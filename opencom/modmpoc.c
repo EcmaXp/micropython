@@ -24,6 +24,7 @@
  * THE SOFTWARE.
  */
 
+#include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -69,10 +70,24 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_mpoc_test_obj, mod_mpoc_test);
 
 // STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_mpoc_pause_obj, mod_mpoc_pause);
 
+STATIC mp_obj_t mod_mpoc_get_loaded_modules(void) {
+    mp_obj_dict_t *self = m_new_obj(mp_obj_dict_t);
+    self->base.type = &mp_type_dict;
+    self->map = MP_STATE_VM(mp_loaded_modules_map);
+    
+    mp_obj_t copy_fun = mp_load_attr(self, MP_QSTR_copy);
+    return mp_call_function_0(copy_fun);
+}
+
+
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_mpoc_get_loaded_modules_obj, mod_mpoc_get_loaded_modules);
+
 STATIC const mp_map_elem_t mp_module_mpoc_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_mpoc) },
     { MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&mod_mpoc_test_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_pause), (mp_obj_t)&mod_mpoc_pause_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_builtin_modules), (mp_obj_t)&mp_builtin_module_dict },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_get_loaded_modules), (mp_obj_t)&mod_mpoc_get_loaded_modules_obj },
 };
 
 STATIC MP_DEFINE_CONST_DICT(mp_module_mpoc_globals, mp_module_mpoc_globals_table);

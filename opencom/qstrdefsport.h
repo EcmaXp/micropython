@@ -84,6 +84,8 @@ Q(test1)
 Q(test2)
 Q(test3)
 Q(test4)
+Q(get_loaded_modules)
+Q(builtin_modules)
 
 // microthread
 Q(microthread)
@@ -135,6 +137,8 @@ Q(test2)
 // persist
 Q(persist)
 Q(upersist)
+Q(Persister)
+Q(UnPersister)
 Q(dumps)
 Q(loads)
 Q(test)

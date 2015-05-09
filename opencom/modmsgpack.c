@@ -100,6 +100,7 @@ STATIC void _mod_msgpack_listpack(msgpack_packer *pk, mp_obj_t o, list_get_f lis
 
 
 // https://github.com/msgpack/msgpack-python/blob/master/msgpack/_packer.pyx
+// TODO: pack handler?
 STATIC void _mod_msgpack_pack(msgpack_packer *pk, mp_obj_t o) {
     MP_STACK_CHECK();
     
@@ -204,6 +205,7 @@ STATIC void _mod_msgpack_pack(msgpack_packer *pk, mp_obj_t o) {
 /******************************************************************************/
 
 // https://github.com/msgpack/msgpack-python/blob/master/msgpack/_unpacker.pyx
+// TODO: ext handler?
 STATIC mp_obj_t _mod_msgpack_unpack(msgpack_object mo) {
     MP_STACK_CHECK();
 
