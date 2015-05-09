@@ -479,6 +479,9 @@ extern const struct _mp_obj_singleton_t mp_const_notimplemented_obj;
 extern const struct _mp_obj_exception_t mp_const_MemoryError_obj;
 extern const struct _mp_obj_exception_t mp_const_GeneratorExit_obj;
 
+// for getting builtin_module_dict from other place (TODO: use other by EcmaXp)
+extern const struct _mp_obj_dict_t mp_builtin_module_dict;
+
 // General API for objects
 
 mp_obj_t mp_obj_new_type(qstr name, mp_obj_t bases_tuple, mp_obj_t locals_dict);

@@ -193,6 +193,9 @@ STATIC const mp_map_elem_t mp_builtin_module_table[] = {
 
 STATIC MP_DEFINE_CONST_MAP(mp_builtin_module_map, mp_builtin_module_table);
 
+// for getting builtin_module_dict from other place (TODO: use other by EcmaXp)
+MP_DEFINE_CONST_DICT(mp_builtin_module_dict, mp_builtin_module_table);
+
 void mp_module_init(void) {
     mp_map_init(&MP_STATE_VM(mp_loaded_modules_map), 3);
 }
