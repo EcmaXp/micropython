@@ -1085,7 +1085,7 @@ mp_vm_return_kind_t mp_resume(mp_obj_t self_in, mp_obj_t send_value, mp_obj_t th
 
     if (type->iternext != NULL && send_value == mp_const_none) {
         mp_obj_t ret = type->iternext(self_in);
-        if (ret != MP_OBJ_NULL) {
+        if (ret != MP_OBJ_STOP_ITERATION) {
             *ret_val = ret;
             return MP_VM_RETURN_YIELD;
         } else {
@@ -1117,6 +1117,8 @@ mp_vm_return_kind_t mp_resume(mp_obj_t self_in, mp_obj_t send_value, mp_obj_t th
         if (mp_obj_is_subclass_fast(mp_obj_get_type(throw_value), &mp_type_GeneratorExit)) {
             mp_load_method_maybe(self_in, MP_QSTR_close, dest);
             if (dest[0] != MP_OBJ_NULL) {
+                // TODO: Exceptions raised in close() are not propagated,
+                // printed to sys.stderr
                 *ret_val = mp_call_method_n_kw(0, 0, dest);
                 // We assume one can't "yield" from close()
                 return MP_VM_RETURN_NORMAL;
