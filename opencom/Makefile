@@ -79,8 +79,8 @@ endif
 # source files
 SRC_C = \
 	main.c \
-	gccollect.c \
 	file.c \
+	gccollect.c \
 	modos.c \
 	modmpoc.c \
 	$(SRC_MOD)
