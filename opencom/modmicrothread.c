@@ -24,9 +24,6 @@
  * THE SOFTWARE.
  */
 
-// Module Name: umicrothread
-// This module will control microthread.
-
 #include <stdio.h>
 #include <string.h>
 

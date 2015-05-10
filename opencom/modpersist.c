@@ -92,6 +92,12 @@ bitmap: 1 KB can handle 128 KB on 64 Bit System.
 #error Persist module require gc. (really?)
 #endif
 
+#if mp_int_t == int32_t
+#define MP_PERSIST_MAP_ROW_SHIFT 3
+#elif mp_int_t == int64_t
+#define MP_PERSIST_MAP_ROW_SHIFT 4
+#endif
+
 #define MP_MSGPACK_EXT_TYPE_MIXIN 's'
 #define MP_MSGPACK_EXT_TYPE_PERSIST 'p'
 #define MP_MSGPACK_EXT_TYPE_QUITE_POINTER 'q'
@@ -100,9 +106,12 @@ void _mod_msgpack_pack(msgpack_packer *pk, mp_obj_t o);
 void _mod_msgpack_unpack(msgpack_packer *pk, mp_obj_t o);
 
 #define PERSIST()
-#define DO_PERSIST(type, value) _mod_persist_dump_##type((value))
+#define DO_PERSIST(type, x) persister_dump_##type(persister, (x))
 #define UNPERSIST()
 #define DO_UNPERSIST()
+#define PACK(type, x) msgpack_pack_##type(pk, x)
+#define PACK_PTR(x) DO_PERSIST(any, (x))
+#define PACK_BASEPTR(baseptr, ptr, size) persister_dump_baseptr(persister, (baseptr), (char *)(ptr), (ptr))
 
 typedef struct _mp_obj_persister_t {
     mp_obj_base_t base;
@@ -110,17 +119,23 @@ typedef struct _mp_obj_persister_t {
     byte *regmap;
     mp_uint_t regmap_size;
     
-    // main?
     msgpack_sbuffer *sbuf;
     msgpack_packer *pk;
-
-    // sub?
 
 } mp_obj_persister_t;
 
 const mp_obj_type_t mp_type_persister;
 
 // some type require for dump thing, like printer?
+
+#define MP_RM_INIT(x) \
+    (void)0;
+#define MP_RM_CHECK(x) ((start <= (i)) && ((i) < end))
+#define MP_RM_OFFSET(i) ((i - start) >> (MP_PERSIST_MAP_ROW_SHIFT))
+#define MP_RM_SHIFT 3
+#define MP_RM_MASK 7 // (BITS_PER_BYTE - 1)
+#define MP_RM_SET(regmap, i) ((regmap)[MP_RM_OFFSET((i)) >> MP_RM_SHIFT] |= 1 << (MP_RM_OFFSET((i)) & MP_RM_MASK))
+#define MP_RM_GET(regmap, i) ((regmap)[MP_RM_OFFSET((i)) >> MP_RM_SHIFT] & (1 << (MP_RM_OFFSET((i)) & MP_RM_MASK)))
 
 mp_obj_t persister_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
     // TODO: make mp_obj_t type. (like Packer, for share packed thing)
@@ -136,19 +151,13 @@ mp_obj_t persister_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, 
     mp_uint_t regmap_size = (memsize + BITS_PER_WORD - 1) / BITS_PER_WORD;
     
     byte *regmap = m_new0(byte, regmap_size);
-
-    #if mp_int_t == int32_t
-    #define MAP_ROW_SHIFT 3
-    #elif mp_int_t == int64_t
-    #define MAP_ROW_SHIFT 4
-    #endif
     
     mp_uint_t start = (mp_uint_t)MP_STATE_MEM(gc_pool_start);
     mp_uint_t end = (mp_uint_t)MP_STATE_MEM(gc_pool_end);
     
     mp_uint_t i = start;
     for (; i < end; i += BYTES_PER_WORD) {
-        mp_uint_t pos = (i - start) >> (MAP_ROW_SHIFT);
+        mp_uint_t pos = (i - start) >> (MP_PERSIST_MAP_ROW_SHIFT);
         regmap[pos >> 3] |= 1 << (pos & (BITS_PER_BYTE - 1));
     }
     
@@ -164,53 +173,53 @@ mp_obj_t persister_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, 
     return persister;
 }
 
-void _mod_persist_dump_microthread(mp_obj_persister_t *packer, mp_obj_t thread_obj) {
+void persister_dump_microthread(mp_obj_persister_t *persister, mp_obj_t thread_obj) {
     assert(MP_OBJ_IS_TYPE(thread_obj, &mp_type_microthread));
+
     mp_obj_microthread_t *thread = thread_obj;
+    msgpack_packer *pk = persister->pk;
+    
+    // PACK(array, 1);
+    // PACK_PTR();
+    // PACK_BASEPTR();
+    // PACK(int64, 32);
 
-    msgpack_sbuffer sbuf;
-    msgpack_sbuffer_init(&sbuf);
-
-    msgpack_packer pk;
-    msgpack_packer_init(&pk, &sbuf, msgpack_sbuffer_write);
-    
-    // sbuf.data, sbuf.size
-    // _mod_msgpack_pack(&pk, object);
-    
-    msgpack_sbuffer_destroy(&sbuf);
-    
     (void)thread;
+    (void)pk;
 }
 
-void _mod_persist_dump_dict() {
+void persister_dump_code_state(mp_obj_persister_t *persister, mp_code_state *code_state) {
     
 }
 
-void _mod_persist_dump_code_state(mp_code_state *code_state) {
+void persister_dump_stack(mp_obj_persister_t *persister) {
     
 }
 
-void _mod_persist_dump_stack() {
+void persister_dump_vm_state(mp_obj_persister_t *persister) {
     
 }
 
-void _mod_persist_dump_vm_state() {
+void persister_dump_qstr(mp_obj_persister_t *persister, mp_obj_t qstr) {
     
 }
 
-void _mod_persist_dump_qstr() {
+void persister_dump_small_int(mp_obj_persister_t *persister, mp_obj_t small_int) {
     
 }
 
-void _mod_persist_dump_small_int() {
+void persister_dump_obj(mp_obj_persister_t *persister, mp_obj_t obj) {
     
 }
 
-void _mod_persist_dump_obj(mp_obj_t obj) {
+void persister_dump_baseptr(mp_obj_t baseptr, char *ptr, mp_uint_t size) {
+    mp_uint_t offset = (mp_uint_t)baseptr - (mp_uint_t)ptr;
+    assert(offset < 0 || size <= offset);
     
+    // PACK()
 }
 
-void _mod_persist_dump_any(mp_obj_t any) {
+void persister_dump_any(mp_obj_persister_t *persister, mp_obj_t any) {
     if (any == MP_OBJ_NULL) {
 
     } else if (any == MP_OBJ_STOP_ITERATION) {
@@ -230,7 +239,7 @@ void _mod_persist_dump_any(mp_obj_t any) {
     }
 }
 
-// void _mod_persist_dump_
+// void persister_dump_
 
 STATIC mp_obj_t mod_persist_test(mp_obj_t test) {
     return mp_obj_new_int((mp_int_t)&MP_STATE_CTX(dict_globals));
