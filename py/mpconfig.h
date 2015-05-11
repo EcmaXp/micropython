@@ -165,6 +165,11 @@
 /*****************************************************************************/
 /* Micro Python emitters                                                     */
 
+// If you need copy bytecode, bc emiter will give bytecode size.
+#ifndef MICROPY_EMIT_BC_WITH_SIZE
+#define MICROPY_EMIT_BC_WITH_SIZE (0)
+#endif
+
 // Whether to emit CPython byte codes (for debugging/testing)
 // Enabling this overrides all other emitters
 #ifndef MICROPY_EMIT_CPYTHON
@@ -396,6 +401,27 @@ typedef double mp_float_t;
 // Whether you can override builtins in the builtins module
 #ifndef MICROPY_CAN_OVERRIDE_BUILTINS
 #define MICROPY_CAN_OVERRIDE_BUILTINS (0)
+#endif
+
+// Pause any time when execute bytecode function.
+// if you need pause at any time, must enable stackless feature.
+// else you can't pause when call are stacked.
+#ifndef MICROPY_ALLOW_PAUSE_VM
+#define MICROPY_ALLOW_PAUSE_VM (0)
+#endif
+
+// Whether you using MICROPY_ALLOW_PAUSE_VM, must enable that.
+#ifndef MICROPY_KEEP_LAST_CODE_STATE
+#define MICROPY_KEEP_LAST_CODE_STATE (MICROPY_ALLOW_PAUSE_VM)
+#endif
+
+#if MICROPY_ALLOW_PAUSE_VM && !MICROPY_KEEP_LAST_CODE_STATE
+#error MICROPY_ALLOW_PAUSE_VM require MICROPY_KEEP_LAST_CODE_STATE
+#endif
+
+// Whether you can control cpu when execute bytecode function.
+#ifndef MICROPY_LIMIT_CPU
+#define MICROPY_LIMIT_CPU (0)
 #endif
 
 /*****************************************************************************/
