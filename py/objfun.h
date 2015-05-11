@@ -37,6 +37,10 @@ typedef struct _mp_obj_fun_bc_t {
     mp_uint_t has_def_kw_args : 1;  // set if this function has default keyword args
     mp_uint_t takes_var_args : 1;   // set if this function takes variable args
     mp_uint_t takes_kw_args : 1;    // set if this function takes keyword args
+    #if MICROPY_EMIT_BC_WITH_SIZE
+    mp_uint_t bytecode_size;        // if you need copy bytecode, use this.
+    // it can be zero if that is not bytecode function. like native.
+    #endif
     const byte *bytecode;           // bytecode for the function
     // the following extra_args array is allocated space to take (in order):
     //  - values of positional default args (if any)
