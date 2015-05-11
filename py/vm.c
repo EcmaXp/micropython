@@ -185,10 +185,8 @@ typedef enum {
 #if MICROPY_ALLOW_PAUSE_VM
 //  MP_VM_RETURN_PAUSE, sp vaild, *sp accept resume value
 //  MP_VM_RETURN_FORCE_PAUSE, require execute library event processer (before resume)
-    #if !MICROPY_KEEP_LAST_CODE_STATE
-        #error MICROPY_ALLOW_PAUSE_VM require MICROPY_KEEP_LAST_CODE_STATE
-    #endif
 #endif
+
 #if !MICROPY_ALLOW_PAUSE_VM
 mp_vm_return_kind_t mp_execute_bytecode(mp_code_state *code_state, volatile mp_obj_t inject_exc) {
 #else
