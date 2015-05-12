@@ -137,6 +137,7 @@ typedef enum {
     UPDATE_CODE_STATE(); \
     UPDATE_LAST_CODE_STATE(); \
     nlr_pop(); \
+    MP_CPU_FORCE_UPDATE_STATUS(); \
     return (return_value); \
 } while (0)
 
@@ -164,16 +165,17 @@ typedef enum {
 #endif
 
 #if MICROPY_LIMIT_CPU
-#define VM_CPU_LIMIT() do { \
-    MP_CPU_EXECUTED(); \
-    if (!MP_CPU_HARD_CHECK()) { \
-        mp_cpu_exc_hard_limit(); \
-    } else if (!MP_CPU_SOFT_CHECK()) { \
-        mp_cpu_exc_soft_limit(); \
-    } \
-} while (0)
+#define VM_CPU_LIMIT \
+    if (MP_CPU_UPDATE_STATUS()) { \
+        if (!MP_CPU_HARD_CHECK()) { \
+            mp_cpu_exc_hard_limit(); \
+        } else if (!MP_CPU_SOFT_CHECK()) { \
+            mp_cpu_exc_soft_limit(); \
+        } \
+    }
 #else
-#define VM_CPU_LIMIT()
+#define VM_CPU_LIMIT \
+    if (1) {}
 #endif
 
 // fastn has items in reverse order (fastn[0] is local[0], fastn[-1] is local[1], etc)
@@ -209,8 +211,7 @@ mp_vm_return_kind_t mp_execute_bytecode(mp_code_state *code_state, volatile mp_o
             exc = mp_obj_new_exception_msg(&mp_type_SystemError, "VM can't pauseable");
             nlr_raise(exc);
         default:
-            exc = mp_obj_new_exception_msg(&mp_type_SystemError, "Unknown vm return kind from mp_resume_bytecode");
-            nlr_raise(exc);
+            assert(0);
     }
     
     assert(0);
@@ -233,8 +234,7 @@ mp_vm_return_kind_t _mp_execute_bytecode(bool is_pauseable, mp_code_state *first
 #if MICROPY_OPT_COMPUTED_GOTO
     #include "py/vmentrytable.h"
     #define DISPATCH() do { \
-        VM_CPU_LIMIT(); \
-        VM_SAFE_PAUSE_POINT; \
+        VM_CPU_LIMIT else VM_SAFE_PAUSE_POINT; \
         TRACE(ip); \
         MARK_EXC_IP_GLOBAL(); \
         goto *entry_table[*ip++]; \
@@ -303,8 +303,7 @@ dispatch_loop:
 #if MICROPY_OPT_COMPUTED_GOTO
                 DISPATCH();
 #else
-                VM_CPU_LIMIT();
-                VM_SAFE_PAUSE_POINT;
+                VM_CPU_LIMIT else VM_SAFE_PAUSE_POINT;
                 TRACE(ip);
                 MARK_EXC_IP_GLOBAL();
                 switch (*ip++) {
@@ -1166,6 +1165,7 @@ unwind_return:
                         goto run_code_state;
                     }
                     #endif
+                    MP_CPU_FORCE_UPDATE_STATUS();
                     return MP_VM_RETURN_NORMAL;
 
                 ENTRY(MP_BC_RAISE_VARARGS): {
@@ -1197,6 +1197,7 @@ unwind_return:
 yield:
                     nlr_pop();
                     UPDATE_CODE_STATE();
+                    MP_CPU_FORCE_UPDATE_STATUS();
                     return MP_VM_RETURN_YIELD;
 
                 ENTRY(MP_BC_YIELD_FROM): {
@@ -1326,6 +1327,7 @@ yield:
                     mp_obj_t obj = mp_obj_new_exception_msg(&mp_type_NotImplementedError, "byte code not implemented");
                     nlr_pop();
                     fastn[0] = obj;
+                    MP_CPU_FORCE_UPDATE_STATUS();
                     return MP_VM_RETURN_EXCEPTION;
                 }
 
@@ -1448,6 +1450,7 @@ unwind_loop:
                 // propagate exception to higher level
                 // TODO what to do about ip and sp? they don't really make sense at this point
                 fastn[0] = nlr.ret_val; // must put exception here because sp is invalid
+                MP_CPU_FORCE_UPDATE_STATUS();
                 return MP_VM_RETURN_EXCEPTION;
             }
         }

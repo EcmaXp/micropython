@@ -31,6 +31,9 @@
 
 void mp_cpu_ctrl_init(void) {
 #if MICROPY_LIMIT_CPU
+    MP_STATE_VM(cpu_last_check_clock) = MICROPY_LIMIT_CPU_CHECK_INTERVAL;
+    MP_STATE_VM(cpu_check_clock) = MP_STATE_VM(cpu_last_check_clock);
+    
     MP_STATE_VM(cpu_hard_limit) = 0;
     MP_STATE_VM(cpu_soft_limit) = 0;
     MP_STATE_VM(cpu_safe_limit) = 0;
@@ -44,52 +47,81 @@ void mp_cpu_ctrl_init(void) {
 
 #if MICROPY_LIMIT_CPU
 
-void mp_cpu_set_hard_limit(mp_uint_t hard_limit){
+void mp_cpu_set_hard_limit(mp_uint_t hard_limit) {
     MP_STATE_VM(cpu_hard_limit) = hard_limit;
 }
 
-void mp_cpu_set_soft_limit(mp_uint_t soft_limit){
+void mp_cpu_set_soft_limit(mp_uint_t soft_limit) {
     MP_STATE_VM(cpu_soft_limit) = soft_limit;
 }
 
-void mp_cpu_set_soft_limited(void){
+void mp_cpu_set_soft_limited(void) {
     MP_STATE_VM(cpu_soft_limit_executed) = true;
 }
 
-void mp_cpu_clear_soft_limited(void){
+void mp_cpu_clear_soft_limited(void) {
     MP_STATE_VM(cpu_soft_limit_executed) = false;
 }
 
-void mp_cpu_set_limit(mp_uint_t safe_limit){
+void mp_cpu_set_limit(mp_uint_t safe_limit) {
     MP_STATE_VM(cpu_safe_limit) = safe_limit;
 }
 
-mp_uint_t mp_cpu_get_hard_limit(void){
+mp_uint_t mp_cpu_get_hard_limit(void) {
     return MP_STATE_VM(cpu_hard_limit);
 }
 
-mp_uint_t mp_cpu_get_soft_limit(void){
+mp_uint_t mp_cpu_get_soft_limit(void) {
     return MP_STATE_VM(cpu_soft_limit);
 }
 
-bool mp_cpu_get_soft_limited(void){
+bool mp_cpu_get_soft_limited(void) {
     return MP_STATE_VM(cpu_soft_limit_executed);
 }
 
-mp_uint_t mp_cpu_get_safe_limit(void){
+mp_uint_t mp_cpu_get_safe_limit(void) {
     return MP_STATE_VM(cpu_safe_limit);
 }
 
-void mp_cpu_set_usage(mp_uint_t cpu_current_executed){
+void mp_cpu_set_usage(mp_uint_t cpu_current_executed) {
     MP_STATE_VM(cpu_current_executed) = cpu_current_executed;
 }
 
-void mp_cpu_clear_usage(void){
+void mp_cpu_clear_usage(void) {
     mp_cpu_set_usage(0);
 }
 
-mp_uint_t mp_cpu_usage(void){
+mp_uint_t mp_cpu_usage(void) {
     return MP_STATE_VM(cpu_current_executed);    
+}
+
+void mp_cpu_update_status(void) {
+    MP_STATE_VM(cpu_current_executed) += \
+        MP_STATE_VM(cpu_last_check_clock) - MP_STATE_VM(cpu_check_clock);
+    
+    mp_uint_t current_executed = MP_STATE_VM(cpu_current_executed);
+    mp_uint_t new_clock = MICROPY_LIMIT_CPU_CHECK_INTERVAL;
+    mp_uint_t limit_value;
+    
+    limit_value = MP_STATE_VM(cpu_hard_limit);
+    if (limit_value > 0) {
+        new_clock = MIN(new_clock, limit_value - current_executed);
+    }
+
+    limit_value = MP_STATE_VM(cpu_soft_limit);
+    if (limit_value > 0) {
+        new_clock = MIN(new_clock, limit_value - current_executed);
+    }
+
+    limit_value = MP_STATE_VM(cpu_safe_limit);    
+    if (limit_value > 0) {
+        new_clock = MIN(new_clock, limit_value - current_executed);
+    }
+    
+    new_clock = MAX(new_clock, 0);
+    
+    MP_STATE_VM(cpu_last_check_clock) = MICROPY_LIMIT_CPU_CHECK_INTERVAL;
+    MP_STATE_VM(cpu_check_clock) = MP_STATE_VM(cpu_last_check_clock);
 }
 
 void mp_cpu_exc_hard_limit(void) {
@@ -97,13 +129,15 @@ void mp_cpu_exc_hard_limit(void) {
 }
 
 void mp_cpu_exc_soft_limit(void) {
+    // 
+    // assert(!MP_STATE_VM(cpu_soft_limit_executed));
     MP_STATE_VM(cpu_soft_limit_executed) = true;
     nlr_raise(mp_obj_new_exception(&mp_type_SystemSoftLimit));
 }
 
 /* TODO: should be limit
- (!) long time calc
- (!) big num calc
+ (!) long time calc -> now i starting with that.
+ (!) big num calc -> just use long long for big int.
 */
 
 #endif // MICROPY_LIMIT_CPU

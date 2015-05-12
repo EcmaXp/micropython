@@ -424,6 +424,12 @@ typedef double mp_float_t;
 #define MICROPY_LIMIT_CPU (0)
 #endif
 
+// When using MICROPY_LIMIT_CPU, it will check by execute bytecode.
+// if MICROPY_LIMIT_CPU_CHECK_INTERVAL is zero; it will check every time.
+#ifndef MICROPY_LIMIT_CPU_CHECK_INTERVAL
+#define MICROPY_LIMIT_CPU_CHECK_INTERVAL (65535)
+#endif
+
 /*****************************************************************************/
 /* Fine control over Python builtins, classes, modules, etc                  */
 

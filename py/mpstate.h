@@ -147,9 +147,13 @@ typedef struct _mp_state_vm_t {
     #endif
     
     #if MICROPY_LIMIT_CPU
+    mp_int_t cpu_last_check_clock;
+    mp_int_t cpu_check_clock;
+    
     mp_uint_t cpu_hard_limit;
     mp_uint_t cpu_soft_limit;
     mp_uint_t cpu_safe_limit;
+    
     mp_uint_t cpu_current_executed;
     bool cpu_soft_limit_executed;
     #endif    

@@ -33,11 +33,12 @@ void mp_cpu_ctrl_init(void);
 
 #if MICROPY_LIMIT_CPU
 
-#define MP_CPU_EXECUTED() (_mp_cpu_opcode_executed())
+#define MP_CPU_UPDATE_STATUS() (_mp_cpu_update_status())
+#define MP_CPU_FORCE_UPDATE_STATUS() (_mp_cpu_update_status())
 #define MP_CPU_HARD_CHECK() (!_mp_cpu_is_hard_limited())
 #define MP_CPU_SOFT_CHECK() (!_mp_cpu_is_soft_limited())
 #define MP_CPU_SAFE_CHECK() (!_mp_cpu_is_safe_limited())
-#define MP_CPU_CLEAR_SOFT_LIMITED() ()
+#define MP_CPU_CLEAR_SOFT_LIMITED() (mp_cpu_clear_soft_limited())
 
 void mp_cpu_set_hard_limit(mp_uint_t hard_limit);
 void mp_cpu_set_soft_limit(mp_uint_t soft_limit);
@@ -54,32 +55,45 @@ void mp_cpu_set_usage(mp_uint_t cpu_current_executed);
 void mp_cpu_clear_usage(void);
 mp_uint_t mp_cpu_usage(void);
 
+void mp_cpu_update_status(void);
+
 void mp_cpu_exc_hard_limit(void);
 void mp_cpu_exc_soft_limit(void);
 
-inline void _mp_cpu_opcode_executed(void){
+inline bool _mp_cpu_update_status(void) {
+#if MICROPY_LIMIT_CPU_CHECK_INTERVAL
+    if (MP_STATE_VM(cpu_check_clock)-- <= 0) {
+        mp_cpu_update_status();
+        return true;
+    }
+    
+    return false;
+#else
     MP_STATE_VM(cpu_current_executed)++;
+    return true;
+#endif
 }
 
-inline bool _mp_cpu_is_hard_limited(){
+inline bool _mp_cpu_is_hard_limited() {
     return (MP_STATE_VM(cpu_hard_limit) > 0) && \
         (MP_STATE_VM(cpu_hard_limit) <= MP_STATE_VM(cpu_current_executed));
 }
 
-inline bool _mp_cpu_is_soft_limited(){
+inline bool _mp_cpu_is_soft_limited() {
     return (MP_STATE_VM(cpu_soft_limit) > 0) && \
         !MP_STATE_VM(cpu_soft_limit_executed) && \
         (MP_STATE_VM(cpu_soft_limit) <= MP_STATE_VM(cpu_current_executed));
 }
 
-inline bool _mp_cpu_is_safe_limited(){
+inline bool _mp_cpu_is_safe_limited() {
     return (MP_STATE_VM(cpu_safe_limit) > 0) && \
         (MP_STATE_VM(cpu_safe_limit) <= MP_STATE_VM(cpu_current_executed));
 }
 
 #else // MICROPY_LIMIT_CPU
 
-#define MP_CPU_EXECUTED()
+#define MP_CPU_UPDATE_STATUS() (false)
+#define MP_CPU_FORCE_UPDATE_STATUS()
 #define MP_CPU_HARD_CHECK() (true)
 #define MP_CPU_SOFT_CHECK() (true)
 #define MP_CPU_SAFE_CHECK() (true)
