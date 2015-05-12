@@ -25,7 +25,6 @@
  */
 
 // for OpenComptuers
-#define MICROPY_KEEP_LAST_CODE_STATE (1)
 #define MICROPY_LIMIT_CPU           (1)
 
 // options to control how Micro Python is built

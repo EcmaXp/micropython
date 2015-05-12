@@ -132,8 +132,8 @@ const mp_obj_type_t mp_type_persister;
     (void)0;
 #define MP_RM_CHECK(x) ((start <= (i)) && ((i) < end))
 #define MP_RM_OFFSET(i) ((i - start) >> (MP_PERSIST_MAP_ROW_SHIFT))
-#define MP_RM_SHIFT 3
-#define MP_RM_MASK 7 // (BITS_PER_BYTE - 1)
+#define MP_RM_SHIFT 3 // = log2(BITS_PER_BYTE)
+#define MP_RM_MASK 7 // = BITS_PER_BYTE - 1
 #define MP_RM_SET(regmap, i) ((regmap)[MP_RM_OFFSET((i)) >> MP_RM_SHIFT] |= 1 << (MP_RM_OFFSET((i)) & MP_RM_MASK))
 #define MP_RM_GET(regmap, i) ((regmap)[MP_RM_OFFSET((i)) >> MP_RM_SHIFT] & (1 << (MP_RM_OFFSET((i)) & MP_RM_MASK)))
 

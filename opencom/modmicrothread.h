@@ -29,6 +29,7 @@
 #include "py/obj.h"
 #include "py/bc.h"
 
+/* from py/mpstate.h */
 typedef struct _mp_microthread_context_t {
     // == context ==
     mp_obj_dict_t *dict_locals;
@@ -53,10 +54,14 @@ typedef struct _mp_microthread_context_t {
     #endif
 
     #if MICROPY_LIMIT_CPU
-    mp_uint_t cpu_hard_limit;
-    mp_uint_t cpu_soft_limit;
-    mp_uint_t cpu_safe_limit;
-    mp_uint_t cpu_current_executed;
+    mp_int_t cpu_last_check_clock;
+    mp_int_t cpu_check_clock;
+    
+    mp_int_t cpu_hard_limit;
+    mp_int_t cpu_soft_limit;
+    mp_int_t cpu_safe_limit;
+    
+    mp_int_t cpu_current_executed;
     bool cpu_soft_limit_executed;
     #endif
 } mp_microthread_context_t;

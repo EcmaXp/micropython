@@ -36,6 +36,7 @@
 #include "py/objmodule.h"
 #include "py/runtime.h"
 #include "py/bc.h"
+#include "py/cpuctrl.h"
 
 #if MICROPY_STACKLESS_EXTRA
 #include "py/objclosure.h"
@@ -74,6 +75,8 @@ STATIC mp_obj_t mod_microthread_init(void) {
     STATE(VM, mp_module_builtins_override_dict);
 
     #if MICROPY_LIMIT_CPU
+    STATE(VM, cpu_last_check_clock);
+    STATE(VM, cpu_check_clock);
     STATE(VM, cpu_hard_limit);
     STATE(VM, cpu_soft_limit);
     STATE(VM, cpu_safe_limit);
@@ -165,6 +168,8 @@ STATIC mp_obj_t microthread_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint
     STATE_FROM(VM, mp_module_builtins_override_dict);
 
     #if MICROPY_LIMIT_CPU
+    STATE(VM, cpu_last_check_clock, 0);
+    STATE(VM, cpu_check_clock, 0);
     STATE(VM, cpu_hard_limit, 0);
     STATE(VM, cpu_soft_limit, 0);
     STATE(VM, cpu_safe_limit, 0);
@@ -193,6 +198,8 @@ void mp_load_microthread_context(mp_microthread_context_t *context) {
     STATE(VM, mp_module_builtins_override_dict);
 
     #if MICROPY_LIMIT_CPU
+    STATE(VM, cpu_last_check_clock);
+    STATE(VM, cpu_check_clock);
     STATE(VM, cpu_hard_limit);
     STATE(VM, cpu_soft_limit);
     STATE(VM, cpu_safe_limit);
@@ -214,6 +221,8 @@ void mp_store_microthread_context(mp_microthread_context_t *context) {
     STATE(VM, mp_module_builtins_override_dict);
 
     #if MICROPY_LIMIT_CPU
+    STATE(VM, cpu_last_check_clock);
+    STATE(VM, cpu_check_clock);
     STATE(VM, cpu_hard_limit);
     STATE(VM, cpu_soft_limit);
     STATE(VM, cpu_safe_limit);
@@ -257,6 +266,11 @@ STATIC mp_obj_t microthread_attr_resume(mp_uint_t n_args, mp_obj_t args[]) {
     mp_store_microthread_context(&prev_context);
     mp_current_microthread = thread;
     mp_load_microthread_context(&thread->context);
+    
+#if MICROPY_LIMIT_CPU
+    // before execute, just reset clock.
+    mp_cpu_update_status(false);
+#endif
 
     mp_vm_return_kind_t kind;
 
@@ -269,6 +283,12 @@ STATIC mp_obj_t microthread_attr_resume(mp_uint_t n_args, mp_obj_t args[]) {
         kind = MP_VM_RETURN_EXCEPTION;
         code_state->current->state[code_state->current->n_state - 1] = &nlr.ret_val;
     }
+
+#if MICROPY_LIMIT_CPU
+    // after execute, clear soft limited for continue execute.
+    // if SystemSoftLimit are alerady, thread will be stopped status.
+    mp_cpu_clear_soft_limited();
+#endif
 
     mp_store_microthread_context(&thread->context);
     mp_current_microthread = prev_thread;
@@ -397,13 +417,13 @@ STATIC void microthread_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
 #if MICROPY_LIMIT_CPU
     if (attr == MP_QSTR_cpu_hard_limit) {
         if (is_load) {
-            dest[0] = mp_obj_new_int_from_uint(thread->context.cpu_hard_limit);
+            dest[0] = mp_obj_new_int(thread->context.cpu_hard_limit);
             return;
         } else if (is_store) {
             if (!MP_OBJ_IS_INT(dest[1])) {
                 goto FAIL_NOT_INT;
             }
-            thread->context.cpu_hard_limit = (mp_uint_t)mp_obj_int_get_truncated(dest[1]);
+            thread->context.cpu_hard_limit = (mp_int_t)mp_obj_int_get_truncated(dest[1]);
             goto STORE_OK;
         } else if (is_del) {
             thread->context.cpu_hard_limit = 0;
@@ -412,12 +432,12 @@ STATIC void microthread_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
     }
     if (attr == MP_QSTR_cpu_soft_limit) {
         if (is_load) {
-            dest[0] = mp_obj_new_int_from_uint(thread->context.cpu_soft_limit);
+            dest[0] = mp_obj_new_int(thread->context.cpu_soft_limit);
         } else if (is_store) {
             if (!MP_OBJ_IS_INT(dest[1])) {
                 goto FAIL_NOT_INT;
             }
-            thread->context.cpu_soft_limit = (mp_uint_t)mp_obj_int_get_truncated(dest[1]);
+            thread->context.cpu_soft_limit = (mp_int_t)mp_obj_int_get_truncated(dest[1]);
             goto STORE_OK;
         } else if (is_del) {
             thread->context.cpu_soft_limit = 0;
@@ -426,12 +446,12 @@ STATIC void microthread_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
     }
     if (attr == MP_QSTR_cpu_safe_limit) {
         if (is_load) {
-            dest[0] = mp_obj_new_int_from_uint(thread->context.cpu_safe_limit);
+            dest[0] = mp_obj_new_int(thread->context.cpu_safe_limit);
         } else if (is_store) {
             if (!MP_OBJ_IS_INT(dest[1])) {
                 goto FAIL_NOT_INT;
             }
-            thread->context.cpu_safe_limit = (mp_uint_t)mp_obj_int_get_truncated(dest[1]);
+            thread->context.cpu_safe_limit = (mp_int_t)mp_obj_int_get_truncated(dest[1]);
             goto STORE_OK;
         } else if (is_del) {
             thread->context.cpu_safe_limit = 0;
@@ -440,13 +460,13 @@ STATIC void microthread_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
     }
     if (attr == MP_QSTR_cpu_current_executed) {
         if (is_load) {
-            dest[0] = mp_obj_new_int_from_uint(thread->context.cpu_current_executed);
+            dest[0] = mp_obj_new_int(thread->context.cpu_current_executed);
             goto LOAD_OK;
         } else if (is_store) {
             if (!MP_OBJ_IS_INT(dest[1])) {
                 goto FAIL_NOT_INT;
             }
-            thread->context.cpu_current_executed = (mp_uint_t)mp_obj_int_get_truncated(dest[1]);
+            thread->context.cpu_current_executed = (mp_int_t)mp_obj_int_get_truncated(dest[1]);
             goto STORE_OK;
         } else if (is_del) {
             thread->context.cpu_current_executed = 0;
