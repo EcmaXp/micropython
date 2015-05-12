@@ -150,13 +150,13 @@ typedef struct _mp_state_vm_t {
     mp_int_t cpu_last_check_clock;
     mp_int_t cpu_check_clock;
     
-    mp_uint_t cpu_hard_limit;
-    mp_uint_t cpu_soft_limit;
-    mp_uint_t cpu_safe_limit;
+    mp_int_t cpu_hard_limit;
+    mp_int_t cpu_soft_limit;
+    mp_int_t cpu_safe_limit;
     
-    mp_uint_t cpu_current_executed;
+    mp_int_t cpu_current_executed;
     bool cpu_soft_limit_executed;
-    #endif    
+    #endif
 } mp_state_vm_t;
 
 // This structure combines the above 2 structures, and adds the local
