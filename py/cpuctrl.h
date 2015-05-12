@@ -34,7 +34,7 @@ void mp_cpu_ctrl_init(void);
 #if MICROPY_LIMIT_CPU
 
 #define MP_CPU_UPDATE_STATUS() (_mp_cpu_update_status())
-#define MP_CPU_FORCE_UPDATE_STATUS() (mp_cpu_update_status())
+#define MP_CPU_FORCE_UPDATE_STATUS() (mp_cpu_update_status(true))
 #define MP_CPU_HARD_CHECK() (!_mp_cpu_is_hard_limited())
 #define MP_CPU_SOFT_CHECK() (!_mp_cpu_is_soft_limited())
 #define MP_CPU_SAFE_CHECK() (!_mp_cpu_is_safe_limited())
@@ -44,7 +44,7 @@ void mp_cpu_set_hard_limit(mp_uint_t hard_limit);
 void mp_cpu_set_soft_limit(mp_uint_t soft_limit);
 void mp_cpu_set_soft_limited(void);
 void mp_cpu_clear_soft_limited(void);
-void mp_cpu_set_limit(mp_uint_t safe_limit);
+void mp_cpu_set_safe_limit(mp_uint_t safe_limit);
 
 mp_uint_t mp_cpu_get_hard_limit(void);
 mp_uint_t mp_cpu_get_soft_limit(void);

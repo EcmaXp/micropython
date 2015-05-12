@@ -49,10 +49,12 @@ void mp_cpu_ctrl_init(void) {
 
 void mp_cpu_set_hard_limit(mp_uint_t hard_limit) {
     MP_STATE_VM(cpu_hard_limit) = hard_limit;
+    mp_cpu_update_status(true);
 }
 
 void mp_cpu_set_soft_limit(mp_uint_t soft_limit) {
     MP_STATE_VM(cpu_soft_limit) = soft_limit;
+    mp_cpu_update_status(true);
 }
 
 void mp_cpu_set_soft_limited(void) {
@@ -63,8 +65,9 @@ void mp_cpu_clear_soft_limited(void) {
     MP_STATE_VM(cpu_soft_limit_executed) = false;
 }
 
-void mp_cpu_set_limit(mp_uint_t safe_limit) {
+void mp_cpu_set_safe_limit(mp_uint_t safe_limit) {
     MP_STATE_VM(cpu_safe_limit) = safe_limit;
+    mp_cpu_update_status(true);
 }
 
 mp_uint_t mp_cpu_get_hard_limit(void) {
@@ -85,6 +88,7 @@ mp_uint_t mp_cpu_get_safe_limit(void) {
 
 void mp_cpu_set_usage(mp_uint_t cpu_current_executed) {
     MP_STATE_VM(cpu_current_executed) = cpu_current_executed;
+    mp_cpu_update_status(true);
 }
 
 void mp_cpu_clear_usage(void) {
@@ -95,13 +99,19 @@ mp_uint_t mp_cpu_usage(void) {
     return MP_STATE_VM(cpu_current_executed);    
 }
 
-void mp_cpu_update_status(void) {
+void mp_cpu_update_status(bool use_last_clock) {
     MP_STATE_VM(cpu_current_executed) += \
         MP_STATE_VM(cpu_last_check_clock) - MP_STATE_VM(cpu_check_clock);
     
     mp_uint_t current_executed = MP_STATE_VM(cpu_current_executed);
     mp_uint_t new_clock = MICROPY_LIMIT_CPU_CHECK_INTERVAL;
     mp_uint_t limit_value;
+    
+    if (use_last_clock) {
+        // use_last_clock mean continue clock by before set.
+        // if setting are chaned for require update cpu_current_executed.
+        new_clock = MIN(new_clock, MP_STATE_VM(cpu_check_clock));
+    }
     
     limit_value = MP_STATE_VM(cpu_hard_limit);
     if (limit_value > 0) {
@@ -120,7 +130,7 @@ void mp_cpu_update_status(void) {
     
     new_clock = MAX(new_clock, 0);
     
-    MP_STATE_VM(cpu_last_check_clock) = MICROPY_LIMIT_CPU_CHECK_INTERVAL;
+    MP_STATE_VM(cpu_last_check_clock) = new_clock;
     MP_STATE_VM(cpu_check_clock) = MP_STATE_VM(cpu_last_check_clock);
 }
 
