@@ -98,6 +98,7 @@ const mp_obj_type_t mp_type_fun_builtin = {
     { &mp_type_type },
     .name = MP_QSTR_function,
     .call = fun_builtin_call,
+    .unary_op = mp_generic_unary_op,
 };
 
 /******************************************************************************/
@@ -323,6 +324,7 @@ const mp_obj_type_t mp_type_fun_bc = {
 #if MICROPY_STACKLESS_EXTRA
     .flatcall = fun_bc_flatcall,
 #endif
+    .unary_op = mp_generic_unary_op,
 #if MICROPY_PY_FUNCTION_ATTRS
     .attr = fun_bc_attr,
 #endif
@@ -382,6 +384,7 @@ STATIC const mp_obj_type_t mp_type_fun_native = {
     { &mp_type_type },
     .name = MP_QSTR_function,
     .call = fun_native_call,
+    .unary_op = mp_generic_unary_op,
 };
 
 mp_obj_t mp_obj_new_fun_native(mp_uint_t scope_flags, mp_uint_t n_pos_args, mp_uint_t n_kwonly_args, mp_obj_t def_args_in, mp_obj_t def_kw_args, const void *fun_data) {
@@ -442,6 +445,7 @@ STATIC const mp_obj_type_t mp_type_fun_viper = {
     { &mp_type_type },
     .name = MP_QSTR_function,
     .call = fun_viper_call,
+    .unary_op = mp_generic_unary_op,
 };
 
 mp_obj_t mp_obj_new_fun_viper(mp_uint_t n_args, void *fun_data, mp_uint_t type_sig) {
@@ -554,6 +558,7 @@ STATIC const mp_obj_type_t mp_type_fun_asm = {
     { &mp_type_type },
     .name = MP_QSTR_function,
     .call = fun_asm_call,
+    .unary_op = mp_generic_unary_op,
 };
 
 mp_obj_t mp_obj_new_fun_asm(mp_uint_t n_args, void *fun_data) {

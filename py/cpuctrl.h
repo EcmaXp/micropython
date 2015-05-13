@@ -55,6 +55,7 @@ void mp_cpu_set_usage(mp_int_t cpu_current_executed);
 void mp_cpu_clear_usage(void);
 mp_int_t mp_cpu_usage(void);
 
+bool mp_cpu_is_correct_status(void);
 void mp_cpu_update_status(bool use_last_clock);
 
 void mp_cpu_exc_hard_limit(void);

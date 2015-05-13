@@ -99,6 +99,10 @@ mp_int_t mp_cpu_usage(void) {
     return MP_STATE_VM(cpu_current_executed);    
 }
 
+bool mp_cpu_is_correct_status(void) {
+    return (MP_STATE_VM(cpu_last_check_clock) - MP_STATE_VM(cpu_check_clock)) == 0;
+}
+
 void mp_cpu_update_status(bool use_last_clock) {
     MP_STATE_VM(cpu_current_executed) += \
         MP_STATE_VM(cpu_last_check_clock) - MP_STATE_VM(cpu_check_clock);
