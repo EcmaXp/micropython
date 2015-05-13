@@ -285,6 +285,14 @@ STATIC mp_obj_t microthread_attr_resume(mp_uint_t n_args, mp_obj_t args[]) {
     }
 
 #if MICROPY_LIMIT_CPU
+    #if 1
+        // even if status are not updated correctly. it is problem.
+        assert(mp_cpu_is_correct_status());
+    #else
+        // but we can ignore them by
+        mp_cpu_update_status(true);
+    #endif
+    
     // after execute, clear soft limited for continue execute.
     // if SystemSoftLimit are alerady, thread will be stopped status.
     mp_cpu_clear_soft_limited();
@@ -293,6 +301,7 @@ STATIC mp_obj_t microthread_attr_resume(mp_uint_t n_args, mp_obj_t args[]) {
     mp_store_microthread_context(&thread->context);
     mp_current_microthread = prev_thread;
     mp_load_microthread_context(&prev_context);
+
 
     qstr return_status_qstr;
     switch (kind){
