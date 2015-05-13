@@ -3,7 +3,8 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2014 Damien P. George
+ * Copyright (c) 2013, 2014 Damien P. George
+ * Copyright (c) 2015 Daniel Campora
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,76 +25,31 @@
  * THE SOFTWARE.
  */
 
-// qstrs specific to this port
+#ifndef __MICROPY_INCLUDED_LIB_TIMEUTILS_H__
+#define __MICROPY_INCLUDED_LIB_TIMEUTILS_H__
 
-Q(help)
+typedef struct _timeutils_struct_time_t {
+    uint16_t    tm_year;    // i.e. 2014
+    uint8_t     tm_mon;     // 1..12
+    uint8_t     tm_mday;    // 1..31
+    uint8_t     tm_hour;    // 0..23
+    uint8_t     tm_min;     // 0..59
+    uint8_t     tm_sec;     // 0..59
+    uint8_t     tm_wday;    // 0..6  0 = Monday
+    uint16_t    tm_yday;    // 1..366
+} timeutils_struct_time_t;
 
-// pyb module
-Q(pyb)
-Q(info)
-Q(freq)
-Q(millis)
-Q(elapsed_millis)
-Q(micros)
-Q(elapsed_micros)
-Q(delay)
-Q(udelay)
-Q(sync)
-Q(hard_reset)
+bool timeutils_is_leap_year(mp_uint_t year);
+mp_uint_t timeutils_days_in_month(mp_uint_t year, mp_uint_t month);
+mp_uint_t timeutils_year_day(mp_uint_t year, mp_uint_t month, mp_uint_t date);
 
-Q(esp)
-Q(socket)
-Q(connect)
-Q(disconnect)
-Q(scan)
-Q(status)
-Q(getaddrinfo)
-Q(send)
-Q(sendto)
-Q(recv)
-Q(recvfrom)
-Q(listen)
-Q(accept)
-Q(bind)
-Q(settimeout)
-Q(setblocking)
-Q(setsockopt)
-Q(close)
-Q(protocol)
-Q(onconnect)
-Q(onrecv)
-Q(onsent)
-Q(ondisconnect)
-Q(STAT_IDLE)
-Q(STAT_CONNECTING)
-Q(STAT_WRONG_PASSWORD)
-Q(STAT_NO_AP_FOUND)
-Q(STAT_CONNECT_FAIL)
-Q(STAT_GOT_IP)
+void timeutils_seconds_since_2000_to_struct_time(mp_uint_t t,
+    timeutils_struct_time_t *tm);
 
-// Pin class
-Q(Pin)
-Q(init)
-Q(mode)
-Q(pull)
-Q(value)
-Q(low)
-Q(high)
-Q(IN)
-Q(OUT_PP)
-Q(OUT_OD)
-Q(PULL_NONE)
-Q(PULL_UP)
-Q(PULL_DOWN)
+mp_uint_t timeutils_seconds_since_2000(mp_uint_t year, mp_uint_t month,
+    mp_uint_t date, mp_uint_t hour, mp_uint_t minute, mp_uint_t second);
 
-// RTC
-Q(RTC)
-Q(datetime)
-Q(memory)
+mp_uint_t timeutils_mktime(mp_uint_t year, mp_uint_t month, mp_uint_t mday,
+    mp_uint_t hours, mp_uint_t minutes, mp_uint_t seconds);
 
-// utime
-Q(utime)
-Q(localtime)
-Q(mktime)
-Q(sleep)
-Q(time)
+#endif // __MICROPY_INCLUDED_LIB_TIMEUTILS_H__

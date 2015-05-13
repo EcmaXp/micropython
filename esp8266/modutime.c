@@ -4,6 +4,7 @@
  * The MIT License (MIT)
  *
  * Copyright (c) 2013, 2014 Damien P. George
+ * Copyright (c) 2015 Josef Gajdusek
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,13 +27,16 @@
 
 #include <stdio.h>
 #include <string.h>
-#include "stm32f4xx_hal.h"
 
 #include "py/nlr.h"
 #include "py/obj.h"
+#include "py/gc.h"
+#include "py/runtime.h"
+#include MICROPY_HAL_H
+#include "modpyb.h"
+#include "modpybrtc.h"
 #include "timeutils.h"
-#include "portmodules.h"
-#include "rtc.h"
+#include "user_interface.h"
 
 /// \module time - time related functions
 ///
@@ -52,53 +56,35 @@
 /// weekday is 0-6 for Mon-Sun.
 /// yearday is 1-366
 STATIC mp_obj_t time_localtime(mp_uint_t n_args, const mp_obj_t *args) {
+    timeutils_struct_time_t tm;
+    mp_int_t seconds;
     if (n_args == 0 || args[0] == mp_const_none) {
-        // get current date and time
-        // note: need to call get time then get date to correctly access the registers
-        RTC_DateTypeDef date;
-        RTC_TimeTypeDef time;
-        HAL_RTC_GetTime(&RTCHandle, &time, FORMAT_BIN);
-        HAL_RTC_GetDate(&RTCHandle, &date, FORMAT_BIN);
-        mp_obj_t tuple[8] = {
-            mp_obj_new_int(2000 + date.Year),
-            mp_obj_new_int(date.Month),
-            mp_obj_new_int(date.Date),
-            mp_obj_new_int(time.Hours),
-            mp_obj_new_int(time.Minutes),
-            mp_obj_new_int(time.Seconds),
-            mp_obj_new_int(date.WeekDay - 1),
-            mp_obj_new_int(timeutils_year_day(2000 + date.Year, date.Month, date.Date)),
-        };
-        return mp_obj_new_tuple(8, tuple);
+        seconds = pyb_rtc_get_us_since_2000() / 1000 / 1000;
     } else {
-        mp_int_t seconds = mp_obj_get_int(args[0]);
-        timeutils_struct_time_t tm;
-        timeutils_seconds_since_2000_to_struct_time(seconds, &tm);
-        mp_obj_t tuple[8] = {
-            tuple[0] = mp_obj_new_int(tm.tm_year),
-            tuple[1] = mp_obj_new_int(tm.tm_mon),
-            tuple[2] = mp_obj_new_int(tm.tm_mday),
-            tuple[3] = mp_obj_new_int(tm.tm_hour),
-            tuple[4] = mp_obj_new_int(tm.tm_min),
-            tuple[5] = mp_obj_new_int(tm.tm_sec),
-            tuple[6] = mp_obj_new_int(tm.tm_wday),
-            tuple[7] = mp_obj_new_int(tm.tm_yday),
-        };
-        return mp_obj_new_tuple(8, tuple);
+        seconds = mp_obj_get_int(args[0]);
     }
+    timeutils_seconds_since_2000_to_struct_time(seconds, &tm);
+    mp_obj_t tuple[8] = {
+        tuple[0] = mp_obj_new_int(tm.tm_year),
+        tuple[1] = mp_obj_new_int(tm.tm_mon),
+        tuple[2] = mp_obj_new_int(tm.tm_mday),
+        tuple[3] = mp_obj_new_int(tm.tm_hour),
+        tuple[4] = mp_obj_new_int(tm.tm_min),
+        tuple[5] = mp_obj_new_int(tm.tm_sec),
+        tuple[6] = mp_obj_new_int(tm.tm_wday),
+        tuple[7] = mp_obj_new_int(tm.tm_yday),
+    };
+    return mp_obj_new_tuple(8, tuple);
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(time_localtime_obj, 0, 1, time_localtime);
-
 
 /// \function mktime()
 /// This is inverse function of localtime. It's argument is a full 8-tuple
 /// which expresses a time as per localtime. It returns an integer which is
 /// the number of seconds since Jan 1, 2000.
 STATIC mp_obj_t time_mktime(mp_obj_t tuple) {
-
     mp_uint_t len;
     mp_obj_t *elem;
-
     mp_obj_get_array(tuple, &len, &elem);
 
     // localtime generates a tuple of len 8. CPython uses 9, so we accept both.
@@ -112,20 +98,10 @@ STATIC mp_obj_t time_mktime(mp_obj_t tuple) {
 }
 MP_DEFINE_CONST_FUN_OBJ_1(time_mktime_obj, time_mktime);
 
-
 /// \function sleep(seconds)
-/// Sleep for the given number of seconds.  Seconds can be a floating-point number to
-/// sleep for a fractional number of seconds.
+/// Sleep for the given number of seconds.
 STATIC mp_obj_t time_sleep(mp_obj_t seconds_o) {
-#if MICROPY_PY_BUILTINS_FLOAT
-    if (MP_OBJ_IS_INT(seconds_o)) {
-#endif
-        HAL_Delay(1000 * mp_obj_get_int(seconds_o));
-#if MICROPY_PY_BUILTINS_FLOAT
-    } else {
-        HAL_Delay((uint32_t)(1000 * mp_obj_get_float(seconds_o)));
-    }
-#endif
+    HAL_Delay(1000 * mp_obj_get_int(seconds_o));
     return mp_const_none;
 }
 MP_DEFINE_CONST_FUN_OBJ_1(time_sleep_obj, time_sleep);
@@ -134,12 +110,7 @@ MP_DEFINE_CONST_FUN_OBJ_1(time_sleep_obj, time_sleep);
 /// Returns the number of seconds, as an integer, since 1/1/2000.
 STATIC mp_obj_t time_time(void) {
     // get date and time
-    // note: need to call get time then get date to correctly access the registers
-    RTC_DateTypeDef date;
-    RTC_TimeTypeDef time;
-    HAL_RTC_GetTime(&RTCHandle, &time, FORMAT_BIN);
-    HAL_RTC_GetDate(&RTCHandle, &date, FORMAT_BIN);
-    return mp_obj_new_int(timeutils_seconds_since_2000(2000 + date.Year, date.Month, date.Date, time.Hours, time.Minutes, time.Seconds));
+    return mp_obj_new_int(pyb_rtc_get_us_since_2000() / 1000 / 1000);
 }
 MP_DEFINE_CONST_FUN_OBJ_0(time_time_obj, time_time);
 
@@ -154,7 +125,7 @@ STATIC const mp_map_elem_t time_module_globals_table[] = {
 
 STATIC MP_DEFINE_CONST_DICT(time_module_globals, time_module_globals_table);
 
-const mp_obj_module_t mp_module_utime = {
+const mp_obj_module_t utime_module = {
     .base = { &mp_type_module },
     .name = MP_QSTR_utime,
     .globals = (mp_obj_dict_t*)&time_module_globals,
