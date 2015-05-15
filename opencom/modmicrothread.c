@@ -57,7 +57,7 @@ STATIC mp_obj_t mod_microthread_current_thread(void) {
     }
 }
 
-MP_DEFINE_CONST_FUN_OBJ_1(mod_microthread_current_thread_obj, mod_microthread_current_thread);
+MP_DEFINE_CONST_FUN_OBJ_0(mod_microthread_current_thread_obj, mod_microthread_current_thread);
 
 STATIC mp_obj_t microthread_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 2, n_args, true);
@@ -225,7 +225,7 @@ STATIC mp_obj_t microthread_attr_resume(mp_uint_t n_args, mp_obj_t args[]) {
     }
 
     // store value for prev context
-    mp_obj_microthread_t *prev_thread = mp_current_microthread;
+    mp_obj_microthread_t *prev_thread = mod_microthread_current_thread();
     mp_microthread_context_t prev_context;
 
     // load context
@@ -391,6 +391,10 @@ STATIC void microthread_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
     }
     if (attr == MP_QSTR_function && is_load) {
         dest[0] = thread->fun;
+        goto LOAD_OK;
+    }
+    if (attr == MP_QSTR_prev_thread && is_load) {
+        dest[0] = thread->prev_thread;
         goto LOAD_OK;
     }
 #if MICROPY_LIMIT_CPU
