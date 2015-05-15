@@ -2,8 +2,6 @@ import umicrothread
 from umicrothread import MicroThread as _MicroThread
 from umicrothread import *
 
-assert umicrothread._init()
-
 assert STATUS_NORMAL
 assert STATUS_YIELD
 assert STATUS_EXCEPTION
@@ -18,11 +16,6 @@ def auto(*args, **kwargs):
     def warp(func):
         return MicroThread(func.__name__, func, *args, **kwargs)
     return warp
-    
-_current_thread = None
-
-def current_thread():
-    return _current_thread
 
 class MicroThread():
     def __init__(self, name, function, *args, **kwargs):
@@ -83,13 +76,8 @@ class MicroThread():
         return self.resume(value)
     
     def resume(self, value=None):
-        global _current_thread
         thread = self._thread
 
-        try:
-            _current_thread = thread
-            status, result = thread.resume(value)
-        finally:
-            _current_thread = None
-        
+        status, result = thread.resume(value)
+
         return status, result

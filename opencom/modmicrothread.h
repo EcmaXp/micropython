@@ -81,6 +81,7 @@ typedef struct _mp_obj_microthread_t {
     mp_obj_t name;
     mp_obj_t fun;
     mp_obj_t last_result;
+    mp_obj_t prev_thread;
 
     mp_code_state *code_state;
     mp_microthread_status_type status;
