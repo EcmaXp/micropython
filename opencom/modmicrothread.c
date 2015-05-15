@@ -503,6 +503,7 @@ STATIC const mp_map_elem_t mp_module_microthread_globals_table[] = {
     C(STATUS_PAUSE, pause),
     C(STATUS_FORCE_PAUSE, force_pause),
     C(STATUS_STOP, stop),
+    C(STATUS_RUNNING, running),
     C(LIMIT_SOFT, limit_soft),
     C(LIMIT_HARD, limit_hard),
 #undef C

@@ -9,6 +9,7 @@ assert STATUS_LIMIT
 assert STATUS_PAUSE
 assert STATUS_FORCE_PAUSE
 assert STATUS_STOP
+assert STATUS_RUNNING
 assert LIMIT_SOFT
 assert LIMIT_HARD
 
@@ -75,8 +76,6 @@ class MicroThread(_MicroThread):
     
     # __setattr__ are not exists.
 
-
-    
     # del cpu_* value will set zero and unlimited.
     # assign with zero is not allowed?
     
