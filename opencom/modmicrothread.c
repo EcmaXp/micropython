@@ -372,13 +372,42 @@ STATIC void microthread_print(const mp_print_t *print, mp_obj_t self_in, mp_prin
     mp_print_str(print, ">");
 }
 
+#if MICROPY_LIMIT_CPU
+void microthread_attr_int(mp_int_t *value_ptr, mp_obj_t *dest) {
+    bool is_load = (dest[0] == MP_OBJ_NULL);
+    bool is_store = (dest[0] == MP_OBJ_SENTINEL && dest[1] != MP_OBJ_NULL);
+    bool is_del = (dest[0] == MP_OBJ_SENTINEL && dest[1] == MP_OBJ_NULL);
+    
+    if (is_load) {
+        dest[0] = mp_obj_new_int(*value_ptr);
+        goto LOAD_OK;
+    } else if (is_store) {
+        if (!MP_OBJ_IS_INT(dest[1])) {
+            nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "value must be a int"));
+        }
+        *value_ptr = (mp_int_t)mp_obj_int_get_truncated(dest[1]);
+        goto STORE_OK;
+    } else if (is_del) {
+        *value_ptr = 0;
+        goto STORE_OK;
+    }
+    
+    return;
+    
+LOAD_OK:
+    return;
+
+STORE_OK:
+    dest[0] = MP_OBJ_NULL;
+    return;
+}
+#endif
+
 STATIC void microthread_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
     mp_obj_microthread_t *thread = self_in;
 
     bool is_load = (dest[0] == MP_OBJ_NULL);
-    bool is_store = (dest[0] == MP_OBJ_SENTINEL && dest[1] != MP_OBJ_NULL);
-    bool is_del = (dest[0] == MP_OBJ_SENTINEL && dest[1] == MP_OBJ_NULL);
-
+    
     if (attr == MP_QSTR_resume && is_load) {
         dest[0] = (mp_obj_t)&microthread_attr_resume_obj;
         goto METHOD_OK;
@@ -399,62 +428,20 @@ STATIC void microthread_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
     }
 #if MICROPY_LIMIT_CPU
     if (attr == MP_QSTR_cpu_hard_limit) {
-        if (is_load) {
-            dest[0] = mp_obj_new_int(thread->context.cpu_hard_limit);
-            return;
-        } else if (is_store) {
-            if (!MP_OBJ_IS_INT(dest[1])) {
-                goto FAIL_NOT_INT;
-            }
-            thread->context.cpu_hard_limit = (mp_int_t)mp_obj_int_get_truncated(dest[1]);
-            goto STORE_OK;
-        } else if (is_del) {
-            thread->context.cpu_hard_limit = 0;
-            goto DEL_OK;
-        }
+        microthread_attr_int(&thread->context.cpu_hard_limit, dest);
+        return;
     }
     if (attr == MP_QSTR_cpu_soft_limit) {
-        if (is_load) {
-            dest[0] = mp_obj_new_int(thread->context.cpu_soft_limit);
-        } else if (is_store) {
-            if (!MP_OBJ_IS_INT(dest[1])) {
-                goto FAIL_NOT_INT;
-            }
-            thread->context.cpu_soft_limit = (mp_int_t)mp_obj_int_get_truncated(dest[1]);
-            goto STORE_OK;
-        } else if (is_del) {
-            thread->context.cpu_soft_limit = 0;
-            goto DEL_OK;
-        }
+        microthread_attr_int(&thread->context.cpu_soft_limit, dest);
+        return;
     }
     if (attr == MP_QSTR_cpu_safe_limit) {
-        if (is_load) {
-            dest[0] = mp_obj_new_int(thread->context.cpu_safe_limit);
-        } else if (is_store) {
-            if (!MP_OBJ_IS_INT(dest[1])) {
-                goto FAIL_NOT_INT;
-            }
-            thread->context.cpu_safe_limit = (mp_int_t)mp_obj_int_get_truncated(dest[1]);
-            goto STORE_OK;
-        } else if (is_del) {
-            thread->context.cpu_safe_limit = 0;
-            goto DEL_OK;
-        }
+        microthread_attr_int(&thread->context.cpu_safe_limit, dest);
+        return;
     }
     if (attr == MP_QSTR_cpu_current_executed) {
-        if (is_load) {
-            dest[0] = mp_obj_new_int(thread->context.cpu_current_executed);
-            goto LOAD_OK;
-        } else if (is_store) {
-            if (!MP_OBJ_IS_INT(dest[1])) {
-                goto FAIL_NOT_INT;
-            }
-            thread->context.cpu_current_executed = (mp_int_t)mp_obj_int_get_truncated(dest[1]);
-            goto STORE_OK;
-        } else if (is_del) {
-            thread->context.cpu_current_executed = 0;
-            goto DEL_OK;
-        }
+        microthread_attr_int(&thread->context.cpu_current_executed, dest);
+        return;
     }
 #endif // MICROPY_LIMIT_CPU
 
@@ -463,23 +450,15 @@ STATIC void microthread_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
 LOAD_OK:
     return;
 
+/*
 STORE_OK:
     dest[0] = MP_OBJ_NULL;
     return;
+*/
 
 METHOD_OK:
     dest[1] = self_in;
     return;
-
-DEL_OK:
-    // TODO: write DEL_OK
-    assert(0);
-    return;
-
-#if MICROPY_LIMIT_CPU
-FAIL_NOT_INT:
-    nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "that is not int. (TODO: fix this message)"));
-#endif
 }
 
 const mp_obj_type_t mp_type_microthread = {
