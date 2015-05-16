@@ -166,12 +166,12 @@ typedef enum {
 
 #if MICROPY_LIMIT_CPU
 #define VM_CPU_LIMIT \
-    if (MP_CPU_UPDATE_STATUS()) { \
-        if (!MP_CPU_HARD_CHECK()) { \
-            mp_cpu_exc_hard_limit(); \
-        } else if (!MP_CPU_SOFT_CHECK()) { \
-            mp_cpu_exc_soft_limit(); \
-        } \
+    if (!MP_CPU_UPDATE_STATUS()) { \
+        \
+    } else if (!MP_CPU_HARD_CHECK()) { \
+        mp_cpu_exc_hard_limit(); \
+    } else if (!MP_CPU_SOFT_CHECK()) { \
+        mp_cpu_exc_soft_limit(); \
     }
 #else
 #define VM_CPU_LIMIT \
