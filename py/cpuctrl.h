@@ -63,7 +63,7 @@ void mp_cpu_exc_soft_limit(void);
 
 inline bool _mp_cpu_update_status(void) {
 #if MICROPY_LIMIT_CPU_CHECK_INTERVAL
-    if (MP_STATE_VM(cpu_check_clock)-- <= 0) {
+    if (--MP_STATE_VM(cpu_check_clock) <= 0) {
         mp_cpu_update_status(false);
         return true;
     }
