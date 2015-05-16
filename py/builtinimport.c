@@ -161,6 +161,8 @@ mp_obj_t mp_builtin___import__(mp_uint_t n_args, const mp_obj_t *args) {
 #endif
 
     mp_obj_t module_name = args[0];
+    mp_obj_t globals_dict = args[1];
+    // mp_obj_t locals_dict = args[2];
     mp_obj_t fromtuple = mp_const_none;
     mp_int_t level = 0;
     if (n_args >= 4) {
@@ -182,9 +184,9 @@ mp_obj_t mp_builtin___import__(mp_uint_t n_args, const mp_obj_t *args) {
         // "Relative imports use a module's __name__ attribute to determine that
         // module's position in the package hierarchy."
         level--;
-        mp_obj_t this_name_q = mp_obj_dict_get(mp_globals_get(), MP_OBJ_NEW_QSTR(MP_QSTR___name__));
+        mp_obj_t this_name_q = mp_obj_dict_get(globals_dict, MP_OBJ_NEW_QSTR(MP_QSTR___name__));
         assert(this_name_q != MP_OBJ_NULL);
-        mp_map_t *globals_map = mp_obj_dict_get_map(mp_globals_get());
+        mp_map_t *globals_map = mp_obj_dict_get_map(globals_dict);
         mp_map_elem_t *elem = mp_map_lookup(globals_map, MP_OBJ_NEW_QSTR(MP_QSTR___path__), MP_MAP_LOOKUP);
         bool is_pkg = (elem != NULL);
 

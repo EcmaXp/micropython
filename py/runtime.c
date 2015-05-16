@@ -161,18 +161,23 @@ mp_obj_t mp_load_global(qstr qst) {
     return elem->value;
 }
 
-mp_obj_t mp_load_build_class(void) {
-    DEBUG_OP_printf("load_build_class\n");
+mp_obj_t mp_load_builtin_const(qstr qst, mp_obj_t obj) {
+    DEBUG_OP_printf("load builtin const %s -> %p?\n", qstr_str(qst), obj);
     #if MICROPY_CAN_OVERRIDE_BUILTINS
     if (MP_STATE_VM(mp_module_builtins_override_dict) != NULL) {
         // lookup in additional dynamic table of builtins first
-        mp_map_elem_t *elem = mp_map_lookup(&MP_STATE_VM(mp_module_builtins_override_dict)->map, MP_OBJ_NEW_QSTR(MP_QSTR___build_class__), MP_MAP_LOOKUP);
+        mp_map_elem_t *elem = mp_map_lookup(&MP_STATE_VM(mp_module_builtins_override_dict)->map, MP_OBJ_NEW_QSTR(qst), MP_MAP_LOOKUP);
         if (elem != NULL) {
             return elem->value;
         }
     }
     #endif
-    return (mp_obj_t)&mp_builtin___build_class___obj;
+    return obj;
+}
+
+mp_obj_t mp_load_build_class(void) {
+    DEBUG_OP_printf("load_build_class\n");
+    return mp_load_builtin_const(MP_QSTR___build_class__, (mp_obj_t)&mp_builtin___build_class___obj);
 }
 
 void mp_store_name(qstr qst, mp_obj_t obj) {
@@ -1174,13 +1179,17 @@ mp_obj_t mp_import_name(qstr name, mp_obj_t fromlist, mp_obj_t level) {
     // build args array
     mp_obj_t args[5];
     args[0] = MP_OBJ_NEW_QSTR(name);
-    args[1] = mp_const_none; // TODO should be globals
-    args[2] = mp_const_none; // TODO should be locals
+    args[1] = mp_globals_get();
+    args[2] = mp_locals_get();
     args[3] = fromlist;
     args[4] = level; // must be 0; we don't yet support other values
 
-    // TODO lookup __import__ and call that instead of going straight to builtin implementation
-    return mp_builtin___import__(5, args);
+    mp_obj_t import_func_obj = mp_load_builtin_const(MP_QSTR___import__, MP_OBJ_NULL);
+    if (import_func_obj != MP_OBJ_NULL) {
+        return mp_call_function_n_kw(import_func_obj, 5, 0, args);
+    } else {
+        return mp_builtin___import__(5, args);
+    }
 }
 
 mp_obj_t mp_import_from(mp_obj_t module, qstr name) {
@@ -1218,13 +1227,17 @@ import_error:
 
     mp_obj_t args[5];
     args[0] = MP_OBJ_NEW_QSTR(dot_name_q);
-    args[1] = mp_const_none; // TODO should be globals
-    args[2] = mp_const_none; // TODO should be locals
+    args[1] = mp_globals_get();
+    args[2] = mp_locals_get();
     args[3] = mp_const_true; // Pass sentinel "non empty" value to force returning of leaf module
     args[4] = MP_OBJ_NEW_SMALL_INT(0);
 
-    // TODO lookup __import__ and call that instead of going straight to builtin implementation
-    return mp_builtin___import__(5, args);
+    mp_obj_t import_func_obj = mp_load_builtin_const(MP_QSTR___import__, MP_OBJ_NULL);
+    if (import_func_obj != MP_OBJ_NULL) {
+        return mp_call_function_n_kw(import_func_obj, 5, 0, args);
+    } else {
+        return mp_builtin___import__(5, args);
+    }
 }
 
 void mp_import_all(mp_obj_t module) {
