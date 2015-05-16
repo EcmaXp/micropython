@@ -1,0 +1,219 @@
+../py/objmodule.c: if (MP_STATE_VM(mp_module_builtins_override_dict) == NULL) {
+../py/objmodule.c: MP_STATE_VM(mp_module_builtins_override_dict) = mp_obj_new_dict(1);
+../py/objmodule.c: dict = MP_STATE_VM(mp_module_builtins_override_dict);
+../py/objmodule.c: mp_map_elem_t *el = mp_map_lookup(&MP_STATE_VM(mp_loaded_modules_map), MP_OBJ_NEW_QSTR(module_name), MP_MAP_LOOKUP_ADD_IF_NOT_FOUND);
+../py/objmodule.c: mp_map_init(&MP_STATE_VM(mp_loaded_modules_map), 3);
+../py/objmodule.c: mp_map_deinit(&MP_STATE_VM(mp_loaded_modules_map));
+../py/objmodule.c: mp_map_elem_t *el = mp_map_lookup(&MP_STATE_VM(mp_loaded_modules_map), MP_OBJ_NEW_QSTR(module_name), MP_MAP_LOOKUP);
+../py/objmodule.c: mp_map_lookup(&MP_STATE_VM(mp_loaded_modules_map), MP_OBJ_NEW_QSTR(qst), MP_MAP_LOOKUP_ADD_IF_NOT_FOUND)->value = module;
+../py/cpuctrl.h:if (--MP_STATE_VM(cpu_check_clock) <= 0) {
+../py/cpuctrl.h:MP_STATE_VM(cpu_current_executed)++;
+../py/cpuctrl.h:return (MP_STATE_VM(cpu_hard_limit) > 0) && \
+../py/cpuctrl.h:(MP_STATE_VM(cpu_hard_limit) <= MP_STATE_VM(cpu_current_executed));
+../py/cpuctrl.h:return (MP_STATE_VM(cpu_soft_limit) > 0) && \
+../py/cpuctrl.h:!MP_STATE_VM(cpu_soft_limit_executed) && \
+../py/cpuctrl.h:(MP_STATE_VM(cpu_soft_limit) <= MP_STATE_VM(cpu_current_executed));
+../py/cpuctrl.h:return (MP_STATE_VM(cpu_safe_limit) > 0) && \
+../py/cpuctrl.h:(MP_STATE_VM(cpu_safe_limit) <= MP_STATE_VM(cpu_current_executed));
+../py/runtime.c: .globals = (mp_obj_dict_t*)&MP_STATE_VM(dict_main),
+../py/runtime.c: MP_STATE_VM(mp_pending_exception) = MP_OBJ_NULL;
+../py/runtime.c: MP_STATE_VM(mp_optimise_value) = 0;
+../py/runtime.c: mp_obj_dict_init(&MP_STATE_VM(dict_main), 1);
+../py/runtime.c: mp_obj_dict_store(&MP_STATE_VM(dict_main), MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR___main__));
+../py/runtime.c: MP_STATE_CTX(dict_locals) = MP_STATE_CTX(dict_globals) = &MP_STATE_VM(dict_main);
+../py/runtime.c: MP_STATE_VM(mp_module_builtins_override_dict) = NULL;
+../py/runtime.c: if (MP_STATE_CTX(dict_locals) != MP_STATE_CTX(dict_globals)) {
+../py/runtime.c: mp_map_elem_t *elem = mp_map_lookup(&MP_STATE_CTX(dict_locals)->map, MP_OBJ_NEW_QSTR(qst), MP_MAP_LOOKUP);
+../py/runtime.c: mp_map_elem_t *elem = mp_map_lookup(&MP_STATE_CTX(dict_globals)->map, MP_OBJ_NEW_QSTR(qst), MP_MAP_LOOKUP);
+../py/runtime.c: if (MP_STATE_VM(mp_module_builtins_override_dict) != NULL) {
+../py/runtime.c: elem = mp_map_lookup(&MP_STATE_VM(mp_module_builtins_override_dict)->map, MP_OBJ_NEW_QSTR(qst), MP_MAP_LOOKUP);
+../py/runtime.c: if (MP_STATE_VM(mp_module_builtins_override_dict) != NULL) {
+../py/runtime.c: mp_map_elem_t *elem = mp_map_lookup(&MP_STATE_VM(mp_module_builtins_override_dict)->map, MP_OBJ_NEW_QSTR(qst), MP_MAP_LOOKUP);
+../py/runtime.c: mp_obj_dict_store(MP_STATE_CTX(dict_locals), MP_OBJ_NEW_QSTR(qst), obj);
+../py/runtime.c: mp_obj_dict_delete(MP_STATE_CTX(dict_locals), MP_OBJ_NEW_QSTR(qst));
+../py/runtime.c: mp_obj_dict_store(MP_STATE_CTX(dict_globals), MP_OBJ_NEW_QSTR(qst), obj);
+../py/runtime.c: mp_obj_dict_delete(MP_STATE_CTX(dict_globals), MP_OBJ_NEW_QSTR(qst));
+../py/stackctrl.c: MP_STATE_VM(stack_top) = (char*)&stack_dummy;
+../py/stackctrl.c: return MP_STATE_VM(stack_top) - (char*)&stack_dummy;
+../py/stackctrl.c: MP_STATE_VM(stack_limit) = limit;
+../py/stackctrl.c: if (mp_stack_usage() >= MP_STATE_VM(stack_limit)) {
+../py/objexcept.c: #define mp_emergency_exception_buf_size MP_STATE_VM(mp_emergency_exception_buf_size)
+../py/objexcept.c: MP_STATE_VM(mp_emergency_exception_buf) = NULL;
+../py/objexcept.c: void *old_buf = MP_STATE_VM(mp_emergency_exception_buf);
+../py/objexcept.c: MP_STATE_VM(mp_emergency_exception_buf) = buf;
+../py/objexcept.c: o = &MP_STATE_VM(mp_emergency_exception_obj);
+../py/objexcept.c: o = &MP_STATE_VM(mp_emergency_exception_obj);
+../py/objexcept.c: mp_obj_tuple_t *tuple = (mp_obj_tuple_t *)MP_STATE_VM(mp_emergency_exception_buf);
+../py/objexcept.c: uint max_len = MP_STATE_VM(mp_emergency_exception_buf) + mp_emergency_exception_buf_size
+../py/objexcept.c: uint offset = &str_data[str->len] - MP_STATE_VM(mp_emergency_exception_buf);
+../py/objexcept.c: o->traceback_data = (mp_uint_t*)((byte *)MP_STATE_VM(mp_emergency_exception_buf) + offset);
+../py/objexcept.c: o->traceback_alloc = (MP_STATE_VM(mp_emergency_exception_buf) + mp_emergency_exception_buf_size - (byte *)o->traceback_data) / sizeof(o->traceback_data[0]);
+../py/gc.c: #define ATB_GET_KIND(block) ((MP_STATE_MEM(gc_alloc_table_start)[(block) / BLOCKS_PER_ATB] >> BLOCK_SHIFT(block)) & 3)
+../py/gc.c: #define ATB_ANY_TO_FREE(block) do { MP_STATE_MEM(gc_alloc_table_start)[(block) / BLOCKS_PER_ATB] &= (~(AT_MARK << BLOCK_SHIFT(block))); } while (0)
+../py/gc.c: #define ATB_FREE_TO_HEAD(block) do { MP_STATE_MEM(gc_alloc_table_start)[(block) / BLOCKS_PER_ATB] |= (AT_HEAD << BLOCK_SHIFT(block)); } while (0)
+../py/gc.c: #define ATB_FREE_TO_TAIL(block) do { MP_STATE_MEM(gc_alloc_table_start)[(block) / BLOCKS_PER_ATB] |= (AT_TAIL << BLOCK_SHIFT(block)); } while (0)
+../py/gc.c: #define ATB_HEAD_TO_MARK(block) do { MP_STATE_MEM(gc_alloc_table_start)[(block) / BLOCKS_PER_ATB] |= (AT_MARK << BLOCK_SHIFT(block)); } while (0)
+../py/gc.c: #define ATB_MARK_TO_HEAD(block) do { MP_STATE_MEM(gc_alloc_table_start)[(block) / BLOCKS_PER_ATB] &= (~(AT_TAIL << BLOCK_SHIFT(block))); } while (0)
+../py/gc.c: #define BLOCK_FROM_PTR(ptr) (((ptr) - (mp_uint_t)MP_STATE_MEM(gc_pool_start)) / BYTES_PER_BLOCK)
+../py/gc.c: #define PTR_FROM_BLOCK(block) (((block) * BYTES_PER_BLOCK + (mp_uint_t)MP_STATE_MEM(gc_pool_start)))
+../py/gc.c: #define FTB_GET(block) ((MP_STATE_MEM(gc_finaliser_table_start)[(block) / BLOCKS_PER_FTB] >> ((block) & 7)) & 1)
+../py/gc.c: #define FTB_SET(block) do { MP_STATE_MEM(gc_finaliser_table_start)[(block) / BLOCKS_PER_FTB] |= (1 << ((block) & 7)); } while (0)
+../py/gc.c: #define FTB_CLEAR(block) do { MP_STATE_MEM(gc_finaliser_table_start)[(block) / BLOCKS_PER_FTB] &= (~(1 << ((block) & 7))); } while (0)
+../py/gc.c: MP_STATE_MEM(gc_alloc_table_byte_len) = total_byte_len * BITS_PER_BYTE / (BITS_PER_BYTE + BITS_PER_BYTE * BLOCKS_PER_ATB / BLOCKS_PER_FTB + BITS_PER_BYTE * BLOCKS_PER_ATB * BYTES_PER_BLOCK);
+../py/gc.c: MP_STATE_MEM(gc_alloc_table_byte_len) = total_byte_len / (1 + BITS_PER_BYTE / 2 * BYTES_PER_BLOCK);
+../py/gc.c: MP_STATE_MEM(gc_alloc_table_start) = (byte*)start;
+../py/gc.c: mp_uint_t gc_finaliser_table_byte_len = (MP_STATE_MEM(gc_alloc_table_byte_len) * BLOCKS_PER_ATB + BLOCKS_PER_FTB - 1) / BLOCKS_PER_FTB;
+../py/gc.c: MP_STATE_MEM(gc_finaliser_table_start) = MP_STATE_MEM(gc_alloc_table_start) + MP_STATE_MEM(gc_alloc_table_byte_len);
+../py/gc.c: mp_uint_t gc_pool_block_len = MP_STATE_MEM(gc_alloc_table_byte_len) * BLOCKS_PER_ATB;
+../py/gc.c: MP_STATE_MEM(gc_pool_start) = (mp_uint_t*)((byte*)end - gc_pool_block_len * BYTES_PER_BLOCK);
+../py/gc.c: MP_STATE_MEM(gc_pool_end) = (mp_uint_t*)end;
+../py/gc.c: assert((byte*)MP_STATE_MEM(gc_pool_start) >= MP_STATE_MEM(gc_finaliser_table_start) + gc_finaliser_table_byte_len);
+../py/gc.c: memset(MP_STATE_MEM(gc_alloc_table_start), 0, MP_STATE_MEM(gc_alloc_table_byte_len));
+../py/gc.c: memset(MP_STATE_MEM(gc_finaliser_table_start), 0, gc_finaliser_table_byte_len);
+../py/gc.c: MP_STATE_MEM(gc_last_free_atb_index) = 0;
+../py/gc.c: MP_STATE_MEM(gc_lock_depth) = 0;
+../py/gc.c: MP_STATE_MEM(gc_auto_collect_enabled) = 1;
+../py/gc.c: DEBUG_printf("  alloc table at %p, length " UINT_FMT " bytes, " UINT_FMT " blocks\n", MP_STATE_MEM(gc_alloc_table_start), MP_STATE_MEM(gc_alloc_table_byte_len), MP_STATE_MEM(gc_alloc_table_byte_len) * BLOCKS_PER_ATB);
+../py/gc.c: DEBUG_printf("  finaliser table at %p, length " UINT_FMT " bytes, " UINT_FMT " blocks\n", MP_STATE_MEM(gc_finaliser_table_start), gc_finaliser_table_byte_len, gc_finaliser_table_byte_len * BLOCKS_PER_FTB);
+../py/gc.c: DEBUG_printf("  pool at %p, length " UINT_FMT " bytes, " UINT_FMT " blocks\n", MP_STATE_MEM(gc_pool_start), gc_pool_block_len * BYTES_PER_BLOCK, gc_pool_block_len);
+../py/gc.c: MP_STATE_MEM(gc_lock_depth)++;
+../py/gc.c: MP_STATE_MEM(gc_lock_depth)--;
+../py/gc.c: return MP_STATE_MEM(gc_lock_depth) != 0;
+../py/gc.c: && ptr >= (mp_uint_t)MP_STATE_MEM(gc_pool_start) /* must be above start of pool */ \
+../py/gc.c: && ptr < (mp_uint_t)MP_STATE_MEM(gc_pool_end)/* must be below end of pool */ \
+../py/gc.c: if (MP_STATE_MEM(gc_sp) < &MP_STATE_MEM(gc_stack)[MICROPY_ALLOC_GC_STACK_SIZE]) { \
+../py/gc.c: *MP_STATE_MEM(gc_sp)++ = _block; \
+../py/gc.c: MP_STATE_MEM(gc_stack_overflow) = 1; \
+../py/gc.c: while (MP_STATE_MEM(gc_sp) > MP_STATE_MEM(gc_stack)) {
+../py/gc.c: mp_uint_t block = *--MP_STATE_MEM(gc_sp);
+../py/gc.c: while (MP_STATE_MEM(gc_stack_overflow)) {
+../py/gc.c: MP_STATE_MEM(gc_stack_overflow) = 0;
+../py/gc.c: MP_STATE_MEM(gc_sp) = MP_STATE_MEM(gc_stack);
+../py/gc.c: for (mp_uint_t block = 0; block < MP_STATE_MEM(gc_alloc_table_byte_len) * BLOCKS_PER_ATB; block++) {
+../py/gc.c: *MP_STATE_MEM(gc_sp)++ = block;
+../py/gc.c: MP_STATE_MEM(gc_collected) = 0;
+../py/gc.c: for (mp_uint_t block = 0; block < MP_STATE_MEM(gc_alloc_table_byte_len) * BLOCKS_PER_ATB; block++) {
+../py/gc.c: MP_STATE_MEM(gc_collected)++;
+../py/gc.c: MP_STATE_MEM(gc_stack_overflow) = 0;
+../py/gc.c: MP_STATE_MEM(gc_sp) = MP_STATE_MEM(gc_stack);
+../py/gc.c: MP_STATE_MEM(gc_last_free_atb_index) = 0;
+../py/gc.c: info->total = (MP_STATE_MEM(gc_pool_end) - MP_STATE_MEM(gc_pool_start)) * sizeof(mp_uint_t);
+../py/gc.c: for (mp_uint_t block = 0, len = 0; block < MP_STATE_MEM(gc_alloc_table_byte_len) * BLOCKS_PER_ATB; block++) {
+../py/gc.c: if (MP_STATE_MEM(gc_lock_depth) > 0) {
+../py/gc.c: int collected = !MP_STATE_MEM(gc_auto_collect_enabled);
+../py/gc.c: for (i = MP_STATE_MEM(gc_last_free_atb_index); i < MP_STATE_MEM(gc_alloc_table_byte_len); i++) {
+../py/gc.c: byte a = MP_STATE_MEM(gc_alloc_table_start)[i];
+../py/gc.c: MP_STATE_MEM(gc_last_free_atb_index) = (i + 1) / BLOCKS_PER_ATB;
+../py/gc.c: void *ret_ptr = (void*)(MP_STATE_MEM(gc_pool_start) + start_block * WORDS_PER_BLOCK);
+../py/gc.c: if (MP_STATE_MEM(gc_lock_depth) > 0) {
+../py/gc.c: if (block / BLOCKS_PER_ATB < MP_STATE_MEM(gc_last_free_atb_index)) {
+../py/gc.c: MP_STATE_MEM(gc_last_free_atb_index) = block / BLOCKS_PER_ATB;
+../py/gc.c: if (MP_STATE_MEM(gc_lock_depth) > 0) {
+../py/gc.c: mp_uint_t max_block = MP_STATE_MEM(gc_alloc_table_byte_len) * BLOCKS_PER_ATB;
+../py/gc.c: if ((block + new_blocks) / BLOCKS_PER_ATB < MP_STATE_MEM(gc_last_free_atb_index)) {
+../py/gc.c: MP_STATE_MEM(gc_last_free_atb_index) = (block + new_blocks) / BLOCKS_PER_ATB;
+../py/gc.c: mp_printf(&mp_plat_print, "GC memory layout; from %p:", MP_STATE_MEM(gc_pool_start));
+../py/gc.c: for (mp_uint_t bl = 0; bl < MP_STATE_MEM(gc_alloc_table_byte_len) * BLOCKS_PER_ATB; bl++) {
+../py/gc.c: while (bl2 < MP_STATE_MEM(gc_alloc_table_byte_len) * BLOCKS_PER_ATB && ATB_GET_KIND(bl2) == AT_FREE) {
+../py/gc.c: if (bl >= MP_STATE_MEM(gc_alloc_table_byte_len) * BLOCKS_PER_ATB) {
+../py/gc.c: len = ((mp_uint_t)MP_STATE_VM(stack_top) - (mp_uint_t)&c) / sizeof(mp_uint_t);
+../py/gc.c: mp_uint_t *ptr = MP_STATE_MEM(gc_pool_start) + bl * WORDS_PER_BLOCK;
+../py/gc.c: for (qstr_pool_t *pool = MP_STATE_VM(last_pool); c == 'h' && pool != NULL; pool = pool->prev) {
+../py/nlr.h:#define nlr_push(buf) ((buf)->prev = MP_STATE_VM(nlr_top), MP_STATE_VM(nlr_top) = (buf), setjmp((buf)->jmpbuf))
+../py/nlr.h:#define nlr_pop() { MP_STATE_VM(nlr_top) = MP_STATE_VM(nlr_top)->prev; }
+../py/nlr.h:/*printf("nlr_raise: nlr_top=%p\n", MP_STATE_VM(nlr_top)); \
+../py/nlr.h:assert(MP_STATE_VM(nlr_top) != val),nlr_push(val)
+../py/nlr.h:printf("nlr_push: before: nlr_top=%p, val=%p\n", MP_STATE_VM(nlr_top), val),assert(MP_STATE_VM(nlr_top) != val),nlr_push(val)
+../py/qstr.c: MP_STATE_VM(last_pool) = (qstr_pool_t*)&const_pool; // we won't modify the const_pool since it has no allocated room left
+../py/qstr.c: for (qstr_pool_t *pool = MP_STATE_VM(last_pool); pool != NULL; pool = pool->prev) {
+../py/qstr.c: if (MP_STATE_VM(last_pool)->len >= MP_STATE_VM(last_pool)->alloc) {
+../py/qstr.c: qstr_pool_t *pool = m_new_obj_var(qstr_pool_t, const char*, MP_STATE_VM(last_pool)->alloc * 2);
+../py/qstr.c: pool->prev = MP_STATE_VM(last_pool);
+../py/qstr.c: pool->total_prev_len = MP_STATE_VM(last_pool)->total_prev_len + MP_STATE_VM(last_pool)->len;
+../py/qstr.c: pool->alloc = MP_STATE_VM(last_pool)->alloc * 2;
+../py/qstr.c: MP_STATE_VM(last_pool) = pool;
+../py/qstr.c: DEBUG_printf("QSTR: allocate new pool of size %d\n", MP_STATE_VM(last_pool)->alloc);
+../py/qstr.c: MP_STATE_VM(last_pool)->qstrs[MP_STATE_VM(last_pool)->len++] = q_ptr;
+../py/qstr.c: return MP_STATE_VM(last_pool)->total_prev_len + MP_STATE_VM(last_pool)->len - 1;
+../py/qstr.c: for (qstr_pool_t *pool = MP_STATE_VM(last_pool); pool != NULL; pool = pool->prev) {
+../py/qstr.c: for (qstr_pool_t *pool = MP_STATE_VM(last_pool); pool != NULL && pool != &const_pool; pool = pool->prev) {
+../py/qstr.c: for (qstr_pool_t *pool = MP_STATE_VM(last_pool); pool != NULL && pool != &const_pool; pool = pool->prev) {
+../py/mpstate.h:#define MP_STATE_CTX(x) (mp_state_ctx.x)
+../py/mpstate.h:#define MP_STATE_VM(x) (mp_state_ctx.vm.x)
+../py/mpstate.h:#define MP_STATE_MEM(x) (mp_state_ctx.mem.x)
+../py/modmicropython.c: mp_printf(&mp_plat_print, "stack: " UINT_FMT " out of " INT_FMT "\n", mp_stack_usage(), MP_STATE_VM(stack_limit));
+../py/modsys.c: mp_obj_t cur_exc = MP_STATE_VM(cur_exception);
+../py/modsys.c: { MP_OBJ_NEW_QSTR(MP_QSTR_path), (mp_obj_t)&MP_STATE_VM(mp_sys_path_obj) },
+../py/modsys.c: { MP_OBJ_NEW_QSTR(MP_QSTR_argv), (mp_obj_t)&MP_STATE_VM(mp_sys_argv_obj) },
+../py/runtime.h:static inline mp_obj_dict_t *mp_locals_get(void) { return MP_STATE_CTX(dict_locals); }
+../py/runtime.h:static inline void mp_locals_set(mp_obj_dict_t *d) { MP_STATE_CTX(dict_locals) = d; }
+../py/runtime.h:static inline mp_obj_dict_t *mp_globals_get(void) { return MP_STATE_CTX(dict_globals); }
+../py/runtime.h:static inline void mp_globals_set(mp_obj_dict_t *d) { MP_STATE_CTX(dict_globals) = d; }
+../py/runtime.h:#define mp_sys_path ((mp_obj_t)&MP_STATE_VM(mp_sys_path_obj))
+../py/runtime.h:#define mp_sys_argv ((mp_obj_t)&MP_STATE_VM(mp_sys_argv_obj))
+../py/nlrsetjmp.c: nlr_buf_t *buf = MP_STATE_VM(nlr_top);
+../py/nlrsetjmp.c: MP_STATE_VM(nlr_top) = buf->prev;
+../py/modgc.c: return MP_OBJ_NEW_SMALL_INT(MP_STATE_MEM(gc_collected));
+../py/modgc.c: MP_STATE_MEM(gc_auto_collect_enabled) = 0;
+../py/modgc.c: MP_STATE_MEM(gc_auto_collect_enabled) = 1;
+../py/modgc.c: return MP_BOOL(MP_STATE_MEM(gc_auto_collect_enabled));
+../py/malloc.c: #define UPDATE_PEAK() { if (MP_STATE_MEM(current_bytes_allocated) > MP_STATE_MEM(peak_bytes_allocated)) MP_STATE_MEM(peak_bytes_allocated) = MP_STATE_MEM(current_bytes_allocated); }
+../py/malloc.c: MP_STATE_MEM(total_bytes_allocated) += num_bytes;
+../py/malloc.c: MP_STATE_MEM(current_bytes_allocated) += num_bytes;
+../py/malloc.c: MP_STATE_MEM(total_bytes_allocated) += num_bytes;
+../py/malloc.c: MP_STATE_MEM(current_bytes_allocated) += num_bytes;
+../py/malloc.c: MP_STATE_MEM(total_bytes_allocated) += num_bytes;
+../py/malloc.c: MP_STATE_MEM(current_bytes_allocated) += num_bytes;
+../py/malloc.c: MP_STATE_MEM(total_bytes_allocated) += diff;
+../py/malloc.c: MP_STATE_MEM(current_bytes_allocated) += diff;
+../py/malloc.c: MP_STATE_MEM(total_bytes_allocated) += diff;
+../py/malloc.c: MP_STATE_MEM(current_bytes_allocated) += diff;
+../py/malloc.c: MP_STATE_MEM(current_bytes_allocated) -= num_bytes;
+../py/malloc.c: return MP_STATE_MEM(total_bytes_allocated);
+../py/malloc.c: return MP_STATE_MEM(current_bytes_allocated);
+../py/malloc.c: return MP_STATE_MEM(peak_bytes_allocated);
+../py/emitbc.c: if (MP_STATE_VM(mp_optimise_value) >= 3) {
+../py/lexer.c: lex->tok_kind = (MP_STATE_VM(mp_optimise_value) == 0 ? MP_TOKEN_KW_TRUE : MP_TOKEN_KW_FALSE);
+../py/vm.c: #define CLEAR_SYS_EXC_INFO() MP_STATE_VM(cur_exception) = MP_OBJ_NULL;
+../py/vm.c: if (x < MP_STATE_CTX(dict_locals)->map.alloc && MP_STATE_CTX(dict_locals)->map.table[x].key == key) {
+../py/vm.c: PUSH(MP_STATE_CTX(dict_locals)->map.table[x].value);
+../py/vm.c: mp_map_elem_t *elem = mp_map_lookup(&MP_STATE_CTX(dict_locals)->map, MP_OBJ_NEW_QSTR(qst), MP_MAP_LOOKUP);
+../py/vm.c: *(byte*)ip = (elem - &MP_STATE_CTX(dict_locals)->map.table[0]) & 0xff;
+../py/vm.c: if (x < MP_STATE_CTX(dict_globals)->map.alloc && MP_STATE_CTX(dict_globals)->map.table[x].key == key) {
+../py/vm.c: PUSH(MP_STATE_CTX(dict_globals)->map.table[x].value);
+../py/vm.c: mp_map_elem_t *elem = mp_map_lookup(&MP_STATE_CTX(dict_globals)->map, MP_OBJ_NEW_QSTR(qst), MP_MAP_LOOKUP);
+../py/vm.c: *(byte*)ip = (elem - &MP_STATE_CTX(dict_globals)->map.table[0]) & 0xff;
+../py/vm.c: if (MP_STATE_VM(mp_pending_exception) != MP_OBJ_NULL) {
+../py/vm.c: mp_obj_t obj = MP_STATE_VM(mp_pending_exception);
+../py/vm.c: MP_STATE_VM(mp_pending_exception) = MP_OBJ_NULL;
+../py/vm.c: MP_STATE_VM(cur_exception) = nlr.ret_val;
+../py/cpuctrl.c: MP_STATE_VM(cpu_last_check_clock) = MICROPY_LIMIT_CPU_CHECK_INTERVAL;
+../py/cpuctrl.c: MP_STATE_VM(cpu_check_clock) = MP_STATE_VM(cpu_last_check_clock);
+../py/cpuctrl.c: MP_STATE_VM(cpu_hard_limit) = 0;
+../py/cpuctrl.c: MP_STATE_VM(cpu_soft_limit) = 0;
+../py/cpuctrl.c: MP_STATE_VM(cpu_safe_limit) = 0;
+../py/cpuctrl.c: MP_STATE_VM(cpu_current_executed) = 0;
+../py/cpuctrl.c: MP_STATE_VM(cpu_soft_limit_executed) = false;
+../py/cpuctrl.c: MP_STATE_VM(cpu_hard_limit) = hard_limit;
+../py/cpuctrl.c: MP_STATE_VM(cpu_soft_limit) = soft_limit;
+../py/cpuctrl.c: MP_STATE_VM(cpu_soft_limit_executed) = true;
+../py/cpuctrl.c: MP_STATE_VM(cpu_soft_limit_executed) = false;
+../py/cpuctrl.c: MP_STATE_VM(cpu_safe_limit) = safe_limit;
+../py/cpuctrl.c: return MP_STATE_VM(cpu_hard_limit);
+../py/cpuctrl.c: return MP_STATE_VM(cpu_soft_limit);
+../py/cpuctrl.c: return MP_STATE_VM(cpu_soft_limit_executed);
+../py/cpuctrl.c: return MP_STATE_VM(cpu_safe_limit);
+../py/cpuctrl.c: MP_STATE_VM(cpu_current_executed) = cpu_current_executed;
+../py/cpuctrl.c: return MP_STATE_VM(cpu_current_executed);
+../py/cpuctrl.c: return (MP_STATE_VM(cpu_last_check_clock) - MP_STATE_VM(cpu_check_clock)) == 0;
+../py/cpuctrl.c: MP_STATE_VM(cpu_current_executed) += \
+../py/cpuctrl.c: MP_STATE_VM(cpu_last_check_clock) - MP_STATE_VM(cpu_check_clock);
+../py/cpuctrl.c: mp_int_t current_executed = MP_STATE_VM(cpu_current_executed);
+../py/cpuctrl.c: new_clock = MIN(new_clock, MP_STATE_VM(cpu_check_clock));
+../py/cpuctrl.c: limit_value = MP_STATE_VM(cpu_hard_limit);
+../py/cpuctrl.c: limit_value = MP_STATE_VM(cpu_soft_limit);
+../py/cpuctrl.c: limit_value = MP_STATE_VM(cpu_safe_limit);
+../py/cpuctrl.c: MP_STATE_VM(cpu_last_check_clock) = new_clock;
+../py/cpuctrl.c: MP_STATE_VM(cpu_check_clock) = MP_STATE_VM(cpu_last_check_clock);
+../py/cpuctrl.c: // assert(!MP_STATE_VM(cpu_soft_limit_executed));
+../py/cpuctrl.c: MP_STATE_VM(cpu_soft_limit_executed) = true;
