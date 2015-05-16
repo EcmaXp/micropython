@@ -143,6 +143,7 @@ typedef enum {
 
 #define VM_PAUSE_POINT do { \
     if (sp[0] == MP_OBJ_PAUSE_VM){ \
+        sp[0] = mp_const_none; \
         VM_PAUSE(MP_VM_RETURN_PAUSE); \
     } \
 } while (0)
