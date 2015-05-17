@@ -146,6 +146,10 @@ typedef struct _mp_state_vm_t {
     mp_int_t mp_emergency_exception_buf_size;
     #endif
     
+    #if MICROPY_MULTI_STATE_CONTEXT
+    bool is_state_loaded;
+    #endif
+    
     #if MICROPY_LIMIT_CPU
     mp_int_t cpu_last_check_clock;
     mp_int_t cpu_check_clock;

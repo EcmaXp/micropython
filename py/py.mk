@@ -51,6 +51,7 @@ PY_O_BASENAME = \
 	nativeglue.o \
 	cpuctrl.o \
 	stackctrl.o \
+	statectrl.o \
 	argcheck.o \
 	warning.o \
 	map.o \
