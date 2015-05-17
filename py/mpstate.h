@@ -172,33 +172,20 @@ typedef struct _mp_state_ctx_t {
     mp_state_mem_t mem;
 } mp_state_ctx_t;
 
-#define MICROPY_MULTI_STATE_CONTEXT 0
-/*
-multiful state require:
-    - nlr_*** function handle __thread value.
-    - mp_module___main__ should have multi state.
-    - well. assert handler required... (and vm.c never handle it.)
-*/
-
 #if MICROPY_MULTI_STATE_CONTEXT
-extern __thread mp_state_ctx_t mp_state_ctx;
-extern mp_state_ctx_t mp_static_state_ctx;
+extern __thread mp_state_ctx_t *mp_state_ctx;
 #else
 extern mp_state_ctx_t mp_state_ctx;
 #endif
 
+#if MICROPY_MULTI_STATE_CONTEXT
+#define MP_STATE_CTX(x) (mp_state_ctx->x)
+#define MP_STATE_VM(x) (mp_state_ctx->vm.x)
+#define MP_STATE_MEM(x) (mp_state_ctx->mem.x)
+#else
 #define MP_STATE_CTX(x) (mp_state_ctx.x)
 #define MP_STATE_VM(x) (mp_state_ctx.vm.x)
 #define MP_STATE_MEM(x) (mp_state_ctx.mem.x)
-
-#if MICROPY_MULTI_STATE_CONTEXT
-#define MP_STATIC_STATE_CTX(x) (mp_static_state_ctx.x)
-#define MP_STATIC_STATE_VM(x) (mp_static_state_ctx.vm.x)
-#define MP_STATIC_STATE_MEM(x) (mp_static_state_ctx.mem.x)
-#else
-#define MP_STATIC_STATE_CTX(x) (MP_STATE_CTX(x))
-#define MP_STATIC_STATE_VM(x) (MP_STATE_VM(x))
-#define MP_STATIC_STATE_MEM(x) (MP_STATE_MEM(x))
 #endif
 
 #endif // __MICROPY_INCLUDED_PY_MPSTATE_H__

@@ -275,7 +275,11 @@ void gc_collect_start(void) {
     // Trace root pointers.  This relies on the root pointers being organised
     // correctly in the mp_state_ctx structure.  We scan nlr_top, dict_locals,
     // dict_globals, then the root pointer section of mp_state_vm.
+    #if MICROPY_MULTI_STATE_CONTEXT
+    void **ptrs = (void**)(void*)mp_state_ctx;
+    #else
     void **ptrs = (void**)(void*)&mp_state_ctx;
+    #endif
     gc_collect_root(ptrs, offsetof(mp_state_ctx_t, vm.stack_top) / sizeof(mp_uint_t));
 }
 

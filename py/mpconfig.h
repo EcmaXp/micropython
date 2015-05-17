@@ -430,6 +430,14 @@ typedef double mp_float_t;
 #define MICROPY_LIMIT_CPU_CHECK_INTERVAL (65535)
 #endif
 
+#ifndef MICROPY_MULTI_STATE_CONTEXT
+#define MICROPY_MULTI_STATE_CONTEXT (0)
+#endif
+
+#if MICROPY_MULTI_STATE_CONTEXT && !MICROPY_NLR_SETJMP
+#error MICROPY_MULTI_STATE_CONTEXT require MICROPY_NLR_SETJMP
+#endif
+
 /*****************************************************************************/
 /* Fine control over Python builtins, classes, modules, etc                  */
 

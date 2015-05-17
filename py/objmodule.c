@@ -128,7 +128,9 @@ mp_obj_dict_t *mp_obj_module_get_globals(mp_obj_t self_in) {
 // Global module table and related functions
 
 STATIC const mp_map_elem_t mp_builtin_module_table[] = {
+#if !MICROPY_MULTI_STATE_CONTEXT
     { MP_OBJ_NEW_QSTR(MP_QSTR___main__), (mp_obj_t)&mp_module___main__ },
+#endif
     { MP_OBJ_NEW_QSTR(MP_QSTR_builtins), (mp_obj_t)&mp_module_builtins },
     { MP_OBJ_NEW_QSTR(MP_QSTR_micropython), (mp_obj_t)&mp_module_micropython },
 
@@ -153,7 +155,7 @@ STATIC const mp_map_elem_t mp_builtin_module_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_cmath), (mp_obj_t)&mp_module_cmath },
 #endif
 #endif
-#if MICROPY_PY_SYS
+#if MICROPY_PY_SYS && !MICROPY_MULTI_STATE_CONTEXT
     { MP_OBJ_NEW_QSTR(MP_QSTR_sys), (mp_obj_t)&mp_module_sys },
 #endif
 #if MICROPY_PY_GC && MICROPY_ENABLE_GC

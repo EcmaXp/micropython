@@ -143,9 +143,13 @@ MP_DEFINE_CONST_FUN_OBJ_0(mp_sys_exc_info_obj, mp_sys_exc_info);
 
 STATIC const mp_map_elem_t mp_module_sys_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_sys) },
-
+    #if MICROPY_MULTI_STATE_CONTEXT
+    // path and argv will filled by runtime.c
+    #else
     { MP_OBJ_NEW_QSTR(MP_QSTR_path), (mp_obj_t)&MP_STATE_VM(mp_sys_path_obj) },
     { MP_OBJ_NEW_QSTR(MP_QSTR_argv), (mp_obj_t)&MP_STATE_VM(mp_sys_argv_obj) },
+    #endif
+
     { MP_OBJ_NEW_QSTR(MP_QSTR_version), (mp_obj_t)&version_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_version_info), (mp_obj_t)&mp_sys_version_info_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_implementation), (mp_obj_t)&mp_sys_implementation_obj },
@@ -196,7 +200,11 @@ STATIC const mp_map_elem_t mp_module_sys_globals_table[] = {
 
 STATIC MP_DEFINE_CONST_DICT(mp_module_sys_globals, mp_module_sys_globals_table);
 
+#if MICROPY_MULTI_STATE_CONTEXT
+const mp_obj_module_t mp_module_usys = {
+#else
 const mp_obj_module_t mp_module_sys = {
+#endif
     .base = { &mp_type_module },
     .name = MP_QSTR_sys,
     .globals = (mp_obj_dict_t*)&mp_module_sys_globals,

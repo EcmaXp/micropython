@@ -27,8 +27,7 @@
 #include "py/mpstate.h"
 
 #if MICROPY_MULTI_STATE_CONTEXT
-__thread mp_state_ctx_t mp_state_ctx;
-mp_state_ctx mp_static_state_ctx;
+__thread mp_state_ctx_t *mp_state_ctx;
 #else
-mp_state_ctx mp_state_ctx;
+mp_state_ctx_t mp_state_ctx;
 #endif

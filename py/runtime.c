@@ -54,11 +54,13 @@
 #define DEBUG_OP_printf(...) (void)0
 #endif
 
+#if !MICROPY_MULTI_STATE_CONTEXT
 const mp_obj_module_t mp_module___main__ = {
     .base = { &mp_type_module },
     .name = MP_QSTR___main__,
-    .globals = (mp_obj_dict_t*)&MP_STATIC_STATE_VM(dict_main),
+    .globals = (mp_obj_dict_t*)&MP_STATE_VM(dict_main),
 };
+#endif
 
 void mp_init(void) {
     qstr_init();
@@ -81,6 +83,19 @@ void mp_init(void) {
 
     // init global module stuff
     mp_module_init();
+
+    #if MICROPY_PY_SYS && MICROPY_MULTI_STATE_CONTEXT
+    mp_obj_module_t *module_sys = mp_obj_new_module(MP_QSTR_sys);
+    mp_obj_dict_t *module_sys_dict = mp_call_function_0(mp_load_attr(mp_module_usys.globals, MP_QSTR_copy));
+    mp_obj_dict_store(module_sys_dict, MP_OBJ_NEW_QSTR(MP_QSTR_argv), &MP_STATE_VM(mp_sys_argv_obj));
+    mp_obj_dict_store(module_sys_dict, MP_OBJ_NEW_QSTR(MP_QSTR_path), &MP_STATE_VM(mp_sys_path_obj));
+    module_sys->globals = module_sys_dict;
+    #endif
+
+    #if MICROPY_MULTI_STATE_CONTEXT
+    mp_obj_module_t *module_main = mp_obj_new_module(MP_QSTR___main__);
+    module_main->globals = &MP_STATE_VM(dict_main);
+    #endif
 
     // initialise the __main__ module
     mp_obj_dict_init(&MP_STATE_VM(dict_main), 1);

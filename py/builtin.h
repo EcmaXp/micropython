@@ -79,7 +79,12 @@ MP_DECLARE_CONST_FUN_OBJ(mp_op_getitem_obj);
 MP_DECLARE_CONST_FUN_OBJ(mp_op_setitem_obj);
 MP_DECLARE_CONST_FUN_OBJ(mp_op_delitem_obj);
 
+#if MICROPY_MULTI_STATE_CONTEXT
+extern const mp_obj_module_t mp_module_usys;
+#else
 extern const mp_obj_module_t mp_module___main__;
+extern const mp_obj_module_t mp_module_sys;
+#endif
 extern const mp_obj_module_t mp_module_builtins;
 extern const mp_obj_module_t mp_module_array;
 extern const mp_obj_module_t mp_module_collections;
@@ -88,7 +93,6 @@ extern const mp_obj_module_t mp_module_math;
 extern const mp_obj_module_t mp_module_cmath;
 extern const mp_obj_module_t mp_module_micropython;
 extern const mp_obj_module_t mp_module_ustruct;
-extern const mp_obj_module_t mp_module_sys;
 extern const mp_obj_module_t mp_module_gc;
 
 extern const mp_obj_dict_t mp_module_builtins_globals;
