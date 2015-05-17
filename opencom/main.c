@@ -44,6 +44,7 @@
 #include "py/bc.h"
 #include "py/cpuctrl.h"
 #include "py/stackctrl.h"
+#include "py/statectrl.h"
 #include "genhdr/mpversion.h"
 
 // Command line options, with their defaults
@@ -163,7 +164,9 @@ STATIC void pre_process_options(int argc, char **argv) {
 
 int main(int argc, char **argv) {
     pre_process_options(argc, argv);
-    mp_state_ctx = calloc(1, sizeof(mp_state_ctx_t));
+    mp_state_ctx_t *state = mp_state_new();
+    mp_state_load(state);
+
     mp_stack_set_limit(40 * 1024 * (BYTES_PER_WORD / 4));
 
 #if MICROPY_ENABLE_GC
@@ -234,6 +237,7 @@ int main(int argc, char **argv) {
     }
 
     mp_deinit();
+    mp_state_store(state);
 
 #if MICROPY_ENABLE_GC && !defined(NDEBUG)
     // We don't really need to free memory since we are about to exit the
