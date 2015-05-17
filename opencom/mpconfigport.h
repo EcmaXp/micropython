@@ -25,7 +25,14 @@
  */
 
 // for OpenComptuers
-#define MICROPY_LIMIT_CPU           (1)
+/*
+multiful state require:
+    - nlr_*** function handle __thread value. -> just use MICROPY_NLR_SETJMP?
+    - mp_module___main__ should have multi state.
+    - well. assert handler required... (and vm.c never handle it.)
+    - nlr_jump_fail...?
+*/
+
 
 // options to control how Micro Python is built
 

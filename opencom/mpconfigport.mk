@@ -17,3 +17,9 @@ MICROPY_PY_PERSIST = 1
 
 # Allow pause Virtual Machine
 MICROPY_ALLOW_PAUSE_VM = 1
+
+# Allow control cpu
+MICROPY_LIMIT_CPU = 1
+
+# Allow multi state in one process
+MICROPY_MULTI_STATE_CONTEXT = 1

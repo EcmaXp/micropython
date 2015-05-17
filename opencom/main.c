@@ -163,6 +163,7 @@ STATIC void pre_process_options(int argc, char **argv) {
 
 int main(int argc, char **argv) {
     pre_process_options(argc, argv);
+    mp_state_ctx = calloc(1, sizeof(mp_state_ctx_t));
     mp_stack_set_limit(40 * 1024 * (BYTES_PER_WORD / 4));
 
 #if MICROPY_ENABLE_GC
