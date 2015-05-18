@@ -41,16 +41,22 @@ mp_state_ctx_t *mp_state_new() {
 
 void mp_state_load(mp_state_ctx_t *state) {
     // TODO: acquire lock?
+    // TODO: store nlr handler?
+    
+    nlr_buf_t *nlr_ptr = NULL;
     
     if (mp_state_ctx != NULL) {
-        assert(mp_state_ctx != state);
-    
         // prev state
         assert(!MP_STATE_VM(is_state_loaded));
+        
+        nlr_ptr = MP_STATE_VM(nlr_top);
+        MP_STATE_VM(nlr_top) = NULL;
     }
     
     // current state
     mp_state_ctx = state;
+    MP_STATE_VM(nlr_top) = nlr_ptr;
+
     assert(!MP_STATE_VM(is_state_loaded));
     MP_STATE_VM(is_state_loaded) = true;
     
@@ -61,7 +67,7 @@ void mp_state_store(mp_state_ctx_t *state) {
     // TODO: acquire lock?
     assert(mp_state_ctx != NULL);
     assert(mp_state_ctx == state);
-
+    
     // will prev state
     assert(MP_STATE_VM(is_state_loaded));
     MP_STATE_VM(is_state_loaded) = false;

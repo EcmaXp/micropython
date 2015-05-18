@@ -92,17 +92,17 @@ void mp_init(void) {
     module_sys->globals = module_sys_dict;
     #endif
 
-    #if MICROPY_MULTI_STATE_CONTEXT
-    mp_obj_module_t *module_main = mp_obj_new_module(MP_QSTR___main__);
-    module_main->globals = &MP_STATE_VM(dict_main);
-    #endif
-
     // initialise the __main__ module
     mp_obj_dict_init(&MP_STATE_VM(dict_main), 1);
     mp_obj_dict_store(&MP_STATE_VM(dict_main), MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR___main__));
 
     // locals = globals for outer module (see Objects/frameobject.c/PyFrame_New())
     MP_STATE_CTX(dict_locals) = MP_STATE_CTX(dict_globals) = &MP_STATE_VM(dict_main);
+
+    #if MICROPY_MULTI_STATE_CONTEXT
+    mp_obj_module_t *module_main = mp_obj_new_module(MP_QSTR___main__);
+    module_main->globals = &MP_STATE_VM(dict_main);
+    #endif
 
     #if MICROPY_CAN_OVERRIDE_BUILTINS
     // start with no extensions to builtins

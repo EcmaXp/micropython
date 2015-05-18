@@ -727,6 +727,18 @@ typedef double mp_float_t;
 #define STATIC static
 #endif
 
+// Allow to override thread modifier for thread local storage object.
+#ifndef THREAD
+#define THREAD __thread
+#endif
+
+// Automation set thread modifier when MICROPY_MULTI_STATE_CONTEXT is enabled.
+#if MICROPY_MULTI_STATE_CONTEXT
+#define MP_THREAD THREAD
+#else
+#define MP_THREAD
+#endif
+
 #define BITS_PER_BYTE (8)
 #define BITS_PER_WORD (BITS_PER_BYTE * BYTES_PER_WORD)
 // mp_int_t value with most significant bit set
