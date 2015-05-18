@@ -29,6 +29,7 @@
 #if MICROPY_MULTI_STATE_CONTEXT
 
 mp_state_ctx_t *mp_state_new();
+
 void mp_state_load(mp_state_ctx_t *state);
 void mp_state_store(mp_state_ctx_t *state);
 

@@ -25,6 +25,7 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "py/mpstate.h"
 #include "py/stackctrl.h"
@@ -39,7 +40,7 @@ mp_state_ctx_t *mp_state_new() {
     return state;
 }
 
-void mp_state_load(mp_state_ctx_t *state) {
+void mp_state_load_raw(mp_state_ctx_t *state) {
     // TODO: acquire lock?
     // TODO: store nlr handler?
     
@@ -59,7 +60,12 @@ void mp_state_load(mp_state_ctx_t *state) {
 
     assert(!MP_STATE_VM(is_state_loaded));
     MP_STATE_VM(is_state_loaded) = true;
-    
+}
+
+void mp_state_load(mp_state_ctx_t *state) {
+    // this function should keep minimal
+    // for setup stack_top at right position.
+    mp_state_load_raw(state);
     mp_stack_ctrl_init();
 }
 
