@@ -116,34 +116,10 @@ STATIC mp_obj_t *new_module_from_file(const char *filename) {
     return module_fun;
 }
 
-STATIC mp_obj_t load_file(const char *filename) {
-    nlr_buf_t nlr;
-    if (nlr_push(&nlr) == 0) {
-        // new module
-        mp_obj_t module_fun = new_module_from_file(filename);
-        
-        nlr_pop();
-        return module_fun;
-    } else {
-        // uncaught exception
-        handle_uncaught_exception((mp_obj_t)nlr.ret_val);
-        return mp_const_none;
-    }
-}
-
 STATIC mp_obj_t get_executor(mp_obj_t module_fun) {
-    nlr_buf_t nlr;
-    if (nlr_push(&nlr) == 0) {
-        mp_obj_t module_mt = mp_module_get(MP_QSTR_umicrothread);
-        mp_obj_t thread = mp_call_function_2(mp_load_attr(module_mt, MP_QSTR_MicroThread), MP_OBJ_NEW_QSTR(MP_QSTR_module), module_fun);
-        
-        nlr_pop();
-        return thread;
-    } else {
-        // uncaught exception
-        handle_uncaught_exception((mp_obj_t)nlr.ret_val);
-        return mp_const_none;
-    }
+    mp_obj_t module_mt = mp_module_get(MP_QSTR_umicrothread);
+    mp_obj_t thread = mp_call_function_2(mp_load_attr(module_mt, MP_QSTR_MicroThread), MP_OBJ_NEW_QSTR(MP_QSTR_module), module_fun);
+    return thread;
 }
 
 STATIC bool execute(mp_state_ctx_t *state, mp_obj_t thread){
@@ -263,29 +239,33 @@ void setup_main_state(int argc, char **argv) {
 int execute_main_state(int argc, char **argv) {
     const int NOTHING_EXECUTED = -2;
     int ret = NOTHING_EXECUTED;
-    for (int a = 1; a < argc; a++) {
-        if (argv[a][0] == '-') {
-            if (strcmp(argv[a], "-X") == 0) {
-                a += 1;
-            } else {
-                return usage(argv);
-            }
-        } else {
-            if (a + 1 <= argc){
-                set_sys_argv(argv, argc, a);
-                mp_obj_t func = load_file(argv[a]);
-                nlr_buf_t nlr;
-                if (nlr_push(&nlr) == 0) {
-                    mp_call_function_0(func);
-                    ret = 0;
-                    nlr_pop();
+    
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) == 0) {
+        for (int a = 1; a < argc; a++) {
+            if (argv[a][0] == '-') {
+                if (strcmp(argv[a], "-X") == 0) {
+                    a += 1;
                 } else {
-                    ret = 1;
+                    ret = usage(argv);
+                    break;
                 }
             } else {
-                exit(usage(argv));
+                if (a + 1 <= argc){
+                    set_sys_argv(argv, argc, a);
+                    
+                    mp_obj_t module_fun = new_module_from_file(argv[a]);
+                    mp_call_function_0(module_fun);
+                } else {
+                    ret = usage(argv);
+                    break;
+                }
             }
         }
+        
+        nlr_pop();
+    } else {
+        ret = handle_uncaught_exception((mp_obj_t)nlr.ret_val);
     }
     
     return ret;
@@ -315,9 +295,10 @@ int main(int argc, char **argv) {
     if (nlr_push(&nlr) == 0) {
         setup_main_state(argc, argv);
         ret = execute_main_state(argc, argv);
+        
         nlr_pop();
     } else {
-        ret = handle_uncaught_exception(&nlr.ret_val);                
+        ret = handle_uncaught_exception((mp_obj_t)nlr.ret_val);                
     }
     
     mp_state_store(state);
