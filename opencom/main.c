@@ -45,7 +45,15 @@
 #include "py/cpuctrl.h"
 #include "py/stackctrl.h"
 #include "py/statectrl.h"
+#include "py/objmodule.h"
+#include "modmicrothread.h"
 #include "genhdr/mpversion.h"
+
+#define _MEM_SIZE_B  (1)
+#define _MEM_SIZE_KB (1024)
+#define _MEM_SIZE_MB (1024 * 1024)
+
+#define MEM_SIZE(x, y) ((x) * _MEM_SIZE_##y * (BYTES_PER_WORD / 4))
 
 // Command line options, with their defaults
 STATIC uint emit_opt = MP_EMIT_OPT_NONE;
@@ -108,21 +116,57 @@ STATIC mp_obj_t *new_module_from_file(const char *filename) {
     return module_fun;
 }
 
-STATIC int do_file(const char *filename) {
+STATIC mp_obj_t load_file(const char *filename) {
     nlr_buf_t nlr;
     if (nlr_push(&nlr) == 0) {
         // new module
         mp_obj_t module_fun = new_module_from_file(filename);
-
-        // execute it
-        mp_call_function_0(module_fun);
         
         nlr_pop();
-        return 0;
+        return module_fun;
     } else {
         // uncaught exception
-        return handle_uncaught_exception((mp_obj_t)nlr.ret_val);
+        handle_uncaught_exception((mp_obj_t)nlr.ret_val);
+        return mp_const_none;
     }
+}
+
+STATIC mp_obj_t get_executor(mp_obj_t module_fun) {
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) == 0) {
+        mp_obj_t module_mt = mp_module_get(MP_QSTR_umicrothread);
+        mp_obj_t thread = mp_call_function_2(mp_load_attr(module_mt, MP_QSTR_MicroThread), MP_OBJ_NEW_QSTR(MP_QSTR_module), module_fun);
+        
+        nlr_pop();
+        return thread;
+    } else {
+        // uncaught exception
+        handle_uncaught_exception((mp_obj_t)nlr.ret_val);
+        return mp_const_none;
+    }
+}
+
+STATIC bool execute(mp_state_ctx_t *state, mp_obj_t thread){
+    // TODO: handle error?
+
+    mp_state_load(state);
+    
+    bool continue_execute = true;
+    mp_obj_t result;
+    mp_mrk_t kind = microthread_resume(thread, mp_const_none, &result);
+    
+    switch (kind) {
+        case MP_MRK_STOP:
+            continue_execute = false;
+            break;
+        case MP_MRK_EXCEPTION:
+            handle_uncaught_exception(result);
+        default:
+            continue_execute = true;
+    }
+
+    mp_state_store(state);
+    return continue_execute;
 }
 
 STATIC void set_sys_argv(char *argv[], int argc, int start_arg) {
@@ -162,28 +206,34 @@ STATIC void pre_process_options(int argc, char **argv) {
 #define PATHLIST_SEP_CHAR ':'
 #endif
 
-int main(int argc, char **argv) {
-    pre_process_options(argc, argv);
+mp_state_ctx_t *new_state(mp_uint_t stack_size, mp_uint_t mem_size) {
     mp_state_ctx_t *state = mp_state_new();
     mp_state_load(state);
 
-    mp_stack_set_limit(40 * 1024 * (BYTES_PER_WORD / 4));
+    mp_stack_set_limit(stack_size);
 
 #if MICROPY_ENABLE_GC
-    // Heap size of GC heap (if enabled)
-    // Make it larger on a 64 bit machine, because pointers are larger.
-    long heap_size = 256 * 1024 * (BYTES_PER_WORD / 4);
+    long heap_size = mem_size;
     char *heap = malloc(heap_size);
     gc_init(heap, heap + heap_size);
+    assert((char *)MP_STATE_MEM(gc_alloc_table_start) == heap);
 #endif
     
     mp_init();
+    
+    mp_obj_list_init(mp_sys_path, 0);
+    mp_obj_list_init(mp_sys_argv, 0);
 
-    char *home = getenv("HOME");
+    mp_state_store(state);
+    return state;
+}
+
+void setup_main_state(int argc, char **argv) {
     char *path = getenv("MICROPYPATH");
     if (path == NULL) {
-        path = "~/.micropython/lib:/usr/lib/micropython";
+        path = "";
     }
+    
     mp_uint_t path_num = 1; // [0] is for current dir (or base dir of the script)
     for (char *p = path; p != NULL; p = strchr(p, PATHLIST_SEP_CHAR)) {
         path_num++;
@@ -202,21 +252,15 @@ int main(int argc, char **argv) {
         if (p1 == NULL) {
             p1 = p + strlen(p);
         }
-        if (p[0] == '~' && p[1] == '/' && home != NULL) {
-            // Expand standalone ~ to $HOME
-            CHECKBUF(buf, PATH_MAX);
-            CHECKBUF_APPEND(buf, home, strlen(home));
-            CHECKBUF_APPEND(buf, p + 1, (size_t)(p1 - p - 1));
-            path_items[i] = MP_OBJ_NEW_QSTR(qstr_from_strn(buf, CHECKBUF_LEN(buf)));
-        } else {
-            path_items[i] = MP_OBJ_NEW_QSTR(qstr_from_strn(p, p1 - p));
-        }
+        path_items[i] = MP_OBJ_NEW_QSTR(qstr_from_strn(p, p1 - p));
         p = p1 + 1;
     }
     }
 
     mp_obj_list_init(mp_sys_argv, 0);
-    
+}
+
+int execute_main_state(int argc, char **argv) {
     const int NOTHING_EXECUTED = -2;
     int ret = NOTHING_EXECUTED;
     for (int a = 1; a < argc; a++) {
@@ -229,22 +273,59 @@ int main(int argc, char **argv) {
         } else {
             if (a + 1 <= argc){
                 set_sys_argv(argv, argc, a);
-                ret = do_file(argv[a]);
+                mp_obj_t func = load_file(argv[a]);
+                nlr_buf_t nlr;
+                if (nlr_push(&nlr) == 0) {
+                    mp_call_function_0(func);
+                    ret = 0;
+                    nlr_pop();
+                } else {
+                    ret = 1;
+                }
             } else {
                 exit(usage(argv));
             }
         }
     }
+    
+    return ret;
+}
 
+void free_state(mp_state_ctx_t *state) {
+    mp_state_load(state);
     mp_deinit();
-    mp_state_store(state);
-
+    
 #if MICROPY_ENABLE_GC && !defined(NDEBUG)
     // We don't really need to free memory since we are about to exit the
     // process, but doing so helps to find memory leaks.
-    free(heap);
+    free(MP_STATE_MEM(gc_alloc_table_start));
 #endif
 
+    mp_state_store(state);
+}
+
+int main(int argc, char **argv) {
+    int ret;
+    mp_state_ctx_t *state = new_state(MEM_SIZE(40, KB), MEM_SIZE(256, KB));
+    mp_state_load(state);
+
+    pre_process_options(argc, argv);
+
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) == 0) {
+        setup_main_state(argc, argv);
+        ret = execute_main_state(argc, argv);
+        nlr_pop();
+    } else {
+        ret = handle_uncaught_exception(&nlr.ret_val);                
+    }
+    
+    mp_state_store(state);
+    free_state(state);
+    
+    (void)get_executor;
+    (void)execute;
+    
     return ret & 0xff;
 }
 

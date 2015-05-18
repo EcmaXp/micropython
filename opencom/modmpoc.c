@@ -30,6 +30,7 @@
 
 #include "py/nlr.h"
 #include "py/runtime.h"
+#include "py/runtime0.h"
 #include "py/objtuple.h"
 
 STATIC mp_obj_t mod_mpoc_test(mp_obj_t asdf) {
@@ -37,6 +38,16 @@ STATIC mp_obj_t mod_mpoc_test(mp_obj_t asdf) {
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_mpoc_test_obj, mod_mpoc_test);
+
+STATIC mp_obj_t mod_mpoc_get_state_ident() {
+    #if MICROPY_MULTI_STATE_CONTEXT
+    return mp_obj_new_int((mp_uint_t)mp_state_ctx);
+    #else
+    return mp_const_none;
+    #endif
+}
+
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_mpoc_get_state_ident_obj, mod_mpoc_get_state_ident);
 
 STATIC mp_obj_t mod_mpoc_get_loaded_modules(void) {
     mp_obj_dict_t *self = m_new_obj(mp_obj_dict_t);
@@ -52,6 +63,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_mpoc_get_loaded_modules_obj, mod_mpoc_get_l
 STATIC const mp_map_elem_t mp_module_mpoc_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_mpoc) },
     { MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&mod_mpoc_test_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_get_state_ident), (mp_obj_t)&mod_mpoc_get_state_ident_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_builtin_modules), (mp_obj_t)&mp_builtin_module_dict },
     { MP_OBJ_NEW_QSTR(MP_QSTR_get_loaded_modules), (mp_obj_t)&mod_mpoc_get_loaded_modules_obj },
 };

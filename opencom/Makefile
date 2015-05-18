@@ -34,6 +34,9 @@ endif
 # question: just static link with msgpack? (maybe no)
 LDFLAGS_MOD += -lmsgpack
 
+# TODO: remove this (just temp usage for test multi context in one process)
+LDFLAGS_MOD += -lpthread
+
 # On OSX, 'gcc' is a symlink to clang unless a real gcc is installed.
 # The unix port of micropython on OSX must be compiled with clang,
 # while cross-compile ports require gcc, so we test here for OSX and 
@@ -83,13 +86,18 @@ endif
 
 # source files
 SRC_C = \
-	main.c \
 	file.c \
 	gccollect.c \
 	modos.c \
 	modmpoc.c \
 	$(SRC_MOD)
 
+ifeq ($(MICROPY_BUILD_JAVA_NATIVE_INTERFACE),1)
+CFLAGS_MOD += -DMICROPY_BUILD_JAVA_NATIVE_INTERFACE=1
+SRC_MOD += jnpython.c
+else
+SRC_MOD += main.c
+endif
 
 OBJ = $(PY_O) $(addprefix $(BUILD)/, $(SRC_C:.c=.o)) 
 

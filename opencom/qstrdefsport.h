@@ -84,6 +84,7 @@ Q(test1)
 Q(test2)
 Q(test3)
 Q(test4)
+Q(get_state_ident)
 Q(get_loaded_modules)
 Q(builtin_modules)
 

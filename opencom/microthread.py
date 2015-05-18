@@ -10,17 +10,25 @@ def auto(*args, **kwargs):
         return MicroThread(func.__name__, func, *args, **kwargs)
     return warp
 
+_main = None
 _active = None
 
 def current_thread():
+    global _active, _main
     raw_thread = _current_thread()
     thread = _active
 
     if raw_thread is None:
         assert _active is None
+    elif thread is None:
+        # this moment it is maybe main thread.
+        if _main is None or _main._thread is not raw_thread:
+            _main = MainThread(raw_thread)
+        
+        _active = thread = _main
     else:
         assert thread._thread is raw_thread
-
+    
     return thread
 
 class MicroThread():
@@ -93,3 +101,7 @@ class MicroThread():
             _active = prev_thread
         
         return status, result
+
+class MainThread(MicroThread):
+    def __init__(self, thread):
+        self._thread = thread

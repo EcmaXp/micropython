@@ -47,7 +47,11 @@
 #error This module require stackless features.
 #endif
 
+#if MICROPY_MULTI_STATE_CONTEXT
+STATIC MP_THREAD mp_obj_microthread_t *mp_current_microthread;
+#else
 STATIC mp_obj_microthread_t *mp_current_microthread;
+#endif
 
 STATIC mp_obj_t mod_microthread_current_thread(void) {
     if (mp_current_microthread != MP_OBJ_NULL) {
@@ -105,10 +109,22 @@ STATIC mp_obj_t microthread_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint
     if (real_fun_obj == MP_OBJ_NULL) {
         nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "function is not pauseable."));
     }
-
-    mp_code_state *code_state = flatcall(fun_obj, n_args - 2, n_kw, &args[2]);
+    
+    mp_obj_t old_globals = mp_globals_get();
+    mp_code_state *code_state;
+    
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) == 0) {
+        code_state = flatcall(fun_obj, n_args - 2, n_kw, &args[2]);
+        mp_globals_set(old_globals);
+        nlr_pop();
+    } else {
+        mp_globals_set(old_globals);
+        nlr_raise(nlr.ret_val);
+    }
+    
     code_state->current = code_state;
-
+    
     mp_obj_microthread_t *thread = m_new_obj(mp_obj_microthread_t);
     thread->base.type = &mp_type_microthread;
 
@@ -123,8 +139,10 @@ STATIC mp_obj_t microthread_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint
 
 #define STATE(t, a, b) thread->context.a = (b);
 #define STATE_FROM(t, a) thread->context.a = MP_STATE_##t(a);
-
-    STATE(CTX, dict_locals, mp_obj_new_dict(0));
+    
+    // currently micropython just use local_dict as global_dict...
+    STATE(CTX, dict_locals, global_dict);
+    
     STATE(CTX, dict_globals, global_dict);
 
     STATE_FROM(VM, mp_loaded_modules_map);
@@ -197,13 +215,10 @@ void mp_store_microthread_context(mp_microthread_context_t *context) {
 #undef STATE
 }
 
-STATIC mp_obj_t microthread_attr_resume(mp_uint_t n_args, mp_obj_t args[]) {
-    mp_obj_t microthread_obj = args[0];
-    mp_obj_t send_value = n_args == 2? args[1]: mp_const_none;
+mp_microthread_resume_kind_t microthread_resume(mp_obj_microthread_t *thread, mp_obj_t send_value, mp_obj_t *result) {
+    mp_microthread_resume_kind_t resume_kind;
 
-    mp_obj_microthread_t *thread = microthread_obj;
     mp_code_state *code_state = thread->code_state;
-
     thread->last_result = mp_const_none;
 
     // TODO: how to throw error?
@@ -213,15 +228,13 @@ STATIC mp_obj_t microthread_attr_resume(mp_uint_t n_args, mp_obj_t args[]) {
     } else if (thread->status == MP_MICROTHREAD_STATUS_STOP) {
         // nlr_raise(mp_obj_new_exception_msg(&mp_type_RuntimeError, "already thread are stopped."))
         // TODO: raise error? or just return stop?
-        mp_obj_t *items = m_new(mp_obj_t, 2);
-        items[0] = MP_OBJ_NEW_QSTR(MP_QSTR_stop);
-        items[1] = mp_const_none;
-        return mp_obj_new_tuple(2, items);
+        resume_kind = MP_MRK_STOP;
+        *result = mp_const_none;
+        return resume_kind;
     } else if (thread->status == MP_MICROTHREAD_STATUS_RUNNING) {
-        mp_obj_t *items = m_new(mp_obj_t, 2);
-        items[0] = MP_OBJ_NEW_QSTR(MP_QSTR_running);
-        items[1] = mp_const_none;
-        return mp_obj_new_tuple(2, items);
+        resume_kind = MP_MRK_RUNNING;
+        *result = mp_const_none;
+        return resume_kind;
     }
 
     // store value for prev context
@@ -240,18 +253,23 @@ STATIC mp_obj_t microthread_attr_resume(mp_uint_t n_args, mp_obj_t args[]) {
     mp_cpu_update_status(false);
 #endif
 
-    mp_vm_return_kind_t kind;
-
+    mp_vm_return_kind_t vm_return_kind;
+    mp_obj_t vm_exc_obj = MP_OBJ_NULL;
+    
     nlr_buf_t nlr;
     if (nlr_push(&nlr) == 0){
         assert(code_state->n_state > 0);
-        kind = mp_resume_bytecode(code_state, code_state->current, MP_OBJ_NULL);
+        vm_return_kind = mp_resume_bytecode(code_state, code_state->current, MP_OBJ_NULL);
         nlr_pop();
     } else {
-        kind = MP_VM_RETURN_EXCEPTION;
-        code_state->current->state[code_state->current->n_state - 1] = &nlr.ret_val;
+        vm_return_kind = MP_VM_RETURN_EXCEPTION;
+        vm_exc_obj = &nlr.ret_val;
     }
-
+    
+    if (vm_return_kind == MP_VM_RETURN_EXCEPTION) {
+        vm_exc_obj = (mp_obj_t)code_state->current->state[code_state->current->n_state - 1];  
+    }
+    
 #if MICROPY_LIMIT_CPU
     #if 1
         // even if status are not updated correctly. it is problem.
@@ -273,59 +291,101 @@ STATIC mp_obj_t microthread_attr_resume(mp_uint_t n_args, mp_obj_t args[]) {
     mp_current_microthread = prev_thread;
     mp_load_microthread_context(&prev_context);
 
-    qstr return_status_qstr;
-    switch (kind){
+    switch (vm_return_kind){
         case MP_VM_RETURN_NORMAL:
-            return_status_qstr = MP_QSTR_normal;
+            resume_kind = MP_MRK_NORMAL;
             thread->status = MP_MICROTHREAD_STATUS_STOP;
-            thread->last_result = (mp_obj_t)code_state->current->sp[0];
+            *result = (mp_obj_t)code_state->current->sp[0];
             break;
         case MP_VM_RETURN_YIELD:
-            return_status_qstr = MP_QSTR_yield;
+            resume_kind = MP_MRK_YIELD;
             // TODO: get yielded value
             thread->status = MP_MICROTHREAD_STATUS_YIELD;
-            thread->last_result = mp_const_none;
+            *result = mp_const_none;
             break;
         case MP_VM_RETURN_EXCEPTION:
-            return_status_qstr = MP_QSTR_exception;
+            resume_kind = MP_MRK_EXCEPTION;
             thread->status = MP_MICROTHREAD_STATUS_STOP;
-            thread->last_result = (mp_obj_t)code_state->current->state[code_state->current->n_state - 1];
 
-            if (mp_obj_exception_match(thread->last_result, &mp_type_SystemHardLimit)) {
-                return_status_qstr = MP_QSTR_limit;
-                thread->last_result = MP_OBJ_NEW_QSTR(MP_QSTR_limit_hard);
-            } else if (mp_obj_exception_match(thread->last_result, &mp_type_SystemSoftLimit)) {
-                return_status_qstr = MP_QSTR_limit;
-                thread->last_result = MP_OBJ_NEW_QSTR(MP_QSTR_limit_soft);
+            if (mp_obj_exception_match(vm_exc_obj, &mp_type_SystemHardLimit)) {
+                resume_kind = MP_MRK_HARD_LIMIT;
+                *result = MP_OBJ_NEW_QSTR(MP_QSTR_limit_hard);
+            } else if (mp_obj_exception_match(vm_exc_obj, &mp_type_SystemSoftLimit)) {
+                resume_kind = MP_MRK_SOFT_LIMIT;
+                *result = MP_OBJ_NEW_QSTR(MP_QSTR_limit_soft);
             } else if (0) {
                 // TODO: handle can't pauseable.
             } else {
-                return_status_qstr = MP_QSTR_exception;
+                *result = vm_exc_obj;
                 // TODO: get traceback?
                 // mp_obj_exception_get_traceback
             }
 
             break;
         case MP_VM_RETURN_PAUSE:
-            return_status_qstr = MP_QSTR_pause;
+            resume_kind = MP_MRK_PAUSE;
             thread->status = MP_MICROTHREAD_STATUS_SOFT_PAUSE;
-            thread->last_result = thread->last_result;
+            *result = thread->last_result;
             break;
         case MP_VM_RETURN_FORCE_PAUSE:
-            return_status_qstr = MP_QSTR_force_pause;
+            resume_kind = MP_MRK_FORCE_PAUSE;
             thread->status = MP_MICROTHREAD_STATUS_HARD_PAUSE;
-            thread->last_result = mp_const_none;
+            *result = mp_const_none;
             break;
         default:
             assert(0);
     }
 
-    mp_obj_t *items = m_new(mp_obj_t, 2);
-    items[0] = MP_OBJ_NEW_QSTR(return_status_qstr);
-    items[1] = thread->last_result;
-
     thread->last_result = mp_const_none;
+    return resume_kind;
+}
 
+STATIC mp_obj_t microthread_attr_resume(mp_uint_t n_args, mp_obj_t args[]) {
+    mp_obj_t microthread_obj = args[0];
+    mp_obj_t send_value = n_args == 2? args[1]: mp_const_none;
+
+    mp_obj_microthread_t *thread = microthread_obj;
+    mp_obj_t result = mp_const_none;
+    
+    mp_mrk_t mrk = microthread_resume(thread, send_value, &result);
+    
+    qstr mrk_qstr;
+    mp_obj_t *items = m_new(mp_obj_t, 2);
+    
+    switch (mrk) {
+        case MP_MRK_STOP:
+            mrk_qstr = MP_QSTR_stop;
+            break;
+        case MP_MRK_RUNNING:
+            mrk_qstr = MP_QSTR_running;
+            break;
+        case MP_MRK_NORMAL:
+            mrk_qstr = MP_QSTR_normal;
+            break;
+        case MP_MRK_YIELD:
+            mrk_qstr = MP_QSTR_yield;
+            break;
+        case MP_MRK_PAUSE:
+            mrk_qstr = MP_QSTR_pause;
+            break;
+        case MP_MRK_FORCE_PAUSE:
+            mrk_qstr = MP_QSTR_force_pause;
+            break;
+        case MP_MRK_EXCEPTION:
+            mrk_qstr = MP_QSTR_exception;
+            break;
+        case MP_MRK_SOFT_LIMIT:
+        case MP_MRK_HARD_LIMIT:
+            mrk_qstr = MP_QSTR_limit;
+            break;
+        default:
+            mrk_qstr = MP_QSTR_;
+            assert(0);
+    }
+    
+    items[0] = MP_OBJ_NEW_QSTR(mrk_qstr);
+    items[1] = result;
+    
     return mp_obj_new_tuple(2, items);
 }
 

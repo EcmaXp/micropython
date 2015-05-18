@@ -66,14 +66,28 @@ typedef struct _mp_microthread_context_t {
     #endif
 } mp_microthread_context_t;
 
-typedef enum _mp_microthread_status_type {
+typedef enum _mp_microthread_status_t {
     MP_MICROTHREAD_STATUS_READY = 1,
     MP_MICROTHREAD_STATUS_RUNNING = 2,
     MP_MICROTHREAD_STATUS_STOP = 3,
     MP_MICROTHREAD_STATUS_YIELD = 4,
     MP_MICROTHREAD_STATUS_SOFT_PAUSE = 5,
     MP_MICROTHREAD_STATUS_HARD_PAUSE = 6,
-} mp_microthread_status_type;
+} mp_microthread_status_t;
+
+typedef enum _mp_microthread_resume_kind_t {
+    MP_MRK_STOP = 0,
+    MP_MRK_RUNNING = 1,
+    MP_MRK_NORMAL = 2,
+    MP_MRK_YIELD = 3,
+    MP_MRK_PAUSE = 4,
+    MP_MRK_FORCE_PAUSE = 5,
+    MP_MRK_EXCEPTION = 6,
+    MP_MRK_SOFT_LIMIT = 7,
+    MP_MRK_HARD_LIMIT = 8,
+} mp_microthread_resume_kind_t;
+
+typedef mp_microthread_resume_kind_t mp_mrk_t;
 
 typedef struct _mp_obj_microthread_t {
     mp_obj_base_t base;
@@ -84,10 +98,12 @@ typedef struct _mp_obj_microthread_t {
     mp_obj_t prev_thread;
 
     mp_code_state *code_state;
-    mp_microthread_status_type status;
+    mp_microthread_status_t status;
     mp_microthread_context_t context;
 } mp_obj_microthread_t;
 
 const mp_obj_type_t mp_type_microthread;
+
+mp_microthread_resume_kind_t microthread_resume(mp_obj_microthread_t *thread, mp_obj_t send_value, mp_obj_t *result);
 
 #endif // __MICROPY_INCLUDED_OPENCOM_MODMICROTHREAD_H__
