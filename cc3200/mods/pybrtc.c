@@ -92,6 +92,18 @@ void pybrtc_init(void) {
     }
 }
 
+void pyb_rtc_callback_disable (mp_obj_t self_in) {
+    // check the wake from param
+    if (pybrtc_data.prwmode & PYB_PWR_MODE_ACTIVE) {
+        // disable the slow clock interrupt
+        MAP_PRCMIntDisable(PRCM_INT_SLOW_CLK_CTR);
+    }
+    // disable wake from ldps and hibernate
+    pybsleep_configure_timer_wakeup (PYB_PWR_MODE_ACTIVE);
+    // read the interrupt status to clear any pending interrupt
+    (void)MAP_PRCMIntStatus();
+}
+
 /******************************************************************************
  DECLARE PRIVATE FUNCTIONS
  ******************************************************************************/
@@ -106,18 +118,6 @@ STATIC void pyb_rtc_callback_enable (mp_obj_t self_in) {
         MAP_PRCMIntDisable(PRCM_INT_SLOW_CLK_CTR);
     }
     pybsleep_configure_timer_wakeup (pybrtc_data.prwmode);
-}
-
-STATIC void pyb_rtc_callback_disable (mp_obj_t self_in) {
-    // check the wake from param
-    if (pybrtc_data.prwmode & PYB_PWR_MODE_ACTIVE) {
-        // disable the slow clock interrupt
-        MAP_PRCMIntDisable(PRCM_INT_SLOW_CLK_CTR);
-    }
-    // disable wake from ldps and hibernate
-    pybsleep_configure_timer_wakeup (PYB_PWR_MODE_ACTIVE);
-    // read the interrupt status to clear any pending interrupt
-    (void)MAP_PRCMIntStatus();
 }
 
 /******************************************************************************/
@@ -192,7 +192,7 @@ STATIC mp_obj_t pyb_rtc_callback (mp_uint_t n_args, const mp_obj_t *pos_args, mp
     // check if any parameters were passed
     mp_obj_t _callback = mpcallback_find((mp_obj_t)&pyb_rtc_obj);
     if (kw_args->used > 0 || !_callback) {
-        uint32_t f_mseconds = args[3].u_int;
+        uint32_t f_mseconds = MAX(1, args[3].u_int);
         uint32_t seconds;
         uint16_t mseconds;
         // get the seconds and the milliseconds from the RTC
@@ -210,7 +210,7 @@ STATIC mp_obj_t pyb_rtc_callback (mp_uint_t n_args, const mp_obj_t *pos_args, mp
         // set the match value
         MAP_PRCMRTCMatchSet(seconds, mseconds);
 
-        // save the match data for later
+        // save the power mode data for later
         pybrtc_data.prwmode = args[4].u_int;
 
         // create the callback

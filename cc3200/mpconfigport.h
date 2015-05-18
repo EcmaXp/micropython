@@ -139,6 +139,7 @@ extern const struct _mp_obj_module_t mp_module_network;
     mp_obj_list_t mod_network_nic_list;                                   \
     mp_obj_list_t pybsleep_obj_list;                                      \
     mp_obj_list_t mpcallback_obj_list;                                    \
+    mp_obj_list_t pyb_timer_channel_obj_list;                             \
 
 
 // type definitions for the specific machine
@@ -182,6 +183,7 @@ void mp_hal_stdout_tx_strn_cooked(const char *str, uint32_t len);
 #define MICROPY_HAL_H                               "cc3200_hal.h"
 #define MICROPY_PORT_HAS_TELNET                     (1)
 #define MICROPY_PORT_HAS_FTP                        (1)
+#define MICROPY_PORT_WLAN_URN                       (0)
 #define MICROPY_PY_SYS_PLATFORM                     "WiPy"
 
 #define MICROPY_PORT_WLAN_AP_SSID                   "wipy-wlan"

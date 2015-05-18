@@ -124,7 +124,7 @@ typedef struct _wlan_obj_t {
 
 #define MODWLAN_TIMEOUT_MS              5000
 #define MODWLAN_MAX_NETWORKS            20
-#define MODWLAN_SCAN_PERIOD_S           300     // 5 minutes
+#define MODWLAN_SCAN_PERIOD_S           3600     // 1 hour
 #define MODWLAN_WAIT_FOR_SCAN_MS        1050
 
 #define ASSERT_ON_ERROR( x )            ASSERT((x) >= 0 )
@@ -187,7 +187,7 @@ STATIC void wlan_servers_start (void);
 STATIC void wlan_servers_stop (void);
 STATIC void wlan_get_sl_mac (void);
 STATIC modwlan_Status_t wlan_do_connect (const char* ssid, uint32_t ssid_len, const char* bssid, uint8_t sec,
-                                         const char* key, uint32_t key_len);
+                                         const char* key, uint32_t key_len, uint32_t timeout);
 STATIC void wlan_lpds_callback_enable (mp_obj_t self_in);
 STATIC void wlan_lpds_callback_disable (mp_obj_t self_in);
 STATIC bool wlan_scan_result_is_unique (const mp_obj_list_t *nets, _u8 *bssid);
@@ -579,7 +579,7 @@ STATIC void wlan_servers_stop (void) {
 }
 
 STATIC modwlan_Status_t wlan_do_connect (const char* ssid, uint32_t ssid_len, const char* bssid, uint8_t sec,
-                                         const char* key, uint32_t key_len) {
+                                         const char* key, uint32_t key_len, uint32_t timeout) {
     SlSecParams_t secParams;
     secParams.Key = (_i8*)key;
     secParams.KeyLen = ((key != NULL) ? key_len : 0);
@@ -591,7 +591,7 @@ STATIC modwlan_Status_t wlan_do_connect (const char* ssid, uint32_t ssid_len, co
         while (!IS_CONNECTED(wlan_obj.status)) {
             HAL_Delay (5);
             wlan_update();
-            if (++waitForConnectionMs >= MODWLAN_TIMEOUT_MS) {
+            if (++waitForConnectionMs >= timeout) {
                 return MODWLAN_ERROR_TIMEOUT;
             }
         }
@@ -735,6 +735,7 @@ STATIC mp_obj_t wlan_connect(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_
         { MP_QSTR_security, MP_ARG_KW_ONLY  | MP_ARG_INT, {.u_int = SL_SEC_TYPE_OPEN} },
         { MP_QSTR_key,      MP_ARG_KW_ONLY  | MP_ARG_OBJ, {.u_obj = mp_const_none} },
         { MP_QSTR_bssid,    MP_ARG_KW_ONLY  | MP_ARG_OBJ, {.u_obj = mp_const_none} },
+        { MP_QSTR_timeout,  MP_ARG_KW_ONLY  | MP_ARG_INT, {.u_int = MODWLAN_TIMEOUT_MS} },
     };
 
     // check for correct wlan mode
@@ -775,6 +776,9 @@ STATIC mp_obj_t wlan_connect(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_
         bssid = mp_obj_str_get_str(args[3].u_obj);
     }
 
+    // get the timeout
+    uint32_t timeout = MAX(args[4].u_int, 0);
+
     if (GET_STATUS_BIT(wlan_obj.status, STATUS_BIT_CONNECTION)) {
         if (0 == sl_WlanDisconnect()) {
             while (IS_CONNECTED(wlan_obj.status)) {
@@ -786,7 +790,7 @@ STATIC mp_obj_t wlan_connect(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_
 
     // connect to the requested access point
     modwlan_Status_t status;
-    status = wlan_do_connect (ssid, ssid_len, bssid, sec, key, key_len);
+    status = wlan_do_connect (ssid, ssid_len, bssid, sec, key, key_len, timeout);
     if (status == MODWLAN_ERROR_TIMEOUT) {
         nlr_raise(mp_obj_new_exception_msg(&mp_type_OSError, mpexception_os_operation_failed));
     }
@@ -846,6 +850,7 @@ STATIC mp_obj_t wlan_ifconfig (mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(wlan_ifconfig_obj, wlan_ifconfig);
 
+#if MICROPY_PORT_WLAN_URN
 STATIC mp_obj_t wlan_urn (uint n_args, const mp_obj_t *args) {
     char urn[MAX_DEVICE_URN_LEN];
     uint8_t len = MAX_DEVICE_URN_LEN;
@@ -876,6 +881,7 @@ STATIC mp_obj_t wlan_urn (uint n_args, const mp_obj_t *args) {
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(wlan_urn_obj, 1, 2, wlan_urn);
+#endif
 
 /// \method wlan_netlist()
 /// Return a list of tuples with all the acces points within range
@@ -1033,7 +1039,9 @@ STATIC const mp_map_elem_t wlan_locals_dict_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_disconnect),          (mp_obj_t)&wlan_disconnect_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_isconnected),         (mp_obj_t)&wlan_isconnected_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_ifconfig),            (mp_obj_t)&wlan_ifconfig_obj },
+#if MICROPY_PORT_WLAN_URN
     { MP_OBJ_NEW_QSTR(MP_QSTR_urn),                 (mp_obj_t)&wlan_urn_obj },
+#endif
     { MP_OBJ_NEW_QSTR(MP_QSTR_callback),            (mp_obj_t)&wlan_callback_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_config_ip),           (mp_obj_t)&wlan_config_ip_obj },
 

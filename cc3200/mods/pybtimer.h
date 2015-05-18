@@ -4,6 +4,7 @@
  * The MIT License (MIT)
  *
  * Copyright (c) 2013, 2014 Damien P. George
+ * Copyright (c) 2015 Daniel Campora
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,13 +24,15 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#ifndef __MICROPY_INCLUDED_PY_FORMATFLOAT_H__
-#define __MICROPY_INCLUDED_PY_FORMATFLOAT_H__
 
-#include "py/mpconfig.h"
+/******************************************************************************
+ DECLARE EXPORTED DATA
+ ******************************************************************************/
+extern const mp_obj_type_t pyb_timer_type;
 
-#if MICROPY_PY_BUILTINS_FLOAT
-int mp_format_float(mp_float_t f, char *buf, size_t bufSize, char fmt, int prec, char sign);
-#endif
+/******************************************************************************
+ DECLARE PUBLIC FUNCTIONS
+ ******************************************************************************/
+void timer_init0 (void);
+void timer_disable_all (void);
 
-#endif // __MICROPY_INCLUDED_PY_FORMATFLOAT_H__
