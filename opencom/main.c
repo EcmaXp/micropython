@@ -285,12 +285,12 @@ void free_state(mp_state_ctx_t *state) {
 }
 
 int main(int argc, char **argv) {
-    int ret;
     mp_state_ctx_t *state = new_state(MEM_SIZE(40, KB), MEM_SIZE(256, KB));
     mp_state_load(state);
-
+    
     pre_process_options(argc, argv);
-
+    
+    int ret;    
     nlr_buf_t nlr;
     if (nlr_push(&nlr) == 0) {
         setup_main_state(argc, argv);
