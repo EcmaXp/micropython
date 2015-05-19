@@ -34,8 +34,28 @@ endif
 # question: just static link with msgpack? (maybe no)
 LDFLAGS_MOD += -lmsgpack
 
-# TODO: remove this (just temp usage for test multi context in one process)
-LDFLAGS_MOD += -lpthread
+ifeq ($(MICROPY_BUILD_JAVA_NATIVE_INTERFACE),1)
+# TODO: cleanup this
+
+ifeq ($(JAVA_HOME),)
+$(error Require setup JAVA_HOME...)
+endif
+
+# TODO: determine PROG must library name or just keep micropython?
+# PROG = libmicropython.so
+SRC_MOD += jnpython.c
+
+INC += -I$(JAVA_HOME)/include
+# TODO: replace this by arch...
+INC += -I$(JAVA_HOME)/include/linux
+
+CFLAGS_MOD += -DMICROPY_BUILD_JAVA_NATIVE_INTERFACE=1
+CFLAGS_EXTRA += -fPIC
+
+LDFLAGS_EXTRA += -shared
+else
+SRC_MOD += main.c
+endif
 
 # On OSX, 'gcc' is a symlink to clang unless a real gcc is installed.
 # The unix port of micropython on OSX must be compiled with clang,
@@ -92,13 +112,6 @@ SRC_C = \
 	modmpoc.c \
 	$(SRC_MOD)
 
-ifeq ($(MICROPY_BUILD_JAVA_NATIVE_INTERFACE),1)
-CFLAGS_MOD += -DMICROPY_BUILD_JAVA_NATIVE_INTERFACE=1
-SRC_MOD += jnpython.c
-else
-SRC_MOD += main.c
-endif
-
 OBJ = $(PY_O) $(addprefix $(BUILD)/, $(SRC_C:.c=.o)) 
 
 include ../py/mkrules.mk
@@ -115,6 +128,9 @@ PREFIX = $(DESTDIR)/usr/local
 BINDIR = $(PREFIX)/bin
 PIPSRC = ../tools/pip-micropython
 PIPTARGET = pip-micropython
+
+jnilib:
+	$(Q)$(CC) $(COPT) -o $@ $(OBJ) $(LIB) $(LDFLAGS)
 
 install: micropython
 	install -D $(TARGET) $(BINDIR)/$(TARGET)
