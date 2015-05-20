@@ -34,15 +34,13 @@ endif
 # question: just static link with msgpack? (maybe no)
 LDFLAGS_MOD += -lmsgpack
 
-ifeq ($(MICROPY_BUILD_JAVA_NATIVE_INTERFACE),1)
-# TODO: cleanup this
+ifeq ($(MICROPY_BUILD_JNI_LIBRARY),1)
 
 ifeq ($(JAVA_HOME),)
 $(error Require setup JAVA_HOME...)
 endif
 
-# TODO: determine PROG must library name or just keep micropython?
-# PROG = libmicropython.so
+PROG = libmicropython.so
 SRC_MOD += jnpython.c
 
 INC += -I$(JAVA_HOME)/include

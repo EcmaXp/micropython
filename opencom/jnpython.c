@@ -83,7 +83,7 @@ TODO: should i make many functions for
 STATIC uint emit_opt = MP_EMIT_OPT_NONE;
 mp_uint_t mp_verbose_flag = 0;
 
-#define FORCED_EXIT (0x100)0
+#define FORCED_EXIT (0x100)
 // If exc is SystemExit, return value where FORCED_EXIT bit set,
 // and lower 8 bits are SystemExit value. For all other exceptions,
 // return 1.

@@ -28,8 +28,8 @@ package kr.pe.ecmaxp.micropython;
 
 class PythonState {
     static {
-		NativeSupport.getInstance().getLoader().load();
-		MICROPYTHON_VERSION = mp_version();
+		// NativeSupport.getInstance().getLoader().load();
+		// MICROPYTHON_VERSION = mp_version();
 	}
 	
 	private static final int APIVERSION = 1;

@@ -23,8 +23,3 @@ MICROPY_LIMIT_CPU = 1
 
 # Allow multi state in one process
 MICROPY_MULTI_STATE_CONTEXT = 1
-
-# Build JNI? (make jnpython?)
-# JAVA_HOME is just place holder...
-JAVA_HOME = /home/ubuntu/workspace/machine/half/env/jdk1.8.0_45/
-MICROPY_BUILD_JAVA_NATIVE_INTERFACE = 1
