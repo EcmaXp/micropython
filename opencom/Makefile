@@ -41,7 +41,7 @@ $(error Require setup JAVA_HOME...)
 endif
 
 PROG = libmicropython.so
-SRC_MOD += jnpython.c
+SRC_MOD += jnupy.c
 
 INC += -I$(JAVA_HOME)/include
 # TODO: replace this by arch...
@@ -51,6 +51,7 @@ CFLAGS_MOD += -DMICROPY_BUILD_JAVA_NATIVE_INTERFACE=1
 CFLAGS_EXTRA += -fPIC
 
 LDFLAGS_EXTRA += -shared
+LDFLAGS_EXTRA += -z noexecstack
 else
 SRC_MOD += main.c
 endif

@@ -24,12 +24,29 @@
  * THE SOFTWARE.
  */
 
-// ref: ../java/kr/pe/ecmaxp/micropython/PythonState.java
+/** ref: ../java/kr/pe/ecmaxp/micropython/PythonState.java **/
 
-/*
-this file used for compile java native.
+/** JNLUA-LICENSE
+Copyright (C) 2008,2012 Andre Naef
 
-*/
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+**/
 
 #include <jni.h>
 
@@ -58,11 +75,75 @@ this file used for compile java native.
 #include "modmicrothread.h"
 #include "genhdr/mpversion.h"
 
+/** JNPYTHON **/
+#define JNUPY_JNIVERSION JNI_VERSION_1_6
+
+/** **/
+#define JNUPY_FUNC(name) Java_kr_pe_ecmaxp_micropython_PythonState_##name
+
+/* */
 #define _MEM_SIZE_B  (1)
 #define _MEM_SIZE_KB (1024)
 #define _MEM_SIZE_MB (1024 * 1024)
 
 #define MEM_SIZE(x, y) ((x) * _MEM_SIZE_##y * (BYTES_PER_WORD / 4))
+
+
+#if !MICROPY_MULTI_STATE_CONTEXT
+#error jnupy require MICROPY_MULTI_STATE_CONTEXT.
+#endif
+
+static int initialized = 0;
+
+JNIEXPORT void JNICALL JNUPY_FUNC(mp_1test_1jni) (JNIEnv *env, jobject obj) {
+	printf("Welcome to java native micropython! (env=%p; obj=%p;)\n", env, obj);
+}
+
+JNIEXPORT void JNICALL JNUPY_FUNC(mp_1state_1new) (JNIEnv *env, jobject obj) {
+	mp_state_ctx_t *state = mp_state_new();
+	if (state == NULL) {
+	    return;
+	}
+}
+
+JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM *vm, void *reserved) {
+	JNIEnv *env;
+    
+    if ((*vm)->GetEnv(vm, (void **) &env, JNUPY_JNIVERSION) != JNI_OK) {
+		return JNUPY_JNIVERSION;
+	}
+	
+	initialized = 1;
+	return JNUPY_JNIVERSION;
+}
+
+JNIEXPORT void JNICALL JNI_OnUnload (JavaVM *vm, void *reserved) {
+	JNIEnv *env;
+	
+	if ((*vm)->GetEnv(vm, (void **) &env, JNUPY_JNIVERSION) != JNI_OK) {
+		return;
+	}
+	
+	return;
+}
+
+/*
+require impl:
+mp_uint_t mp_verbose_flag = 0;
+void nlr_jump_fail(void *val)
+uint mp_import_stat(const char *path)
+
+helper function:
+STATIC int handle_uncaught_exception(mp_obj_t exc)
+STATIC mp_obj_t new_module_from_lexer(mp_lexer_t *lex)
+STATIC mp_obj_t *new_module_from_file(const char *filename)
+STATIC mp_obj_t get_executor(mp_obj_t module_fun)
+STATIC bool execute(mp_state_ctx_t *state, mp_obj_t thread)
+mp_state_ctx_t *new_state(mp_uint_t stack_size, mp_uint_t mem_size)
+void free_state(mp_state_ctx_t *state)
+int DEBUG_printf(const char *fmt, ...)
+int something(char *filename)
+*/
 
 /*
 $ python3 -i -c "from ctypes import CDLL; mp=CDLL('./libmicropython.so')"
@@ -146,7 +227,7 @@ STATIC mp_obj_t get_executor(mp_obj_t module_fun) {
     return thread;
 }
 
-STATIC bool execute(mp_state_ctx_t *state, mp_obj_t thread){
+STATIC bool execute(mp_state_ctx_t *state, mp_obj_t thread) {
     // TODO: handle error?
 
     mp_state_load(state);
@@ -169,7 +250,7 @@ STATIC bool execute(mp_state_ctx_t *state, mp_obj_t thread){
     return continue_execute;
 }
 
-mp_state_ctx_t *new_state(mp_uint_t stack_size, mp_uint_t mem_size) {
+STATIC mp_state_ctx_t *new_state(mp_uint_t stack_size, mp_uint_t mem_size) {
     mp_state_ctx_t *state = mp_state_new();
     mp_state_load(state);
 
@@ -191,7 +272,7 @@ mp_state_ctx_t *new_state(mp_uint_t stack_size, mp_uint_t mem_size) {
     return state;
 }
 
-void free_state(mp_state_ctx_t *state) {
+STATIC void free_state(mp_state_ctx_t *state) {
     mp_state_load(state);
     mp_deinit();
     

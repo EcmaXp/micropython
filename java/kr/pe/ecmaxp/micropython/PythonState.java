@@ -26,15 +26,24 @@
 
 package kr.pe.ecmaxp.micropython;
 
-class PythonState {
+public class PythonState {
     static {
+    	System.load(System.getenv("MICROPYTHON_LIB"));
 		// NativeSupport.getInstance().getLoader().load();
 		// MICROPYTHON_VERSION = mp_version();
 	}
 	
-	private static final int APIVERSION = 1;
+	public static final int APIVERSION = 1;
 	
-	private PythonState(long memory) {
-        // ?
+	public PythonState() {
+		System.out.println("PythonState are generated.");
 	}
+	
+	public void test() {
+		System.out.println("hello from java");
+		mp_test_jni();
+		System.out.println("hello from java2");
+	}
+	
+	public static native void mp_test_jni();
 }
