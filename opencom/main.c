@@ -57,6 +57,7 @@
 
 // Command line options, with their defaults
 STATIC uint emit_opt = MP_EMIT_OPT_NONE;
+STATIC char *progname = "?";
 mp_uint_t mp_verbose_flag = 0;
 
 #define FORCED_EXIT (0x100)
@@ -284,7 +285,15 @@ void free_state(mp_state_ctx_t *state) {
     mp_state_store(state);
 }
 
+NORETURN void mp_assert_fail(const char *assertion, const char *file,
+                             unsigned int line, const char *function) {
+    printf("%s: %s:%u %s: Assertion '%s' failed.\n", progname, file, line, function, assertion);
+    abort();
+}
+
 int main(int argc, char **argv) {
+    progname = argv[0];
+    
     mp_state_ctx_t *state = new_state(MEM_SIZE(40, KB), MEM_SIZE(256, KB));
     mp_state_load(state);
     

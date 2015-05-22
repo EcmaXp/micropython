@@ -24,6 +24,10 @@
  * THE SOFTWARE.
  */
 
+/*
+https://github.com/buksy/jnlua/blob/master/src/main/c/jnlua.c
+https://github.com/buksy/jnlua/blob/master/src/main/java/com/naef/jnlua/LuaState.java
+*/
 /** ref: ../java/kr/pe/ecmaxp/micropython/PythonState.java **/
 
 /** JNLUA-LICENSE
@@ -75,25 +79,94 @@ THE SOFTWARE.
 #include "modmicrothread.h"
 #include "genhdr/mpversion.h"
 
-/** JNPYTHON **/
+/** BUILD LIMITER **/
+#if !MICROPY_MULTI_STATE_CONTEXT
+#error jnupy require MICROPY_MULTI_STATE_CONTEXT.
+#endif
+
+#if !MICROPY_PY_MICROTHREAD
+#error jnupy require MICROPY_PY_MICROTHREAD
+#endif
+
+// and other limiter require for building.
+
+
+/** JNPYTHON INFO **/
 #define JNUPY_JNIVERSION JNI_VERSION_1_6
 
-/** **/
+/** JNPYTHON MECRO **/
 #define JNUPY_FUNC(name) Java_kr_pe_ecmaxp_micropython_PythonState_##name
 
-/* */
+/** JNPYTHON VALUE **/
+STATIC int initialized = 0;
+
+/** INTERNAL MECRO **/
 #define _MEM_SIZE_B  (1)
 #define _MEM_SIZE_KB (1024)
 #define _MEM_SIZE_MB (1024 * 1024)
 
 #define MEM_SIZE(x, y) ((x) * _MEM_SIZE_##y * (BYTES_PER_WORD / 4))
 
+/** INTERNAL VALUE **/
+STATIC uint emit_opt = MP_EMIT_OPT_NONE;
 
-#if !MICROPY_MULTI_STATE_CONTEXT
-#error jnupy require MICROPY_MULTI_STATE_CONTEXT.
-#endif
+/** PORT IMPL VALUE/FUNCTIONS **/
+mp_uint_t mp_verbose_flag = 0;
 
-static int initialized = 0;
+uint mp_import_stat(const char *path) {
+    struct stat st;
+    if (stat(path, &st) == 0) {
+        if (S_ISDIR(st.st_mode)) {
+            return MP_IMPORT_STAT_DIR;
+        } else if (S_ISREG(st.st_mode)) {
+            return MP_IMPORT_STAT_FILE;
+        }
+    }
+    return MP_IMPORT_STAT_NO_EXIST;
+}
+
+int DEBUG_printf(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    int ret = vfprintf(stderr, fmt, ap);
+    va_end(ap);
+    return ret;
+}
+
+/* TODO: assert handler? */
+
+void nlr_jump_fail(void *val) {
+    printf("FATAL: uncaught NLR %p\n", val);
+    exit(1);
+}
+
+/** JNI CLASS/VALUE REFERENCE **/
+
+
+/** JNI LOAD/UNLOAD FUNCTIONS **/
+
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
+	JNIEnv *env;
+    
+    if ((*vm)->GetEnv(vm, (void **) &env, JNUPY_JNIVERSION) != JNI_OK) {
+		return JNUPY_JNIVERSION;
+	}
+	
+	initialized = 1;
+	return JNUPY_JNIVERSION;
+}
+
+JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
+	JNIEnv *env;
+	
+	if ((*vm)->GetEnv(vm, (void **) &env, JNUPY_JNIVERSION) != JNI_OK) {
+		return;
+	}
+	
+	return;
+}
+
+/** JNI EXPORT FUNCTIONS (kr.pe.ecmaxp.micropython.PythonState.mp_xxx **/
 
 JNIEXPORT void JNICALL JNUPY_FUNC(mp_1test_1jni) (JNIEnv *env, jobject obj) {
 	printf("Welcome to java native micropython! (env=%p; obj=%p;)\n", env, obj);
@@ -106,33 +179,7 @@ JNIEXPORT void JNICALL JNUPY_FUNC(mp_1state_1new) (JNIEnv *env, jobject obj) {
 	}
 }
 
-JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM *vm, void *reserved) {
-	JNIEnv *env;
-    
-    if ((*vm)->GetEnv(vm, (void **) &env, JNUPY_JNIVERSION) != JNI_OK) {
-		return JNUPY_JNIVERSION;
-	}
-	
-	initialized = 1;
-	return JNUPY_JNIVERSION;
-}
-
-JNIEXPORT void JNICALL JNI_OnUnload (JavaVM *vm, void *reserved) {
-	JNIEnv *env;
-	
-	if ((*vm)->GetEnv(vm, (void **) &env, JNUPY_JNIVERSION) != JNI_OK) {
-		return;
-	}
-	
-	return;
-}
-
 /*
-require impl:
-mp_uint_t mp_verbose_flag = 0;
-void nlr_jump_fail(void *val)
-uint mp_import_stat(const char *path)
-
 helper function:
 STATIC int handle_uncaught_exception(mp_obj_t exc)
 STATIC mp_obj_t new_module_from_lexer(mp_lexer_t *lex)
@@ -141,7 +188,6 @@ STATIC mp_obj_t get_executor(mp_obj_t module_fun)
 STATIC bool execute(mp_state_ctx_t *state, mp_obj_t thread)
 mp_state_ctx_t *new_state(mp_uint_t stack_size, mp_uint_t mem_size)
 void free_state(mp_state_ctx_t *state)
-int DEBUG_printf(const char *fmt, ...)
 int something(char *filename)
 */
 
@@ -158,11 +204,8 @@ TODO: should i make many functions for
     - execute source from file or buffer
     - handle assert failure or nlr_raise
     - use coffeecatch library or other signal capture handler?
-
+    - safe warpper or sandbox for something.
 */
-
-STATIC uint emit_opt = MP_EMIT_OPT_NONE;
-mp_uint_t mp_verbose_flag = 0;
 
 #define FORCED_EXIT (0x100)
 // If exc is SystemExit, return value where FORCED_EXIT bit set,
@@ -308,29 +351,4 @@ int something(char *filename) {
     (void)execute;
     
     return ret & 0xff;
-}
-
-uint mp_import_stat(const char *path) {
-    struct stat st;
-    if (stat(path, &st) == 0) {
-        if (S_ISDIR(st.st_mode)) {
-            return MP_IMPORT_STAT_DIR;
-        } else if (S_ISREG(st.st_mode)) {
-            return MP_IMPORT_STAT_FILE;
-        }
-    }
-    return MP_IMPORT_STAT_NO_EXIST;
-}
-
-int DEBUG_printf(const char *fmt, ...) {
-    va_list ap;
-    va_start(ap, fmt);
-    int ret = vfprintf(stderr, fmt, ap);
-    va_end(ap);
-    return ret;
-}
-
-void nlr_jump_fail(void *val) {
-    printf("FATAL: uncaught NLR %p\n", val);
-    exit(1);
 }

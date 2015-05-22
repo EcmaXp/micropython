@@ -32,7 +32,13 @@ endif
 
 # msgpack (used for communicate with OpenComputers)
 # question: just static link with msgpack? (maybe no)
+# TODO: check env (MICROPY_PY_MSGAPCK?)
 LDFLAGS_MOD += -lmsgpack
+
+ifeq ($(MICROPY_OVERRIDE_ASSERT_FAIL),1)
+CFLAGS_MOD += -DMICROPY_OVERRIDE_ASSERT_FAIL=1
+INC +=  -I../lib/assert
+endif
 
 ifeq ($(MICROPY_BUILD_JNI_LIBRARY),1)
 
@@ -78,8 +84,8 @@ LDFLAGS += -m32
 endif
 
 ifeq ($(MICROPY_MULTI_STATE_CONTEXT),1)
-CFLAGS_EXTRA += -DMICROPY_MULTI_STATE_CONTEXT=1
-CFLAGS_EXTRA += -DMICROPY_NLR_SETJMP=1
+CFLAGS_MOD += -DMICROPY_MULTI_STATE_CONTEXT=1
+CFLAGS_MOD += -DMICROPY_NLR_SETJMP=1
 endif
 
 ifeq ($(MICROPY_PY_TIME),1)

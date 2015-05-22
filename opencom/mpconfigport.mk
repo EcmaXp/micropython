@@ -23,3 +23,6 @@ MICROPY_LIMIT_CPU = 1
 
 # Allow multi state in one process
 MICROPY_MULTI_STATE_CONTEXT = 1
+
+# Allow override assert for include as library (for stable process)
+MICROPY_OVERRIDE_ASSERT_FAIL = 1
