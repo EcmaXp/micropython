@@ -3,6 +3,7 @@
  *
  * The MIT License (MIT)
  *
+ * Copyright (c) 2014 Paul Sokolovsky
  * Copyright (c) 2015 Daniel Campora
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -23,60 +24,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#ifndef MODUHASHLIB_H_
+#define MODUHASHLIB_H_
 
-__stack_size__  = 1024;
+extern const mp_obj_module_t mp_module_uhashlib;
 
-MEMORY
-{
-    SRAM (rwx) : ORIGIN = 0x20000000, LENGTH = 0x00004000
-}
-
-ENTRY(ResetISR)
-
-SECTIONS
-{
-    .text :
-    {
-        _text = .;
-        KEEP(*(.intvecs))
-        *(.boot*)
-        *(.text*)
-        *(.rodata*)
-        *(.ARM.extab* .gnu.linkonce.armextab.*)
-        . = ALIGN(8);
-    } > SRAM
-
-    .ARM :
-    {
-        __exidx_start = .;
-        *(.ARM.exidx*)
-        __exidx_end = .;
-        _etext = .;
-    } > SRAM
-
-    .data :
-    {
-        _data = .;
-        *(.data*)
-        . = ALIGN (8);
-        _edata = .;
-    } > SRAM
-
-    .bss :
-    {
-        _bss = .;
-        *(.bss*)
-        *(COMMON)
-        _ebss = .;
-    } > SRAM
-
-    .stack ORIGIN(SRAM) + LENGTH(SRAM) - __stack_size__ :
-    {
-        . = ALIGN(8);
-        _stack = .;
-        . = . + __stack_size__;
-        . = ALIGN(8);
-        _estack = .;
-    } > SRAM
-}
-
+#endif // MODUHASHLIB_H_

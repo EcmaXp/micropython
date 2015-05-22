@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2015 Daniel Campora
+ * Copyright (c) 2014 Paul Sokolovsky
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,15 +24,10 @@
  * THE SOFTWARE.
  */
 
-#ifndef HASH_H_
-#define HASH_H_
+#ifndef MICROPY_EXTMOD_MODUBINASCII
+#define MICROPY_EXTMOD_MODUBINASCII
 
-/******************************************************************************
- DECLARE PUBLIC FUNCTIONS
- ******************************************************************************/
-extern void HASH_Init (void);
-extern void HASH_SHAMD5Start (uint32_t algo, uint32_t blocklen);
-extern void HASH_SHAMD5Update (uint8_t *data, uint32_t datalen);
-extern void HASH_SHAMD5Read (uint8_t *hash);
+extern mp_obj_t mod_binascii_hexlify(mp_uint_t n_args, const mp_obj_t *args);
+extern mp_obj_t mod_binascii_unhexlify(mp_obj_t data);
 
-#endif /* HASH_H_ */
+#endif /* MICROPY_EXTMOD_MODUBINASCII */
