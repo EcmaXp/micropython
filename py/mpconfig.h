@@ -438,6 +438,20 @@ typedef double mp_float_t;
 #error MICROPY_MULTI_STATE_CONTEXT require MICROPY_NLR_SETJMP
 #endif
 
+// Whether you can override __assert_fail
+// NOTE: do not define this in mpportconfig.h or mpconfig.h
+#ifndef MICROPY_OVERRIDE_ASSERT_FAIL
+#define MICROPY_OVERRIDE_ASSERT_FAIL (0)
+/* if you want use this, paste this code in Makefile:
+
+ifeq ($(MICROPY_CUSTOM_ASSERT_HANDLER),1)
+CFLAGS_EXTRA += -DMICROPY_CUSTOM_ASSERT_HANDLER=1
+INC +=  -I../lib/assert
+endif
+
+*/
+#endif
+
 /*****************************************************************************/
 /* Fine control over Python builtins, classes, modules, etc                  */
 
