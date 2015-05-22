@@ -58,7 +58,7 @@
 // Command line options, with their defaults
 STATIC uint emit_opt = MP_EMIT_OPT_NONE;
 STATIC char *progname = "?";
-mp_uint_t mp_verbose_flag = 0;
+MP_THREAD mp_uint_t mp_verbose_flag = 0;
 
 #define FORCED_EXIT (0x100)
 // If exc is SystemExit, return value where FORCED_EXIT bit set,

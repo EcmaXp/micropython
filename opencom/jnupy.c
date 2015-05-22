@@ -64,6 +64,7 @@ THE SOFTWARE.
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "py/mpconfig.h"
 #include "py/mpstate.h"
 #include "py/nlr.h"
 #include "py/compile.h"
@@ -81,15 +82,23 @@ THE SOFTWARE.
 
 /** BUILD LIMITER **/
 #if !MICROPY_MULTI_STATE_CONTEXT
-#error jnupy require MICROPY_MULTI_STATE_CONTEXT.
+#error jnupy require MICROPY_MULTI_STATE_CONTEXT
 #endif
 
-#if !MICROPY_PY_MICROTHREAD
-#error jnupy require MICROPY_PY_MICROTHREAD
+#if !MICROPY_ALLOW_PAUSE_VM
+#error jnupy require MICROPY_ALLOW_PAUSE_VM
 #endif
+
+#if !MICROPY_OVERRIDE_ASSERT_FAIL
+#error jnupy require MICROPY_OVERRIDE_ASSERT_FAIL
+#endif
+
+//#if !MICROPY_LIMIT_CPU
+//#error jnupy require MICROPY_LIMIT_CPU
+//#endif
 
 // and other limiter require for building.
-
+// TODO: some mecro are not defined in this file. check this.
 
 /** JNPYTHON INFO **/
 #define JNUPY_JNIVERSION JNI_VERSION_1_6
@@ -111,7 +120,7 @@ STATIC int initialized = 0;
 STATIC uint emit_opt = MP_EMIT_OPT_NONE;
 
 /** PORT IMPL VALUE/FUNCTIONS **/
-mp_uint_t mp_verbose_flag = 0;
+MP_THREAD mp_uint_t mp_verbose_flag = 0;
 
 uint mp_import_stat(const char *path) {
     struct stat st;
@@ -133,10 +142,14 @@ int DEBUG_printf(const char *fmt, ...) {
     return ret;
 }
 
-/* TODO: assert handler? */
+NORETURN void mp_assert_fail(const char *assertion, const char *file,
+                             unsigned int line, const char *function) {
+    printf("<JNUPY>: %s:%u %s: Assertion '%s' failed.\n", file, line, function, assertion);
+    abort();
+}
 
 void nlr_jump_fail(void *val) {
-    printf("FATAL: uncaught NLR %p\n", val);
+    printf("<JNUPY>: FATAL: uncaught NLR %p\n", val);
     exit(1);
 }
 

@@ -108,6 +108,9 @@ ifeq ($(MICROPY_ALLOW_PAUSE_VM),1)
 CFLAGS_MOD += -DMICROPY_ALLOW_PAUSE_VM=1
 SRC_MOD += modmicrothread.c
 endif
+ifeq ($(MICROPY_LIMIT_CPU),1)
+CFLAGS_MOD += -DMICROPY_LIMIT_CPU=1
+endif
 
 # source files
 SRC_C = \
