@@ -45,5 +45,15 @@ public class PythonState {
 		System.out.println("hello from java2");
 	}
 	
-	public static native void mp_test_jni();
+	// TODO: public as private (until test done?)
+	// TODO: build this first, and define in jnupy.c later
+	// this is native function list
+	
+	public native void mp_test_jni();
+	public native void mp_test_jni_fail();
+	public native boolean mp_state_new();
+	public native boolean mp_state_free();
+	public native boolean mp_state_exist();
+	public native boolean mp_state_check();
+	public native boolean mp_module_new(String nope);
 }
