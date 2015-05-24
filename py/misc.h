@@ -192,7 +192,7 @@ void vstr_vprintf(vstr_t *vstr, const char *fmt, va_list ap);
 // Debugging helpers
 int DEBUG_printf(const char *fmt, ...);
 
-extern mp_uint_t mp_verbose_flag;
+extern MP_THREAD mp_uint_t mp_verbose_flag;
 
 // This is useful for unicode handling. Some CPU archs has
 // special instructions for efficient implentation of this
