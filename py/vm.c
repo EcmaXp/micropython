@@ -216,6 +216,7 @@ mp_vm_return_kind_t mp_execute_bytecode(mp_code_state *code_state, volatile mp_o
     }
     
     assert(0);
+    return MP_VM_RETURN_NORMAL;
 }
 
 mp_vm_return_kind_t mp_resume_bytecode(mp_code_state *first_code_state, mp_code_state *code_state, volatile mp_obj_t inject_exc) {

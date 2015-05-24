@@ -217,6 +217,7 @@ void persister_dump_baseptr(mp_obj_t baseptr, char *ptr, mp_uint_t size) {
     assert(offset < 0 || size <= offset);
     
     // PACK()
+    (void)offset;
 }
 
 void persister_dump_any(mp_obj_persister_t *persister, mp_obj_t any) {

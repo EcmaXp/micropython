@@ -31,6 +31,11 @@
 #include "py/stackctrl.h"
 #include "py/statectrl.h"
 
+/* TODO: make more function for handling nlr_xxx?
+   across handling mp_state_ctx will make invaild nlr_top!
+   TODO: add 
+*/
+
 #if MICROPY_MULTI_STATE_CONTEXT
 
 mp_state_ctx_t *mp_state_new() {
@@ -47,7 +52,6 @@ void mp_state_free(mp_state_ctx_t *state) {
 
 void mp_state_load_raw(mp_state_ctx_t *state) {
     // TODO: acquire lock?
-    // TODO: store nlr handler?
     
     nlr_buf_t *nlr_ptr = NULL;
     
@@ -62,7 +66,7 @@ void mp_state_load_raw(mp_state_ctx_t *state) {
     // current state
     mp_state_ctx = state;
     MP_STATE_VM(nlr_top) = nlr_ptr;
-
+    
     assert(!MP_STATE_VM(is_state_loaded));
     MP_STATE_VM(is_state_loaded) = true;
 }
@@ -74,16 +78,19 @@ void mp_state_load(mp_state_ctx_t *state) {
     mp_stack_ctrl_init();
 }
 
-void mp_state_force_load(mp_state_ctx_t *state) {
-    if (mp_state_is_loaded(mp_state_ctx)) {
+void mp_state_force_load(mp_state_ctx_t *state, nlr_buf_t *nlr) {
+    if (mp_state_ctx != NULL && mp_state_is_loaded(mp_state_ctx)) {
         if (mp_state_ctx == state) {
+            MP_STATE_VM(nlr_top) = nlr;
             return;
         } else {
+            MP_STATE_VM(nlr_top) = NULL;
             mp_state_store(mp_state_ctx);
         }
-    } else {
-        mp_state_load(state);
     }
+    
+    mp_state_load(state);
+    MP_STATE_VM(nlr_top) = nlr;
 }
 
 void mp_state_store(mp_state_ctx_t *state) {

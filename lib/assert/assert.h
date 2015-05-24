@@ -32,34 +32,17 @@
 #error This library (assert.h) should include by MICROPY_OVERRIDE_ASSERT_FAIL
 #endif
 
-#define __MP_ASSERT_NEVER_EXECUTE(x) do { (x); } while(false)
+#define __MP_ASSERT_NEVER_EXECUTE(x) (void)0
 // http://stackoverflow.com/questions/10593492/catching-assert-with-side-effects
 
 NORETURN void mp_assert_fail(const char *__assertion, const char *__file,
                              unsigned int __line, const char *__function);
 
-#if __USE_GNU
-NORETURN void mp_assert_perror_fail(int __errnum, const char *__file,
-                             unsigned int __line, const char *__function);
-#endif
-
 #if NDEBUG
 #define assert(expr) __MP_ASSERT_NEVER_EXECUTE(expr)
-
-#if __USE_GNU
-#define assert_perror(errnum) __MP_ASSERT_NEVER_EXECUTE(expr)
-#endif
-
-#else // NDEBUG
-
+#else
 #define assert(expr) ((expr)? (void)0 : \
     mp_assert_fail(#expr, __FILE__, __LINE__, __func__))
-
-#if __USE_GNU
-#define assert_perror(errnum) ((errnum)? (void)0 : \
-    mp_assert_perror_fail(errnum, __FILE__, __LINE__, __func__))
 #endif
-
-#endif // NDEBUG
 
 #endif //__MICROPY_INCLUDED_LIB_ASSERT_H__

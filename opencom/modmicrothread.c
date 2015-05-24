@@ -216,7 +216,7 @@ void mp_store_microthread_context(mp_microthread_context_t *context) {
 }
 
 mp_microthread_resume_kind_t microthread_resume(mp_obj_microthread_t *thread, mp_obj_t send_value, mp_obj_t *result) {
-    mp_microthread_resume_kind_t resume_kind;
+    mp_microthread_resume_kind_t resume_kind = MP_MRK_STOP;
 
     mp_code_state *code_state = thread->code_state;
     thread->last_result = mp_const_none;
@@ -236,7 +236,7 @@ mp_microthread_resume_kind_t microthread_resume(mp_obj_microthread_t *thread, mp
         *result = mp_const_none;
         return resume_kind;
     }
-
+    
     // store value for prev context
     mp_obj_microthread_t *prev_thread = mod_microthread_current_thread();
     mp_microthread_context_t prev_context;

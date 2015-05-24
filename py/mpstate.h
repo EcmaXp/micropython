@@ -177,7 +177,7 @@ typedef struct _mp_state_ctx_t {
 } mp_state_ctx_t;
 
 #if MICROPY_MULTI_STATE_CONTEXT
-extern THREAD mp_state_ctx_t *mp_state_ctx;
+extern THREAD mp_state_ctx_t * mp_state_ctx;
 #else
 extern mp_state_ctx_t mp_state_ctx;
 #endif

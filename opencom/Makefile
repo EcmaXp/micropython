@@ -27,7 +27,7 @@ ifdef DEBUG
 CFLAGS += -g
 COPT = -O0
 else
-COPT = -Os #-DNDEBUG
+COPT = -Os -DNDEBUG
 endif
 
 # msgpack (used for communicate with OpenComputers)
@@ -48,6 +48,10 @@ endif
 
 PROG = libmicropython.so
 SRC_MOD += jnupy.c
+
+$(BUILD)/jnupy.o:
+	$(Q)$(PYTHON) jnupy_ap.py jnupy.c
+	$(call compile_c)
 
 INC += -I$(JAVA_HOME)/include
 # TODO: replace this by arch...
@@ -136,9 +140,6 @@ PREFIX = $(DESTDIR)/usr/local
 BINDIR = $(PREFIX)/bin
 PIPSRC = ../tools/pip-micropython
 PIPTARGET = pip-micropython
-
-jnilib:
-	$(Q)$(CC) $(COPT) -o $@ $(OBJ) $(LIB) $(LDFLAGS)
 
 install: micropython
 	install -D $(TARGET) $(BINDIR)/$(TARGET)

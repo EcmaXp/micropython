@@ -116,27 +116,6 @@ TODO: should i make many functions for
 */
 /*
 
-#define FORCED_EXIT (0x100)
-// If exc is SystemExit, return value where FORCED_EXIT bit set,
-// and lower 8 bits are SystemExit value. For all other exceptions,
-// return 1.
-STATIC int handle_uncaught_exception(mp_obj_t exc) {
-    // check for SystemExit
-    if (mp_obj_is_subclass_fast(mp_obj_get_type(exc), &mp_type_SystemExit)) {
-        // None is an exit value of 0; an int is its value; anything else is 1
-        mp_obj_t exit_val = mp_obj_exception_get_value(exc);
-        mp_int_t val = 0;
-        if (exit_val != mp_const_none && !mp_obj_get_int_maybe(exit_val, &val)) {
-            val = 1;
-        }
-        return FORCED_EXIT | (val & 255);
-    }
-
-    // Report all other exceptions
-    mp_obj_print_exception(&mp_plat_print, exc);
-    return 1;
-}
-
 STATIC mp_obj_t get_executor(mp_obj_t module_fun) {
     mp_obj_t module_mt = mp_module_get(MP_QSTR_umicrothread);
     mp_obj_t thread = mp_call_function_2(mp_load_attr(module_mt, MP_QSTR_MicroThread), MP_OBJ_NEW_QSTR(MP_QSTR_module), module_fun);
@@ -147,11 +126,11 @@ STATIC bool execute(mp_state_ctx_t *state, mp_obj_t thread) {
     // TODO: handle error?
 
     mp_state_load(state);
-    
+
     bool continue_execute = true;
     mp_obj_t result;
     mp_mrk_t kind = microthread_resume(thread, mp_const_none, &result);
-    
+
     switch (kind) {
         case MP_MRK_STOP:
             continue_execute = false;
@@ -165,98 +144,206 @@ STATIC bool execute(mp_state_ctx_t *state, mp_obj_t thread) {
     mp_state_store(state);
     return continue_execute;
 }
-
-STATIC mp_state_ctx_t *new_state(mp_uint_t stack_size, mp_uint_t mem_size) {
-    mp_state_ctx_t *state = mp_state_new();
-    mp_state_load(state);
-
-    mp_stack_set_limit(stack_size);
-
-#if MICROPY_ENABLE_GC
-    long heap_size = mem_size;
-    char *heap = malloc(heap_size);
-    gc_init(heap, heap + heap_size);
-    assert((char *)MP_STATE_MEM(gc_alloc_table_start) == heap);
-#endif
-    
-    mp_init();
-    
-    mp_obj_list_init(mp_sys_path, 0);
-    mp_obj_list_init(mp_sys_argv, 0);
-
-    mp_state_store(state);
-    return state;
-}
-
-STATIC void free_state(mp_state_ctx_t *state) {
-    mp_state_load(state);
-    mp_deinit();
-    
-#if MICROPY_ENABLE_GC && !defined(NDEBUG)
-    // We don't really need to free memory since we are about to exit the
-    // process, but doing so helps to find memory leaks.
-    free(MP_STATE_MEM(gc_alloc_table_start));
-#endif
-
-    mp_state_store(state);
-}
-
-int something(char *filename) {
-    mp_state_ctx_t *state = new_state(MEM_SIZE(40, KB), MEM_SIZE(256, KB));
-    mp_state_load(state);
-    
-    int ret = 0;
-    nlr_buf_t nlr;
-    if (nlr_push(&nlr) == 0) {
-        printf("%s\n", filename);
-        mp_obj_t module_fun = new_module_from_file(filename);
-        mp_call_function_0(module_fun);
-        
-        nlr_pop();
-    } else {
-        ret = handle_uncaught_exception((mp_obj_t)nlr.ret_val);                
-    }
-    
-    mp_state_store(state);
-    free_state(state);
-    
-    (void)get_executor;
-    (void)execute;
-    
-    return ret & 0xff;
-}
 */
 
 /** JNUPY INFO **/
 #define JNUPY_JNIVERSION JNI_VERSION_1_6
 
-/** JNUPY MECRO **/
-#define JNUPY_CUR_STATE(x) (jnupy_cur_state.x)
-#define JNUPY_G_VM jnupy_glob_java_vm
-#define JNUPY_ENV JNUPY_CUR_STATE(java_env)
-#define JNUPY_SELF JNUPY_CUR_STATE(java_self)
-#define JNUPY_MP_STATE JNUPY_CUR_STATE(mp_state)
-#define JNUPY_MP_PRE_STATE JNUPY_CUR_STATE(mp_pre_state)
-#define JNUPY_NLR_TOP JNUPY_CUR_STATE(nlr_top)
-
-#define JNUPY_FUNC(name) Java_kr_pe_ecmaxp_micropython_PythonState_##name
-#define JNUPY_FUNC_DEF(ret, name) \
-    JNIEXPORT ret JNICALL JNUPY_FUNC(name) 
-
 /** JNUPY INTERNAL VALUE **/
 STATIC int initialized = 0;
 
-typedef struct _jnupy_current_state_t {
-    mp_state_ctx_t *mp_state;
-    mp_state_ctx_t *mp_pre_state; // just a dummy for nlr_xxx
-    JNIEnv *java_env;
-    jobject java_self;
-    nlr_buf_t *nlr_top;
-} jnupy_current_state_t;
-// pre state required for nlr_top!
+typedef struct _nlr_gk_buf_t {
+    bool is_used;
+    struct _nlr_gk_buf_t *prev;
+    nlr_buf_t buf;
+} nlr_gk_buf_t;
 
+typedef struct _jnupy_current_state_t {
+    // JNUPY_MP_STATE
+    // micropython state context
+    mp_state_ctx_t *mp_state;
+
+    // JNUPY_MP_PRE_STATE
+    // just a dummy for nlr_top
+    mp_state_ctx_t *mp_pre_state;
+    
+    // JNUPY_NLR_GK_TOP
+    // nlr goalkeeper top (for JNI function call warpper)
+    nlr_gk_buf_t *nlr_gk_top;
+
+    // JNUPY_ENV
+    // java env (vaild only current thread)
+    JNIEnv *java_env;
+
+    // JNUPY_SELF
+    // java self (vaild only current thread)
+    jobject java_self;
+    
+} jnupy_current_state_t;
+
+// _JNUPY_CUR_STATE(x)
 STATIC MP_THREAD jnupy_current_state_t jnupy_cur_state;
+
+// JNUPY_G_VM
 STATIC JavaVM *jnupy_glob_java_vm;
+
+/** JNUPY MECRO **/
+// #if DEBUG
+#define _D(x) printf(#x "\n")
+// #else
+// #define _D(x) (void)0
+// #endif
+
+#define _JNUPY_CUR_STATE(x) (jnupy_cur_state.x)
+#define JNUPY_G_VM jnupy_glob_java_vm
+#define JNUPY_ENV _JNUPY_CUR_STATE(java_env)
+#define JNUPY_SELF _JNUPY_CUR_STATE(java_self)
+#define JNUPY_MP_STATE _JNUPY_CUR_STATE(mp_state)
+#define JNUPY_MP_PRE_STATE _JNUPY_CUR_STATE(mp_pre_state)
+#define NLR_GK_TOP _JNUPY_CUR_STATE(nlr_gk_top)
+
+/** JNUPY NLR GOAL KEEPER **/
+/*
+nlr goal keeper are wapper for java throw in nested function call.
+like assert fail.
+*/
+
+#define _nlr_gk_set_buf(gk_buf) MP_STATE_VM(nlr_top) = &(gk_buf)->buf
+
+#define nlr_gk_new() {false}
+#define nlr_gk_push(gk_buf) (nlr_gk_push_raw(gk_buf), nlr_push(&(gk_buf)->buf))
+#define nlr_gk_pop(gk_buf) (nlr_gk_pop_raw(gk_buf))
+#define nlr_gk_jump(val) (nlr_gk_jump_raw(val))
+
+void nlr_gk_push_raw(nlr_gk_buf_t *gk_buf) {
+    gk_buf->is_used = true;
+    
+    _nlr_gk_set_buf(NLR_GK_TOP);
+    gk_buf->prev = NLR_GK_TOP;
+    
+    NLR_GK_TOP = gk_buf;
+}
+
+void nlr_gk_pop_raw(nlr_gk_buf_t *gk_buf) {
+    if (gk_buf->is_used) {
+        NLR_GK_TOP = NLR_GK_TOP->prev;
+        _nlr_gk_set_buf(NLR_GK_TOP);
+    }
+}
+
+NORETURN void nlr_gk_jump_raw(void *val) {
+    _nlr_gk_set_buf(NLR_GK_TOP);
+    nlr_jump(val);
+}
+
+/** JNI AUTO PARSER MECRO **/
+#define JNUPY_JNI_START_AUTOLOAD
+#define JNUPY_JNI_END_AUTOLOAD
+#define JNUPY_JNI_START_PARSE
+#define JNUPY_JNI_START_EXPORT
+#define JNUPY_JNI_START_REF
+#define JNUPY_JNI_END_REF
+JNUPY_JNI_START_PARSE
+
+/** JNI CLASS/VALUE REFERENCE **/
+#define JNUPY_OBJECT(a, b) b
+#define JNUPY_CLASS(a, b) b
+#define JNUPY_METHOD(a, b, c, d) d
+#define JNUPY_FIELD(a, b, c) c
+
+/* TODO: how to auto pasing in c code?
+JNUPY_RE
+JNUPY_FIELD(JNUPY_CLASS("java/lang/System.out", b), "Field Ljava/io/PrintStream;")
+JNUPY_REF("Method java/io/PrintStream.println:(Ljava/lang/String;)V", 0)
+*/
+
+JNUPY_JNI_START_REF
+
+JNUPY_JNI_END_REF
+
+/** JNI LOAD/UNLOAD FUNCTIONS **/
+
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
+	JNIEnv *env;
+
+    if ((*vm)->GetEnv(vm, (void **) &env, JNUPY_JNIVERSION) != JNI_OK) {
+		return JNUPY_JNIVERSION;
+	}
+
+	if ((*env)->GetJavaVM(env, &JNUPY_G_VM) != JNI_OK) {
+	    return JNUPY_JNIVERSION;
+	}
+	
+	JNUPY_JNI_START_AUTOLOAD
+	
+	JNUPY_JNI_END_AUTOLOAD
+
+	initialized = 1;
+	return JNUPY_JNIVERSION;
+}
+
+JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
+	JNIEnv *env;
+
+	if ((*vm)->GetEnv(vm, (void **) &env, JNUPY_JNIVERSION) != JNI_OK) {
+		return;
+	}
+
+	return;
+}
+
+/** JNUPY INTERNAL FUNCTION **/
+bool jnupy_load_pre_state();
+
+void jnupy_force_load_state(mp_state_ctx_t *state) {
+    mp_state_force_load(state, &NLR_GK_TOP->buf);
+}
+
+bool jnupy_load_state() {
+    if (JNUPY_MP_STATE == NULL) {
+        (*JNUPY_ENV)->ThrowNew(JNUPY_ENV, (*JNUPY_ENV)->FindClass(JNUPY_ENV, "java/lang/AssertionError"), "There is no state");
+        return false;
+    } else if (JNUPY_MP_PRE_STATE != NULL) {
+        if (JNUPY_MP_PRE_STATE == mp_state_ctx) {
+            mp_state_ctx = NULL;
+        }
+        mp_state_free(JNUPY_MP_PRE_STATE);
+        JNUPY_MP_PRE_STATE = NULL;
+    }
+
+    jnupy_force_load_state(JNUPY_MP_STATE);
+
+    if (JNUPY_MP_STATE != mp_state_ctx) {
+        return false;
+    }
+
+    return true;
+}
+
+bool jnupy_load_pre_state() {
+    if (JNUPY_MP_STATE != NULL) {
+        if (jnupy_load_state()) {
+            return true;
+        }
+    }
+
+    if (JNUPY_MP_PRE_STATE == NULL) {
+        JNUPY_MP_PRE_STATE = mp_state_new();
+        if (JNUPY_MP_PRE_STATE == NULL) {
+            return false;
+        }
+    }
+
+    mp_state_ctx = JNUPY_MP_PRE_STATE;
+    MP_STATE_VM(nlr_top) = &NLR_GK_TOP->buf;
+    printf("NLR_GK_TOP: %p\n", NLR_GK_TOP);
+    return true;
+}
+
+void jnupy_setup_env(JNIEnv *env, jobject self) {
+    JNUPY_ENV = env;
+    JNUPY_SELF = self;
+}
 
 /** UPY INTERNAL MECRO **/
 #define _MEM_SIZE_B  (1)
@@ -269,33 +356,6 @@ STATIC JavaVM *jnupy_glob_java_vm;
 // STATIC uint emit_opt = MP_EMIT_OPT_NONE;
 
 /** UPY INTERNAL TYPE/FUNCTIONS **/
-
-void jnupy_load_state() {
-    if (JNUPY_MP_STATE == NULL) {
-        assert(! "mp_state is invaild; (NULL)");
-    }
-    
-    mp_state_force_load(JNUPY_MP_STATE);
-
-    if (JNUPY_MP_PRE_STATE != NULL) {
-        mp_state_free(JNUPY_MP_PRE_STATE);
-    }
-    
-    assert(JNUPY_MP_STATE == mp_state_ctx);
-}
-
-void jnupy_load_pre_state() {
-    if (JNUPY_MP_STATE != NULL) {
-        jnupy_load_state();
-    } else if (JNUPY_MP_PRE_STATE == NULL) {
-        mp_state_ctx_t *state = mp_state_new();
-        assert(state != NULL);
-        
-        JNUPY_MP_PRE_STATE = state;
-        mp_state_force_load(state);
-    }
-}
-
 #include "py/lexer.h"
 
 typedef struct _mp_lexer_vstr_buf_t {
@@ -309,7 +369,7 @@ STATIC mp_uint_t vstr_buf_next_byte(mp_lexer_vstr_buf_t *vb) {
     if (vb->pos >= vb->len) {
         return MP_LEXER_EOF;
     }
-    
+
     return vb->buf[vb->pos++];
 }
 
@@ -323,20 +383,19 @@ mp_lexer_t *mp_lexer_new_from_vstr(const char *filename, vstr_t *vstr) {
     if (buf == NULL) {
         return NULL;
     }
-    
+
     mp_lexer_vstr_buf_t *vb = m_new_obj_maybe(mp_lexer_vstr_buf_t);
     if (vb == NULL) {
         return NULL;
     }
-    
+
     vb->vstr = vstr;
     vb->buf = buf;
     vb->len = vstr_len(vstr);
     vb->pos = 0;
-    
+
     return mp_lexer_new(qstr_from_str(filename), vb, (mp_lexer_stream_next_byte_t)vstr_buf_next_byte, (mp_lexer_stream_close_t)vstr_buf_close);
 }
-
 
 /** PORT IMPL VALUE/FUNCTIONS **/
 MP_THREAD mp_uint_t mp_verbose_flag = 0;
@@ -344,7 +403,7 @@ MP_THREAD mp_uint_t mp_verbose_flag = 0;
 uint mp_import_stat(const char *path) {
     // TODO: limit path to internal only?
     // (but custom importer maybe don't this this?)
-    
+
     struct stat st;
     if (stat(path, &st) == 0) {
         if (S_ISDIR(st.st_mode)) {
@@ -357,6 +416,7 @@ uint mp_import_stat(const char *path) {
 }
 
 int DEBUG_printf(const char *fmt, ...) {
+    // TODO: use java output?
     va_list ap;
     va_start(ap, fmt);
     int ret = vfprintf(stderr, fmt, ap);
@@ -366,205 +426,218 @@ int DEBUG_printf(const char *fmt, ...) {
 
 NORETURN void mp_assert_fail(const char *assertion, const char *file,
                              unsigned int line, const char *function) {
-    char buf[256];
-    snprintf(buf, sizeof(buf), "<JNUPY>: %s:%u %s: Assertion '%s' failed.\n", file, line, function, assertion);
-    puts(buf);
-    
+
+    const char *fmt = "<JNUPY>: %s:%u %s: Assertion '%s' failed.";
+    size_t buf_size = strlen(fmt) + strlen(file) + strlen(function) + strlen(assertion) + 64;
+    char *buf = malloc(buf_size);
+
+    if (buf != NULL) {
+        snprintf(buf, buf_size, fmt, file, line, function, assertion);
+    } else {
+        buf = "<JNUPY> Allocation buffer failed.";
+    }
+
     if (JNUPY_ENV != NULL) {
         (*JNUPY_G_VM)->AttachCurrentThread(JNUPY_G_VM, (void **) &JNUPY_ENV, NULL);
-        (*JNUPY_ENV)->ThrowNew(JNUPY_ENV, (*JNUPY_ENV)->FindClass(JNUPY_ENV, "java/lang/NoSuchMethodError"), buf);
+        (*JNUPY_ENV)->ThrowNew(JNUPY_ENV, (*JNUPY_ENV)->FindClass(JNUPY_ENV, "java/lang/AssertionError"), buf);
+    } else {
+        printf("%s\n", buf);
     }
-    
-    MP_STATE_VM(nlr_top) = JNUPY_NLR_TOP;
-    nlr_jump(NULL);
+
+    nlr_gk_jump(NULL);
 }
 
 void nlr_jump_fail(void *val) {
-    char buf[64];
-    snprintf(buf, sizeof(buf), "<JNUPY>: FATAL: uncaught NLR %p\n", val);
-    puts(buf);
+    char buf[128];
+    snprintf(buf, sizeof(buf), "<JNUPY>: FATAL: uncaught NLR %p (mp_state_ctx=%p)", val, mp_state_ctx);
     
     if (JNUPY_ENV != NULL) {
-        printf("e0\n");
         (*JNUPY_G_VM)->AttachCurrentThread(JNUPY_G_VM, (void **) &JNUPY_ENV, NULL);
-        printf("e1\n");
         (*JNUPY_ENV)->FatalError(JNUPY_ENV, buf);
-        printf("e2\n");
     } else {
-        puts(buf);
+        printf("%s\n", buf);
     }
+
+    abort();
 }
 
-/** JNI CLASS/VALUE REFERENCE **/
+/** JNI EXPORT FUNCTION MECRO **/
+#define JNUPY_FUNC(name) Java_kr_pe_ecmaxp_micropython_PythonState_##name
+#define JNUPY_FUNC_DEF(ret, name) \
+    JNIEXPORT ret JNICALL JNUPY_FUNC(name)
 
-/** JNI LOAD/UNLOAD FUNCTIONS **/
+#define _JNUPY_FUNC_BODY_START(init_func) \
+    jnupy_setup_env(env, self); \
+    nlr_gk_buf_t _nlr_gk = nlr_gk_new(); \
+    do { \
+        if (!init_func()) { \
+            break; \
+        } \
+        if (nlr_gk_push(&_nlr_gk) != 0) { \
+            break; \
+        } \
+        
+        /* body */
 
-JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
-	JNIEnv *env;
-    
-    if ((*vm)->GetEnv(vm, (void **) &env, JNUPY_JNIVERSION) != JNI_OK) {
-		return JNUPY_JNIVERSION;
-	}
-	
-	if ((*env)->GetJavaVM(env, &JNUPY_G_VM) != JNI_OK) {
-	    return JNUPY_JNIVERSION;
-	}
-	
-	initialized = 1;
-	return JNUPY_JNIVERSION;
-}
+#define _JNUPY_FUNC_BODY_END(ret_stmt) \
+    } while(0); \
+    ret_stmt;
 
-JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
-	JNIEnv *env;
-	
-	if ((*vm)->GetEnv(vm, (void **) &env, JNUPY_JNIVERSION) != JNI_OK) {
-		return;
-	}
-	
-	return;
-}
+#define return \
+    nlr_gk_pop(&_nlr_gk); \
+    return
+
+#define JNUPY_FUNC_START_WITH_STATE _JNUPY_FUNC_BODY_START(jnupy_load_state)
+#define JNUPY_FUNC_START _JNUPY_FUNC_BODY_START(jnupy_load_pre_state)
+#define JNUPY_FUNC_END_VOID _JNUPY_FUNC_BODY_END(return)
+#define JNUPY_FUNC_END_VALUE(value) _JNUPY_FUNC_BODY_END(return (value))
+#define JNUPY_FUNC_END _JNUPY_FUNC_BODY_END(return 0)
 
 /** JNI EXPORT FUNCTIONS (kr.pe.ecmaxp.micropython.PythonState.mp_xxx **/
 // http://cafe.daum.net/oddtip/JxlJ/27?docid=1CBe5|JxlJ|27|20080424210900&q=java%20jni&srchid=CCB1CBe5|JxlJ|27|20080424210900
+JNUPY_JNI_START_EXPORT
 
-#define return \
-    JNUPY_NLR_TOP = _nlr_goalkeeper.prev; \
-    MP_STATE_VM(nlr_top) = JNUPY_NLR_TOP; \
-    return
-#define JNUPY_FUNC_BODY(ret_stmt) \
-    JNUPY_ENV = env; \
-    JNUPY_SELF = self; \
-    nlr_buf_t _nlr_goalkeeper; \
-    _nlr_goalkeeper.prev = JNUPY_NLR_TOP; \
-    JNUPY_NLR_TOP = &_nlr_goalkeeper; \
-    if (nlr_push(&_nlr_goalkeeper) != 0) { \
-        ret_stmt; \
-    } else
+JNUPY_FUNC_DEF(void, mp_1test_1jni)
+    (JNIEnv *env, jobject self) {
+    JNUPY_FUNC_START;
 
-JNUPY_FUNC_DEF(void, mp_1test_1jni) (JNIEnv *env, jobject self) {
-//JNUPY_FUNC_BODY(return) {
-//    printf("Welcome to java native micropython! (env=%p; obj=%p;)\n", JNUPY_ENV, JNUPY_SELF);
-//}
-    int i = 0;
-    mp_state_ctx = mp_state_new(); // FIX?
-    nlr_buf_t _nlr_goalkeeper;
-    
-    printf("%d\n", i++);
-    MP_STATE_VM(nlr_top) = JNUPY_NLR_TOP;
-    printf("%d\n", i++);
-    JNUPY_NLR_TOP = &_nlr_goalkeeper;
-    
-    if (nlr_push(&_nlr_goalkeeper) == 0) {
-        printf("%d\n", i++);
-        printf("Welcome to java native micropython! (env=%p; obj=%p;)\n", JNUPY_ENV, JNUPY_SELF);
-        assert(! "failed?");
-        printf("%d\n", i++);
-        nlr_pop();
-        printf("%d\n", i++);
-        return;
-    } else {
-        printf("%d\n", i++);
-        printf("failed\n");
-        printf("%d\n", i++);
-        return;
-    }
+    printf("Welcome to java native micropython! (env=%p; obj=%p;)\n", JNUPY_ENV, JNUPY_SELF);
+
+    JNUPY_FUNC_END_VOID;
 }
 
 JNUPY_FUNC_DEF(void, mp_1test_1jni_1fail)
-        (JNIEnv *env, jobject self) {
-JNUPY_FUNC_BODY(return) {
+    (JNIEnv *env, jobject self) {
+    JNUPY_FUNC_START;
+
 	assert(! "just checking assert work?");
-}}
-/*
+
+    JNUPY_FUNC_END_VOID;
+}
+
+JNUPY_FUNC_DEF(void, mp_1test_1jni_1state)
+    (JNIEnv *env, jobject self) {
+    JNUPY_FUNC_START_WITH_STATE;
+
+    JNUPY_FUNC_END_VOID;
+}
+
+
 JNUPY_FUNC_DEF(jboolean, mp_1state_1new)
-        (JNIEnv *env, jobject self) {
-    JNUPY_FUNC_INIT();
-    
+    (JNIEnv *env, jobject self) {
+    JNUPY_FUNC_START;
+
+    if (!initialized) {
+        return JNI_FALSE;
+    }
+
 	if (JNUPY_MP_STATE != NULL) {
 	    // TODO: raise error?
 	    return JNI_FALSE;
 	}
-    
-	JNUPY_MP_STATE = mp_state_new();
-	if (JNUPY_MP_STATE == NULL) {
+
+	mp_state_ctx_t *state = mp_state_new();
+	if (state == NULL) {
 	    return JNI_FALSE;
 	}
-	
-	mp_uint_t stack_size = MEM_SIZE(40, KB);
-	mp_uint_t mem_size = MEM_SIZE(256, KB);
-	
-    mp_state_load(JNUPY_MP_STATE);
-    mp_stack_set_limit(stack_size);
-    
-    long heap_size = mem_size;
-    char *heap = malloc(heap_size);
-    gc_init(heap, heap + heap_size);
-    assert((char *)MP_STATE_MEM(gc_alloc_table_start) == heap);
-    
-    mp_init();
-    
-    mp_obj_list_init(mp_sys_path, 0);
-    mp_obj_list_init(mp_sys_argv, 0);
 
-    return JNI_TRUE;
-    
-    JNUPY_FUNC_DEINIT(0);
+    char *heap = NULL;
+
+    nlr_gk_buf_t nlr_gk = nlr_gk_new();
+    if (nlr_gk_push(&nlr_gk) == 0) {
+        mp_uint_t stack_size = MEM_SIZE(40, KB);
+        mp_uint_t heap_size = MEM_SIZE(256, KB);
+
+        jnupy_force_load_state(state);
+
+        mp_stack_set_limit(stack_size);
+
+        heap = malloc(heap_size);
+        assert(heap != NULL);
+
+        gc_init(heap, heap + heap_size);
+
+        assert((char *)MP_STATE_MEM(gc_alloc_table_start) == heap);
+
+        mp_init();
+
+        mp_obj_list_init(mp_sys_path, 0);
+        mp_obj_list_init(mp_sys_argv, 0);
+
+        JNUPY_MP_STATE = state;
+        mp_state_store(state);
+
+        nlr_gk_pop(&nlr_gk);
+        return JNI_TRUE;
+    } else {
+        if (state != NULL) {
+            free(state);
+        }
+
+        if (heap != NULL) {
+            free(heap);
+        }
+
+        return JNI_FALSE;
+    }
+
+    JNUPY_FUNC_END;
 }
 
+
 JNUPY_FUNC_DEF(jboolean, mp_1state_1check)
-        (JNIEnv *env, jobject self) {
-    JNUPY_FUNC_INIT();
-    
-	if (JNUPY_MP_STATE != NULL && mp_state_is_loaded(JNUPY_MP_STATE)) {
+    (JNIEnv *env, jobject self) {
+    JNUPY_FUNC_START;
+
+	if (JNUPY_MP_STATE != NULL) {
 	    return JNI_TRUE;
 	} else {
 	    return JNI_FALSE;
 	}
-    JNUPY_FUNC_DEINIT(0);
+
+    JNUPY_FUNC_END;
 }
 
 JNUPY_FUNC_DEF(jboolean, mp_1state_1free)
-        (JNIEnv *env, jobject self) {
-    JNUPY_FUNC_INIT();
-    
+    (JNIEnv *env, jobject self) {
+    JNUPY_FUNC_START;
+
 	if (JNUPY_MP_STATE != NULL) {
 	    if (!mp_state_is_loaded(JNUPY_MP_STATE)) {
     	    mp_state_load(JNUPY_MP_STATE);
-            mp_deinit();
-            
-            free(MP_STATE_MEM(gc_alloc_table_start));
-            
-            mp_state_store(JNUPY_MP_STATE);
 	    }
-	    
+
+        mp_deinit();
+        free(MP_STATE_MEM(gc_alloc_table_start));
+        mp_state_store(JNUPY_MP_STATE);
+
 	    mp_state_free(JNUPY_MP_STATE);
 	}
-	
+
 	return JNI_TRUE;
-	
-    JNUPY_FUNC_DEINIT(0);
+
+    JNUPY_FUNC_END;
 }
 
-JNUPY_FUNC_DEF(jboolean, mp_1module_1new)
-        (JNIEnv *env, jobject self, jstring code) {
-    JNUPY_FUNC_INIT();
-    jnupy_load_state();
-    
+JNUPY_FUNC_DEF(jboolean, mp_1code_1exec)
+    (JNIEnv *env, jobject self, jstring code) {
+    JNUPY_FUNC_START_WITH_STATE;
+
     nlr_buf_t nlr;
     if (nlr_push(&nlr) == 0) {
         char *filename = "<CODE>";
         const char *codebuf = (*env)->GetStringUTFChars(env, code, 0);
-        
+
         vstr_t *vstr = vstr_new();
         vstr_add_str(vstr, codebuf);
-        
+
         (*env)->ReleaseStringUTFChars(env, code, codebuf);
-        
+
         mp_lexer_t *lex = mp_lexer_new_from_vstr(filename, vstr);
         if (lex == NULL) {
             return JNI_FALSE;
         }
-        
+
         qstr source_name = lex->source_name;
 
         mp_parse_node_t pn = mp_parse(lex, MP_PARSE_FILE_INPUT);
@@ -573,18 +646,18 @@ JNUPY_FUNC_DEF(jboolean, mp_1module_1new)
         if (module_fun == NULL) {
             return JNI_FALSE;
         }
-        
+
         mp_call_function_0(module_fun);
         nlr_pop();
-        
+
         return JNI_TRUE;
     } else {
         mp_obj_print_exception(&mp_plat_print, nlr.ret_val);
         return JNI_FALSE;
     }
-    
-    JNUPY_FUNC_DEINIT(0);
-}
-*/
 
+    JNUPY_FUNC_END;
+}
+
+/** JNI EXPORT FUNCTION MECRO CLNEAUP **/
 #undef return
