@@ -40,6 +40,11 @@ mp_state_ctx_t *mp_state_new() {
     return state;
 }
 
+void mp_state_free(mp_state_ctx_t *state) {
+    assert(!mp_state_is_loaded(state));
+    free(state);
+}
+
 void mp_state_load_raw(mp_state_ctx_t *state) {
     // TODO: acquire lock?
     // TODO: store nlr handler?
@@ -69,6 +74,18 @@ void mp_state_load(mp_state_ctx_t *state) {
     mp_stack_ctrl_init();
 }
 
+void mp_state_force_load(mp_state_ctx_t *state) {
+    if (mp_state_is_loaded(mp_state_ctx)) {
+        if (mp_state_ctx == state) {
+            return;
+        } else {
+            mp_state_store(mp_state_ctx);
+        }
+    } else {
+        mp_state_load(state);
+    }
+}
+
 void mp_state_store(mp_state_ctx_t *state) {
     // TODO: acquire lock?
     assert(mp_state_ctx != NULL);
@@ -79,8 +96,8 @@ void mp_state_store(mp_state_ctx_t *state) {
     MP_STATE_VM(is_state_loaded) = false;
 }
 
-void mp_state_free(mp_state_ctx_t *state) {
-    free(state);
+bool mp_state_is_loaded(mp_state_ctx_t *state) {
+    return state->vm.is_state_loaded;
 }
 
 #endif
