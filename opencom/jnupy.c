@@ -236,30 +236,51 @@ NORETURN void nlr_gk_jump_raw(void *val) {
     nlr_jump(val);
 }
 
-/** JNI AUTO PARSER MECRO **/
-#define JNUPY_JNI_START_AUTOLOAD
-#define JNUPY_JNI_END_AUTOLOAD
-#define JNUPY_JNI_START_PARSE
-#define JNUPY_JNI_START_EXPORT
-#define JNUPY_JNI_START_REF
-#define JNUPY_JNI_END_REF
-JNUPY_JNI_START_PARSE
+/** JNI CLASS/VALUE REFERENCE MECRO **/
+#define _JNUPY_REF_ID(id) _jnupy_ref_##id
 
-/** JNI CLASS/VALUE REFERENCE **/
-#define JNUPY_OBJECT(a, b) b
-#define JNUPY_CLASS(a, b) b
-#define JNUPY_METHOD(a, b, c, d) d
-#define JNUPY_FIELD(a, b, c) c
+#define JNUPY_CLASS(name, id) _JNUPY_REF_ID(id)
+#define JNUPY_METHOD(class_, name, id) _JNUPY_REF_ID(id)
+#define JNUPY_FIELD(class_, name, id) _JNUPY_REF_ID(id)
+
+#define _JNUPY_REF(vtype, id, default) STATIC vtype _JNUPY_REF_ID(id) = default;
+#define JNUPY_REF_CLASS _JNUPY_REF(jclass, id, NULL)
+#define JNUPY_REF_METHOD _JNUPY_REF(jmethodID, id, 0)
+#define JNUPY_REF_FIELD _JNUPY_REF(jfieldID, id, 0)
+
+/*
+JNUPY_REF(CLASS, )
+	if (!(luaerror_class = referenceclass(env, "com/naef/jnlua/LuaError"))
+			|| !(luaerror_id = (*env)->GetMethodID(env, luaerror_class, "<init>", "(Ljava/lang/String;Ljava/lang/Throwable;)V"))
+			|| !(setluastacktrace_id = (*env)->GetMethodID(env, luaerror_class, "setLuaStackTrace", "([Lcom/naef/jnlua/LuaStackTraceElement;)V"))) {
+		return JNLUA_JNIVERSION;
+	}
+*/
+
+#define _JNUPY_LOAD(id, value) if (!(_JNUPY_REF(id) = (value))) break;
+#define JNUPY_LOAD_CLASS(name, id) \
+    _JNUPY_LOAD(id, referenceclass(env, (name)))
+#define JNUPY_LOAD_METHOD(cls, name, type, id) \
+    _JNUPY_LOAD(id, (*env)->GetMethodID(env, cls, name, type))
+#define JNUPY_LOAD_FIELD(cls, name, type, id) \
+    _JNUPY_LOAD(id, (*env)->GetFieldID(env, cls, name, type))
 
 /* TODO: how to auto pasing in c code?
 JNUPY_RE
-JNUPY_FIELD(JNUPY_CLASS("java/lang/System.out", b), "Field Ljava/io/PrintStream;")
+JNUPY_CLASS()
+JNUPY_FIELD(CLASS("java/lang/System.out", b), "Field Ljava/io/PrintStream;", c)
 JNUPY_REF("Method java/io/PrintStream.println:(Ljava/lang/String;)V", 0)
 */
 
-JNUPY_JNI_START_REF
+/** JNUPY AUTO PARSER MECRO **/
+#define JNUPY_AP(...)
 
-JNUPY_JNI_END_REF
+/** JNI CLASS/VALUE REFERENCE **/
+JNUPY_AP(REF, START)
+/* REF A
+REF B
+REF C */
+JNUPY_AP(REF, END)
 
 /** JNI LOAD/UNLOAD FUNCTIONS **/
 
@@ -274,11 +295,19 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 	    return JNUPY_JNIVERSION;
 	}
 	
-	JNUPY_JNI_START_AUTOLOAD
+	if (initialized) {
+	    return JNUPY_JNIVERSION;
+	}
 	
-	JNUPY_JNI_END_AUTOLOAD
-
+	do {
+	JNUPY_AP(LOAD, START)
+	/* LOAD A
+    LOAD B
+    LOAD C */
+	JNUPY_AP(LOAD, END)
 	initialized = 1;
+	} while (false);
+	
 	return JNUPY_JNIVERSION;
 }
 
@@ -495,7 +524,7 @@ void nlr_jump_fail(void *val) {
 
 /** JNI EXPORT FUNCTIONS (kr.pe.ecmaxp.micropython.PythonState.mp_xxx **/
 // http://cafe.daum.net/oddtip/JxlJ/27?docid=1CBe5|JxlJ|27|20080424210900&q=java%20jni&srchid=CCB1CBe5|JxlJ|27|20080424210900
-JNUPY_JNI_START_EXPORT
+JNUPY_AP(EXPORT)
 
 JNUPY_FUNC_DEF(void, mp_1test_1jni)
     (JNIEnv *env, jobject self) {
