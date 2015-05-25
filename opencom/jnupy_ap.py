@@ -312,7 +312,7 @@ def unescape(x):
 ref_block = []
 tab = config[REF, TAB]
 out = ref_block.append
-for (ref_type, info), hash_value in sorted(ref.items(), key=(lambda x: x[0])):
+for (ref_type, info), hash_value in sorted(ref.items(), key=(lambda x: (x[0], x))):
     name = None
     if ref_type == CLASS:
         desc = unescape(info[0])
@@ -331,7 +331,7 @@ block_assign(fc, REF, ref_block)
 load_block = []
 tab = config[LOAD, TAB]
 out = load_block.append
-for (ref_type, info), hash_value in sorted(ref.items(), key=(lambda x: x[0])):
+for (ref_type, info), hash_value in sorted(ref.items(), key=(lambda x: (x[0], x))):
     if ref_type == CLASS:
         args = info[0], hash_value
     else:
