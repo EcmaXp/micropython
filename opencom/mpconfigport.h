@@ -121,6 +121,7 @@ extern const struct _mp_obj_module_t mp_module_msgpack;
 extern const struct _mp_obj_module_t mp_module_microthread;
 extern const struct _mp_obj_module_t mp_module_persist;
 extern const struct _mp_obj_module_t mp_module_mpoc;
+extern const struct _mp_obj_module_t mp_module_jnupy;
 
 #if MICROPY_PY_TIME
 #define MICROPY_PY_TIME_DEF { MP_OBJ_NEW_QSTR(MP_QSTR_utime), (mp_obj_t)&mp_module_time },
@@ -147,6 +148,11 @@ extern const struct _mp_obj_module_t mp_module_mpoc;
 #else
 #define MICROPY_PY_MICROTHREAD_DEF
 #endif
+#if MICROPY_BUILD_JNI_LIBRARY
+#define MICROPY_PY_JNUPY_DEF { MP_OBJ_NEW_QSTR(MP_QSTR_jnupy), (mp_obj_t)&mp_module_jnupy },
+#else
+#define MICROPY_PY_JNUPY_DEF
+#endif
 
 #define MICROPY_PORT_BUILTIN_MODULES \
     MICROPY_PY_TIME_DEF \
@@ -154,6 +160,7 @@ extern const struct _mp_obj_module_t mp_module_mpoc;
     MICROPY_PY_MSGPACK_DEF \
     MICROPY_PY_MICROTHREAD_DEF \
     MICROPY_PY_PERSIST_DEF \
+    MICROPY_PY_JNUPY_DEF \
     { MP_OBJ_NEW_QSTR(MP_QSTR_mpoc), (mp_obj_t)&mp_module_mpoc }, \
     { MP_OBJ_NEW_QSTR(MP_QSTR__os), (mp_obj_t)&mp_module_os }, \
     {}

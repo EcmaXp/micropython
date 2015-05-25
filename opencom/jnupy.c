@@ -191,6 +191,10 @@ STATIC JavaVM *jnupy_glob_java_vm;
 #define JNUPY_ENV _JNUPY_CUR_STATE(java_env)
 #define JNUPY_SELF _JNUPY_CUR_STATE(java_self)
 #define JNUPY_MP_STATE _JNUPY_CUR_STATE(mp_state)
+#define JNUPY_CALL(func, ...) (*JNUPY_ENV)->func(JNUPY_ENV, __VA_ARGS__)
+#define JNUPY_CHECK() ((*JNUPY_ENV)->ExceptionOccurred(JNUPY_ENV))
+#define JNUPY_AUTO_THROW (JNUPY_CHECK()? nlr_gk_jump(NULL): (void)0)
+
 #define NLR_GK_TOP _JNUPY_CUR_STATE(nlr_gk_top)
 
 /** JNUPY NLR GOAL KEEPER **/
@@ -203,6 +207,7 @@ STATIC JavaVM *jnupy_glob_java_vm;
 #define nlr_gk_push(gk_buf) (nlr_gk_push_raw(gk_buf), nlr_push(&(gk_buf)->buf))
 #define nlr_gk_pop(gk_buf) (nlr_gk_pop_raw(gk_buf))
 #define nlr_gk_jump(val) (nlr_gk_jump_raw(val))
+#define nlr_gk_call(expr) (if ()) { nlr_gk_jump(NULL) }
 
 void nlr_gk_push_raw(nlr_gk_buf_t *gk_buf) {
     gk_buf->is_used = true;
@@ -231,11 +236,15 @@ NORETURN void nlr_gk_jump_raw(void *val) {
 #define JNUPY_CLASS(name, id) _JNUPY_REF_ID(id)
 #define JNUPY_METHOD(class_, name, type, id) _JNUPY_REF_ID(id)
 #define JNUPY_FIELD(class_, name, type, id) _JNUPY_REF_ID(id)
+#define JNUPY_STATICMETHOD(class_, name, type, id) _JNUPY_REF_ID(id)
+#define JNUPY_STATICFIELD(class_, name, type, id) _JNUPY_REF_ID(id)
 
 #define _JNUPY_REF(vtype, id, default) STATIC vtype _JNUPY_REF_ID(id) = default;
 #define JNUPY_REF_CLASS(id) _JNUPY_REF(jclass, id, NULL)
 #define JNUPY_REF_METHOD(id) _JNUPY_REF(jmethodID, id, 0)
 #define JNUPY_REF_FIELD(id) _JNUPY_REF(jfieldID, id, 0)
+#define JNUPY_REF_STATICMETHOD(id) JNUPY_REF_METHOD(id)
+#define JNUPY_REF_STATICFIELD(id) JNUPY_REF_FIELD(id)
 
 #define _JNUPY_LOAD(id, value) if (!(_JNUPY_REF_ID(id) = (value))) break;
 #define JNUPY_LOAD_CLASS(name, id) \
@@ -244,26 +253,56 @@ NORETURN void nlr_gk_jump_raw(void *val) {
     _JNUPY_LOAD(id, (*env)->GetMethodID(env, _JNUPY_REF_ID(clsid), name, type))
 #define JNUPY_LOAD_FIELD(clsname, name, type, clsid, id) \
     _JNUPY_LOAD(id, (*env)->GetFieldID(env, _JNUPY_REF_ID(clsid), name, type))
+#define JNUPY_LOAD_STATICMETHOD(clsname, name, type, clsid, id) \
+    _JNUPY_LOAD(id, (*env)->GetStaticMethodID(env, _JNUPY_REF_ID(clsid), name, type))
+#define JNUPY_LOAD_STATICFIELD(clsname, name, type, clsid, id) \
+    _JNUPY_LOAD(id, (*env)->GetStaticFieldID(env, _JNUPY_REF_ID(clsid), name, type))
 
 /** JNUPY AUTO PARSER MECRO **/
 #define JNUPY_AP(...)
 
 /** JNI CLASS/VALUE AUTO REFERENCE **/
 JNUPY_AP(REF, START)
+// CLASS: java/lang/Boolean
+JNUPY_REF_CLASS(CGo6B)
+// CLASS: java/lang/Object
+JNUPY_REF_CLASS(Cq0rS)
+// CLASS: org/micropython/jnupy/JavaFunction
+JNUPY_REF_CLASS(CiHJF)
 // CLASS: org/micropython/jnupy/PythonState
-JNUPY_REF_CLASS(Ce487)
+JNUPY_REF_CLASS(C5IeC)
 // FIELD: org/micropython/jnupy/PythonState->mpState[J]
-JNUPY_REF_FIELD(Fdd41)
+JNUPY_REF_FIELD(F3UGp)
+// METHOD: org/micropython/jnupy/JavaFunction->invoke[(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;]
+JNUPY_REF_METHOD(MIWs5)
+// STATICFIELD: java/lang/Boolean->FALSE[Ljava/lang/Boolean;]
+JNUPY_REF_STATICFIELD(SwJOv)
+// STATICFIELD: java/lang/Boolean->TRUE[Ljava/lang/Boolean;]
+JNUPY_REF_STATICFIELD(S3GZ3)
 JNUPY_AP(REF, END)
 JNUPY_AP(EXPORT)
 
-/** JNI CLASS/VALUE MANUAL REFERENCE **/
+/** JNI CLASS/VALUE MANUAL REFERENCE MECRO **/
 #define JCLASS(x) JCLASS_##x
 #define JFIELD(x, y) ((void)JCLASS(x), JFIELD_##x##_##y)
 #define JMETHOD(x, y) ((void)JCLASS(x), JMETHOD_##x##_##y)
+#define JSTATICFIELD(x, y) ((void)JCLASS(x), JSTATICFIELD_##x##_##y)
+#define JSTATICMETHOD(x, y) ((void)JCLASS(x), JSTATICMETHOD_##x##_##y)
+#define JOBJECT(x) JOBJECT_##x
 
-#define JCLASS_PythonState JNUPY_CLASS("org/micropython/jnupy/PythonState", Ce487)
-#define JFIELD_PythonState_mpState JNUPY_FIELD("org/micropython/jnupy/PythonState", "mpState", "J", Fdd41)
+/** JNI CLASS/VALUE MANUAL REFERENCE **/
+#define JCLASS_Boolean JNUPY_CLASS("java/lang/Boolean", CGo6B)
+#define JSTATICFIELD_Boolean_TRUE JNUPY_STATICFIELD("java/lang/Boolean", "TRUE", "Ljava/lang/Boolean;", S3GZ3)
+#define JSTATICFIELD_Boolean_FALSE JNUPY_STATICFIELD("java/lang/Boolean", "FALSE", "Ljava/lang/Boolean;", SwJOv)
+
+#define JCLASS_PythonState JNUPY_CLASS("org/micropython/jnupy/PythonState", C5IeC)
+#define JFIELD_PythonState_mpState JNUPY_FIELD("org/micropython/jnupy/PythonState", "mpState", "J", F3UGp)
+
+#define JCLASS_JavaFunction JNUPY_CLASS("org/micropython/jnupy/JavaFunction", CiHJF)
+#define JMETHOD_JavaFunction_invoke JNUPY_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", MIWs5)
+
+#define JOBJECT_TRUE ((*JNUPY_ENV)->GetStaticObjectField(JNUPY_ENV, JCLASS(Boolean), JSTATICFIELD(Boolean, TRUE)))
+#define JOBJECT_FALSE ((*JNUPY_ENV)->GetStaticObjectField(JNUPY_ENV, JCLASS(Boolean), JSTATICFIELD(Boolean, FALSE)))
 
 /** JNI LOAD/UNLOAD FUNCTIONS **/
 
@@ -293,8 +332,14 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 
 	do {
     JNUPY_AP(LOAD, START)
-    JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonState", Ce487)
-    JNUPY_LOAD_FIELD("org/micropython/jnupy/PythonState", "mpState", "J", Ce487, Fdd41)
+    JNUPY_LOAD_CLASS("java/lang/Boolean", CGo6B)
+    JNUPY_LOAD_CLASS("java/lang/Object", Cq0rS)
+    JNUPY_LOAD_CLASS("org/micropython/jnupy/JavaFunction", CiHJF)
+    JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonState", C5IeC)
+    JNUPY_LOAD_FIELD("org/micropython/jnupy/PythonState", "mpState", "J", C5IeC, F3UGp)
+    JNUPY_LOAD_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", CiHJF, MIWs5)
+    JNUPY_LOAD_STATICFIELD("java/lang/Boolean", "FALSE", "Ljava/lang/Boolean;", CGo6B, SwJOv)
+    JNUPY_LOAD_STATICFIELD("java/lang/Boolean", "TRUE", "Ljava/lang/Boolean;", CGo6B, S3GZ3)
 	JNUPY_AP(LOAD, END)
 	initialized = 1;
 	} while (false);
@@ -314,16 +359,20 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
 
 /** JNUPY INTERNAL FUNCTION **/
 bool jnupy_load_state() {
-    mp_state_ctx_t *state = (mp_state_ctx_t *) (void *) (*JNUPY_ENV)->GetLongField(JNUPY_ENV, JNUPY_SELF, JFIELD(PythonState, mpState));
+    mp_state_ctx_t *state = (mp_state_ctx_t *) (void *) JNUPY_CALL(GetLongField, JNUPY_SELF, JFIELD(PythonState, mpState));
+    JNUPY_AUTO_THROW;
 
     if (state == NULL) {
-        (*JNUPY_ENV)->ThrowNew(JNUPY_ENV, (*JNUPY_ENV)->FindClass(JNUPY_ENV, "java/lang/AssertionError"), "There is no state");
+        JNUPY_CALL(ThrowNew, JNUPY_CALL(FindClass, "java/lang/AssertionError"), "There is no state");
+
+        // just return, it will throw error.
         return false;
     }
 
     mp_state_force_load(state);
 
     if (state != mp_state_ctx) {
+        JNUPY_CALL(ThrowNew, JNUPY_CALL(FindClass, "java/lang/AssertionError"), "Invaild Load");
         return false;
     }
 
@@ -452,6 +501,104 @@ void nlr_jump_fail(void *val) {
     abort();
 }
 
+/** JNUPY INTERNAL MODULE **/
+const mp_obj_type_t mp_type_jfunc;
+typedef struct _mp_obj_jfunc_t {
+    mp_obj_base_t base;
+    jobject jfunc;
+} mp_obj_jfunc_t;
+
+STATIC mp_obj_t jfunc_new(jobject jfunc) {
+    mp_obj_jfunc_t *o = m_new_obj_with_finaliser(mp_obj_jfunc_t);
+    o->base.type = &mp_type_jfunc;
+    o->jfunc = (*JNUPY_ENV)->NewGlobalRef(JNUPY_ENV, jfunc);
+
+    return o;
+}
+
+// TODO: check modmsgpack.c will help coding!
+
+STATIC mp_obj_t jnupy_obj_j2py(jobject jobj) {
+    mp_obj_t obj = mp_const_none;
+    // jclass cls = env->GetObjectClass(clsObj);
+
+    // java/lang/Boolean
+
+    return obj;
+}
+
+STATIC jobject jnupy_obj_py2j(mp_obj_t obj) {
+    jobject jobj = NULL;
+
+    if (0) {
+    } else if (obj == mp_const_none) {
+        jobj = NULL;
+    } else if (obj == mp_const_true) {
+        jobj = NULL;
+    } else if (obj == mp_const_false) {
+        jobj = NULL;
+    }
+
+    return JOBJECT_TRUE;
+    return jobj;
+}
+
+STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+    mp_arg_check_num(n_args, n_kw, 0, n_args, false);
+    mp_obj_jfunc_t *o = self_in;
+
+    jobjectArray jargs = (*JNUPY_ENV)->NewObjectArray(JNUPY_ENV, n_args, JNUPY_CLASS("java/lang/Object", Cq0rS), NULL);
+    for (int i = 0; i < n_args; i++) {
+        JNUPY_CALL(SetObjectArrayElement, jargs, i, jnupy_obj_py2j(args[i]));
+        JNUPY_AUTO_THROW;
+    }
+
+	jobject jresult = JNUPY_CALL(CallObjectMethod, o->jfunc, JMETHOD(JavaFunction, invoke), JNUPY_SELF, jargs);
+	if (JNUPY_CHECK()) {
+	    // just throw java error, export to jnupy.
+		nlr_raise(mp_obj_new_exception(&mp_type_RuntimeError));
+	}
+
+	return jnupy_obj_j2py(jresult);
+}
+
+STATIC mp_obj_t jfunc_del(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+    mp_obj_jfunc_t *o = self_in;
+
+    (*JNUPY_ENV)->DeleteGlobalRef(JNUPY_ENV, o->jfunc);
+    printf("success delete;\n");
+
+    return mp_const_none;
+}
+
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(jfunc_del_obj, jfunc_del);
+
+STATIC const mp_map_elem_t jfunc_locals_dict_table[] = {
+    { MP_OBJ_NEW_QSTR(MP_QSTR___del__), (mp_obj_t)&jfunc_del_obj },
+};
+
+STATIC MP_DEFINE_CONST_DICT(jfunc_locals_dict, jfunc_locals_dict_table);
+
+const mp_obj_type_t mp_type_jfunc = {
+    { &mp_type_type },
+    .name = MP_QSTR_JFunction,
+    .call = jfunc_call,
+    .locals_dict = (mp_obj_t)&jfunc_locals_dict,
+};
+
+STATIC const mp_map_elem_t mp_module_jnupy_globals_table[] = {
+    { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_micropython) },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_JFunction), (mp_obj_t)&mp_type_jfunc },
+};
+
+STATIC MP_DEFINE_CONST_DICT(mp_module_jnupy_globals, mp_module_jnupy_globals_table);
+
+const mp_obj_module_t mp_module_jnupy = {
+    .base = { &mp_type_module },
+    .name = MP_QSTR_jnupy,
+    .globals = (mp_obj_dict_t*)&mp_module_jnupy_globals,
+};
+
 /** JNI EXPORT FUNCTION MECRO **/
 #define JNUPY_FUNC(name) Java_org_micropython_jnupy_PythonState_##name
 #define JNUPY_FUNC_DEF(ret, name) \
@@ -511,6 +658,15 @@ JNUPY_FUNC_DEF(void, mp_1test_1jni_1state)
     JNUPY_FUNC_END_VOID;
 }
 
+JNUPY_FUNC_DEF(void, mp_1put_1java_1func)
+    (JNIEnv *env, jobject self, jobject jfunc) {
+    JNUPY_FUNC_START_WITH_STATE;
+
+    mp_obj_t jfunc_obj = jfunc_new(jfunc);
+    mp_obj_subscr(mp_globals_get(), MP_OBJ_NEW_QSTR(MP_QSTR_last_jfunc), jfunc_obj);
+
+    JNUPY_FUNC_END_VOID;
+}
 
 JNUPY_FUNC_DEF(jboolean, mp_1state_1new)
     (JNIEnv *env, jobject self) {

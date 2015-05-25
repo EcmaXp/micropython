@@ -169,7 +169,7 @@ STATIC mp_obj_t microthread_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint
     return thread;
 }
 
-void mp_load_microthread_context(mp_microthread_context_t *context) {
+STATIC void mp_load_microthread_context(mp_microthread_context_t *context) {
 #define STATE(t, a) MP_STATE_##t(a) = context->a;
 
     STATE(CTX, dict_locals);
@@ -192,7 +192,7 @@ void mp_load_microthread_context(mp_microthread_context_t *context) {
 #undef STATE
 }
 
-void mp_store_microthread_context(mp_microthread_context_t *context) {
+STATIC void mp_store_microthread_context(mp_microthread_context_t *context) {
 #define STATE(t, a) context->a = MP_STATE_##t(a);
 
     STATE(CTX, dict_locals);
@@ -392,13 +392,12 @@ STATIC mp_obj_t microthread_attr_resume(mp_uint_t n_args, mp_obj_t args[]) {
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(microthread_attr_resume_obj, 1, 2, microthread_attr_resume);
 
 STATIC mp_obj_t microthread_attr_del(mp_obj_t microthread_obj) {
-    printf("killed\n");
     return mp_const_none;
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(microthread_attr_del_obj, microthread_attr_del);
 
-STATIC mp_obj_t mod_mpoc_pause(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC mp_obj_t mod_microthread_pause(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 0, 1, false);
 
     if (1 <= n_args) {
@@ -412,13 +411,13 @@ typedef struct _mp_type_fun_pause_t {
     mp_obj_base_t base;
 } mp_type_fun_pause_t;
 
-const mp_obj_type_t mp_type_fun_pause = {
+const mp_obj_type_t mp_type_fun_microthread_pause = {
     { &mp_type_type },
     .name = MP_QSTR_function,
-    .call = mod_mpoc_pause,
+    .call = mod_microthread_pause,
 };
 
-STATIC const mp_type_fun_pause_t mod_microthread_pause_obj = {{&mp_type_fun_pause}};
+STATIC const mp_type_fun_pause_t mod_microthread_pause_obj = {{&mp_type_fun_microthread_pause}};
 
 STATIC void microthread_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     mp_obj_microthread_t *self = self_in;
@@ -433,7 +432,7 @@ STATIC void microthread_print(const mp_print_t *print, mp_obj_t self_in, mp_prin
 }
 
 #if MICROPY_LIMIT_CPU
-void microthread_attr_int(mp_int_t *value_ptr, mp_obj_t *dest) {
+STATIC void microthread_attr_int(mp_int_t *value_ptr, mp_obj_t *dest) {
     bool is_load = (dest[0] == MP_OBJ_NULL);
     bool is_store = (dest[0] == MP_OBJ_SENTINEL && dest[1] != MP_OBJ_NULL);
     bool is_del = (dest[0] == MP_OBJ_SENTINEL && dest[1] == MP_OBJ_NULL);

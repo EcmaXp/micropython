@@ -147,3 +147,8 @@ Q(loads)
 Q(test)
 Q(test1)
 Q(test2)
+
+// jnupy
+Q(jnupy)
+Q(JFunction)
+Q(last_jfunc)

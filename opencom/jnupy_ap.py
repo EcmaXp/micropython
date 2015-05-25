@@ -1,7 +1,9 @@
+#!/usr/bin/env python3
 ### This file is jnupy auto parser ###
 from __future__ import print_function
 import collections
 import hashlib
+import base64
 import sys
 import os
 import re
@@ -9,7 +11,7 @@ import re
 if __name__ != "__main__" or len(sys.argv) != 2:
     exit("usage: ./jnupy_ap.py jnupy.c")
 
-# how about use compiled jar?
+# TODO: this file are not documented and lazy.
 
 def build_parse_call(func):
     func_pc = func + "("
@@ -56,11 +58,15 @@ JNUPY_AP_DEFINE = "#define {}(...)".format(JNUPY_AP)
 JNUPY_CLASS = "JNUPY_CLASS"
 JNUPY_METHOD = "JNUPY_METHOD"
 JNUPY_FIELD = "JNUPY_FIELD"
+JNUPY_STATICMETHOD = "JNUPY_STATICMETHOD"
+JNUPY_STATICFIELD = "JNUPY_STATICFIELD"
 
 JNUPY_AP_CALL = build_parse_call(JNUPY_AP)
 JNUPY_CLASS_CALL = build_parse_call(JNUPY_CLASS)
 JNUPY_METHOD_CALL = build_parse_call(JNUPY_METHOD)
 JNUPY_FIELD_CALL = build_parse_call(JNUPY_FIELD)
+JNUPY_STATICMETHOD_CALL = build_parse_call(JNUPY_STATICMETHOD)
+JNUPY_STATICFIELD_CALL = build_parse_call(JNUPY_STATICFIELD)
 
 HASH_LEVEL = 4
 
@@ -168,6 +174,8 @@ TAB = "TAB" # with START
 CLASS = "CLASS"
 METHOD = "METHOD"
 FIELD = "FIELD"
+STATICMETHOD = "STATICMETHOD"
+STATICFIELD = "STATICFIELD"
 
 def block_assign(fc, tag, data):
     try:
@@ -195,7 +203,7 @@ def get_hash(tag):
     hash_value = ref.get(tag)
     if hash_value is None:
         for idx in range(256):
-            hash_value = tag[0][0] + hashlib.md5(repr(tag + (idx,)).encode()).hexdigest()[:HASH_LEVEL]
+            hash_value = tag[0][0] + base64.b64encode(hashlib.md5(repr(tag + (idx,)).encode()).digest())[:HASH_LEVEL]
             if hash_value not in href:
                 href.add(hash_value)
                 break
@@ -236,6 +244,8 @@ for lineno, rawline in enumerate(lines):
             (CLASS, JNUPY_CLASS_CALL, 1),
             (METHOD, JNUPY_METHOD_CALL, 3),
             (FIELD, JNUPY_FIELD_CALL, 3),
+            (STATICMETHOD, JNUPY_STATICMETHOD_CALL, 3),
+            (STATICFIELD, JNUPY_STATICFIELD_CALL, 3),
         ):
         
         lefted = line
@@ -253,7 +263,7 @@ for lineno, rawline in enumerate(lines):
                 vname, = args[:1]
                 tag = ref_type, (vname,)
                 args = map(str, args[:argnum] + (get_hash(tag),))
-            elif ref_type in (METHOD, FIELD):
+            elif ref_type in (METHOD, FIELD, STATICMETHOD, STATICFIELD):
                 class_, vname, vtype, = args[:3]
                 class_hash = ref.get((CLASS, (class_,)))
                 if class_hash is None:
