@@ -233,7 +233,6 @@ Q(IPPROTO_RAW)
 
 // for network class
 Q(network)
-Q(route)
 Q(start_server)
 Q(stop_server)
 Q(server_running)
@@ -357,3 +356,9 @@ Q(digest)
 //Q(md5)
 Q(sha1)
 Q(sha256)
+
+// for ubinascii module
+Q(ubinascii)
+Q(hexlify)
+Q(unhexlify)
+

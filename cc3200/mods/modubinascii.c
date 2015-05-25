@@ -3,6 +3,7 @@
  *
  * The MIT License (MIT)
  *
+ * Copyright (c) 2014 Paul Sokolovsky
  * Copyright (c) 2015 Daniel Campora
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -24,16 +25,38 @@
  * THE SOFTWARE.
  */
 
-#ifndef FTP_H_
-#define FTP_H_
+#include "py/mpconfig.h"
+#include MICROPY_HAL_H
+#include "py/nlr.h"
+#include "py/runtime.h"
+#include "py/binary.h"
+#include "extmod/modubinascii.h"
+#include "modubinascii.h"
+#include "inc/hw_types.h"
+#include "inc/hw_ints.h"
+#include "inc/hw_nvic.h"
+#include "inc/hw_dthe.h"
+#include "hw_memmap.h"
+#include "rom_map.h"
+#include "prcm.h"
+#include "crc.h"
+#include "cryptohash.h"
+#include "mpexception.h"
 
-/******************************************************************************
- DECLARE EXPORTED FUNCTIONS
- ******************************************************************************/
-extern void ftp_init (void);
-extern void ftp_run (void);
-extern void ftp_enable (void);
-extern void ftp_disable (void);
-extern void ftp_reset (void);
 
-#endif /* FTP_H_ */
+/******************************************************************************/
+// Micro Python bindings
+
+STATIC const mp_map_elem_t mp_module_binascii_globals_table[] = {
+    { MP_OBJ_NEW_QSTR(MP_QSTR___name__),        MP_OBJ_NEW_QSTR(MP_QSTR_ubinascii) },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_hexlify),         (mp_obj_t)&mod_binascii_hexlify_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_unhexlify),       (mp_obj_t)&mod_binascii_unhexlify_obj },
+};
+
+STATIC MP_DEFINE_CONST_DICT(mp_module_binascii_globals, mp_module_binascii_globals_table);
+
+const mp_obj_module_t mp_module_ubinascii = {
+    .base = { &mp_type_module },
+    .name = MP_QSTR_ubinascii,
+    .globals = (mp_obj_dict_t*)&mp_module_binascii_globals,
+};

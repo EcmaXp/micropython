@@ -24,16 +24,13 @@
  * THE SOFTWARE.
  */
 
-#ifndef FTP_H_
-#define FTP_H_
+#ifndef MODUSOCKET_H_
+#define MODUSOCKET_H_
 
-/******************************************************************************
- DECLARE EXPORTED FUNCTIONS
- ******************************************************************************/
-extern void ftp_init (void);
-extern void ftp_run (void);
-extern void ftp_enable (void);
-extern void ftp_disable (void);
-extern void ftp_reset (void);
+extern void modusocket_pre_init (void);
+extern void modusocket_socket_add (int16_t sd, bool user);
+extern void modusocket_socket_delete (int16_t sd);
+extern void modusocket_enter_sleep (void);
+extern void modusocket_close_all_user_sockets (void);
 
-#endif /* FTP_H_ */
+#endif /* MODUSOCKET_H_ */

@@ -31,7 +31,9 @@
 #include "py/obj.h"
 #include "telnet.h"
 #include "simplelink.h"
+#include "modnetwork.h"
 #include "modwlan.h"
+#include "modusocket.h"
 #include "debug.h"
 #include "mpexception.h"
 #include "serverstask.h"
@@ -131,7 +133,6 @@ static void telnet_process (void);
 static int telnet_process_credential (char *credential, _i16 rxLen);
 static void telnet_parse_input (uint8_t *str, int16_t *len);
 static bool telnet_send_with_retries (int16_t sd, const void *pBuf, int16_t len);
-static void telnet_reset (void);
 static void telnet_reset_buffer (void);
 
 /******************************************************************************
@@ -292,6 +293,13 @@ void telnet_disable (void) {
     telnet_data.state = E_TELNET_STE_DISABLED;
 }
 
+void telnet_reset (void) {
+    // close the connection and start all over again
+    servers_close_socket(&telnet_data.n_sd);
+    servers_close_socket(&telnet_data.sd);
+    telnet_data.state = E_TELNET_STE_START;
+}
+
 bool telnet_is_enabled (void) {
     return telnet_data.enabled;
 }
@@ -322,6 +330,9 @@ static bool telnet_create_socket (void) {
     // Open a socket for telnet
     ASSERT ((telnet_data.sd = sl_Socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) > 0);
     if (telnet_data.sd > 0) {
+        // add the socket to the network administration
+        modusocket_socket_add(telnet_data.sd, false);
+
         // Enable non-blocking mode
         nonBlockingOption.NonblockingEnabled = 1;
         ASSERT (sl_SetSockOpt(telnet_data.sd, SOL_SOCKET, SL_SO_NONBLOCKING, &nonBlockingOption, sizeof(nonBlockingOption)) == SL_SOC_OK);
@@ -352,14 +363,17 @@ static void telnet_wait_for_connection (void) {
         return;
     }
     else {
-        // close the listening socket, we don't need it anymore
-        sl_Close(telnet_data.sd);
-
         if (telnet_data.n_sd <= 0) {
             // error
             telnet_reset();
             return;
         }
+
+        // close the listening socket, we don't need it anymore
+        servers_close_socket(&telnet_data.sd);
+
+        // add the new socket to the network administration
+        modusocket_socket_add(telnet_data.n_sd, false);
 
         // client connected, so go on
         telnet_data.rxWindex = 0;
@@ -490,13 +504,6 @@ static bool telnet_send_with_retries (int16_t sd, const void *pBuf, int16_t len)
         } while (++retries <= TELNET_TX_RETRIES_MAX);
     }
     return false;
-}
-
-static void telnet_reset (void) {
-    // close the connection and start all over again
-    servers_close_socket(&telnet_data.n_sd);
-    servers_close_socket(&telnet_data.sd);
-    telnet_data.state = E_TELNET_STE_START;
 }
 
 static void telnet_reset_buffer (void) {

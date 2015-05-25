@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2015 Daniel Campora
+ * Copyright (c) 2014 Paul Sokolovsky
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,16 +24,8 @@
  * THE SOFTWARE.
  */
 
-#ifndef FTP_H_
-#define FTP_H_
+#ifndef MODUBINASCII_H_
+#define MODUBINASCII_H_
 
-/******************************************************************************
- DECLARE EXPORTED FUNCTIONS
- ******************************************************************************/
-extern void ftp_init (void);
-extern void ftp_run (void);
-extern void ftp_enable (void);
-extern void ftp_disable (void);
-extern void ftp_reset (void);
 
-#endif /* FTP_H_ */
+#endif /* MODUBINASCII_H_ */

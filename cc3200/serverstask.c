@@ -36,6 +36,7 @@
 #include "telnet.h"
 #include "ftp.h"
 #include "pybwdt.h"
+#include "modusocket.h"
 
 
 /******************************************************************************
@@ -52,12 +53,14 @@ typedef struct {
     volatile bool enabled;
     volatile bool do_disable;
     volatile bool do_enable;
+    volatile bool do_reset;
 }servers_Data_t;
 
 /******************************************************************************
  DECLARE PRIVATE DATA
  ******************************************************************************/
-static servers_Data_t servers_data = {.enabled = false, .do_disable = false, .do_enable = false};
+static servers_Data_t servers_data = {.enabled = false, .do_disable = false, .do_enable = false, .do_reset = false};
+static volatile bool sleep_sockets = false;
 
 /******************************************************************************
  DECLARE PRIVATE FUNCTIONS
@@ -101,18 +104,34 @@ void TASK_Servers (void *pvParameters) {
             servers_data.enabled = false;
         }
 
-        if (cycle) {
-            telnet_run();
+        if (servers_data.do_reset) {
+            telnet_reset();
+            ftp_reset();
+            servers_data.do_reset = false;
+            // resetting the servers is needed to preven half-open sockets
+            // and we should also close all user sockets
+            modusocket_close_all_user_sockets();
         }
         else {
-            ftp_run();
+            if (cycle) {
+                telnet_run();
+            }
+            else {
+                ftp_run();
+            }
+        }
+
+        // set the alive flag for the wdt
+        pybwdt_srv_alive();
+
+        if (sleep_sockets) {
+            sleep_sockets = false;
+            modusocket_enter_sleep();
         }
 
         // move to the next cycle
         cycle = cycle ? false : true;
         HAL_Delay(SERVERS_CYCLE_TIME_MS);
-        // set the alive flag for the wdt
-        pybwdt_srv_alive();
     }
 }
 
@@ -129,12 +148,22 @@ void servers_stop (void) {
     HAL_Delay (SERVERS_CYCLE_TIME_MS * 5);
 }
 
+void servers_reset (void) {
+    servers_data.do_reset = true;
+}
+
 bool servers_are_enabled (void) {
     return servers_data.enabled;
 }
 
+void server_sleep_sockets (void) {
+    sleep_sockets = true;
+    HAL_Delay (SERVERS_CYCLE_TIME_MS + 1);
+}
+
 void servers_close_socket (int16_t *sd) {
     if (*sd > 0) {
+        modusocket_socket_delete(*sd);
         sl_Close(*sd);
         *sd = -1;
     }

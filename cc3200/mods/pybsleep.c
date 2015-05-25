@@ -45,6 +45,7 @@
 #include "pybsleep.h"
 #include "pybpin.h"
 #include "simplelink.h"
+#include "modnetwork.h"
 #include "modwlan.h"
 #include "osi.h"
 #include "debug.h"
@@ -52,6 +53,7 @@
 #include "mpcallback.h"
 #include "mperror.h"
 #include "sleeprestore.h"
+#include "serverstask.h"
 
 /******************************************************************************
  DECLARE PRIVATE CONSTANTS
@@ -429,7 +431,7 @@ STATIC void PRCMInterruptHandler (void) {
             pybsleep_wake_reason = PYB_SLP_WAKED_BY_GPIO;
             break;
         case PRCM_LPDS_TIMER:
-            // disable the timer as a wake-up source
+            // disable the timer as wake-up source
             pybsleep_data.timer_wake_pwrmode &= ~PYB_PWR_MODE_LPDS;
             MAP_PRCMLPDSWakeupSourceDisable(PRCM_LPDS_TIMER);
             mpcallback_handler(pybsleep_data.timer_lpds_wake_cb);
@@ -593,6 +595,7 @@ STATIC mp_obj_t pyb_sleep_suspend (mp_obj_t self_in) {
     // do we need network wake-up?
     if (pybsleep_data.wlan_lpds_wake_cb) {
         MAP_PRCMLPDSWakeupSourceEnable (PRCM_LPDS_HOST_IRQ);
+        server_sleep_sockets();
     }
     else {
         MAP_PRCMLPDSWakeupSourceDisable (PRCM_LPDS_HOST_IRQ);
