@@ -68,7 +68,7 @@ struct _nlr_buf_t {
 // mpstate.c will define mp_nlr_top
 extern THREAD nlr_buf_t *mp_nlr_top;
 #else
-#define mp_nlr_top MP_STATE_VM(nlr_top)
+#define mp_nlr_top MP_STATE_VM(_nlr_top)
 #endif
 
 #if MICROPY_NLR_SETJMP

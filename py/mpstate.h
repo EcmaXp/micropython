@@ -82,9 +82,13 @@ typedef struct _mp_state_vm_t {
     //
 
     #if !MICROPY_MULTI_STATE_CONTEXT
-    nlr_buf_t *nlr_top;
+    // Note: nlr asm code has the offset of this hard-coded
+    // MP_STATE_VM(_nlr_top) is dangerous, use mp_nlr_top
+    nlr_buf_t *_nlr_top;
+    #else
+    // just use mp_nlr_top
     #endif
-
+    
     qstr_pool_t *last_pool;
 
     // non-heap memory for creating an exception if we can't allocate RAM
