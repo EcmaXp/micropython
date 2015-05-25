@@ -64,14 +64,21 @@ struct _nlr_buf_t {
 #endif
 };
 
+#if MICROPY_MULTI_STATE_CONTEXT
+// mpstate.c will define mp_nlr_top
+extern THREAD nlr_buf_t *mp_nlr_top;
+#else
+#define mp_nlr_top MP_STATE_VM(nlr_top)
+#endif
+
 #if MICROPY_NLR_SETJMP
 #include "py/mpstate.h"
 
 NORETURN void nlr_setjmp_jump(void *val);
 // nlr_push() must be defined as a macro, because "The stack context will be
 // invalidated if the function which called setjmp() returns."
-#define nlr_push(buf) ((buf)->prev = MP_STATE_VM(nlr_top), MP_STATE_VM(nlr_top) = (buf), setjmp((buf)->jmpbuf))
-#define nlr_pop() { MP_STATE_VM(nlr_top) = MP_STATE_VM(nlr_top)->prev; }
+#define nlr_push(buf) ((buf)->prev = mp_nlr_top, mp_nlr_top = (buf), setjmp((buf)->jmpbuf))
+#define nlr_pop() { mp_nlr_top = mp_nlr_top->prev; }
 #define nlr_jump(val) nlr_setjmp_jump(val)
 #else
 unsigned int nlr_push(nlr_buf_t *);
@@ -91,7 +98,7 @@ void nlr_jump_fail(void *val);
 #include "mpstate.h"
 #define nlr_raise(val) \
     do { \
-        /*printf("nlr_raise: nlr_top=%p\n", MP_STATE_VM(nlr_top)); \
+        /*printf("nlr_raise: nlr_top=%p\n", mp_nlr_top); \
         fflush(stdout);*/ \
         void *_val = val; \
         assert(_val != NULL); \
@@ -101,11 +108,11 @@ void nlr_jump_fail(void *val);
 
 #if !MICROPY_NLR_SETJMP
 #define nlr_push(val) \
-    assert(MP_STATE_VM(nlr_top) != val),nlr_push(val)
+    assert(mp_nlr_top != val),nlr_push(val)
 
 /*
 #define nlr_push(val) \
-    printf("nlr_push: before: nlr_top=%p, val=%p\n", MP_STATE_VM(nlr_top), val),assert(MP_STATE_VM(nlr_top) != val),nlr_push(val)
+    printf("nlr_push: before: nlr_top=%p, val=%p\n", mp_nlr_top, val),assert(mp_nlr_top != val),nlr_push(val)
 #endif
 */
 #endif

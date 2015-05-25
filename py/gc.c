@@ -277,6 +277,7 @@ void gc_collect_start(void) {
     // dict_globals, then the root pointer section of mp_state_vm.
     #if MICROPY_MULTI_STATE_CONTEXT
     void **ptrs = (void**)(void*)mp_state_ctx;
+    gc_collect_root((void**)(void*)mp_nlr_top, 1);
     #else
     void **ptrs = (void**)(void*)&mp_state_ctx;
     #endif

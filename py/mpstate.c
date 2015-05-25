@@ -25,9 +25,11 @@
  */
 
 #include "py/mpstate.h"
+#include "py/nlr.h"
 
 #if MICROPY_MULTI_STATE_CONTEXT
-THREAD mp_state_ctx_t * mp_state_ctx;
+THREAD mp_state_ctx_t *mp_state_ctx;
+THREAD nlr_buf_t *mp_nlr_top;
 #else
 mp_state_ctx_t mp_state_ctx;
 #endif

@@ -81,8 +81,9 @@ typedef struct _mp_state_vm_t {
     // this must start at the start of this structure
     //
 
-    // Note: nlr asm code has the offset of this hard-coded
+    #if !MICROPY_MULTI_STATE_CONTEXT
     nlr_buf_t *nlr_top;
+    #endif
 
     qstr_pool_t *last_pool;
 
@@ -177,19 +178,15 @@ typedef struct _mp_state_ctx_t {
 } mp_state_ctx_t;
 
 #if MICROPY_MULTI_STATE_CONTEXT
-extern THREAD mp_state_ctx_t * mp_state_ctx;
-#else
-extern mp_state_ctx_t mp_state_ctx;
-#endif
-
-#if MICROPY_MULTI_STATE_CONTEXT
+extern THREAD mp_state_ctx_t *mp_state_ctx;
 #define MP_STATE_CTX(x) (mp_state_ctx->x)
 #define MP_STATE_VM(x) (mp_state_ctx->vm.x)
 #define MP_STATE_MEM(x) (mp_state_ctx->mem.x)
 #else
+extern mp_state_ctx_t mp_state_ctx;
 #define MP_STATE_CTX(x) (mp_state_ctx.x)
 #define MP_STATE_VM(x) (mp_state_ctx.vm.x)
 #define MP_STATE_MEM(x) (mp_state_ctx.mem.x)
-#endif
+#endif // MICROPY_MULTI_STATE_CONTEXT
 
 #endif // __MICROPY_INCLUDED_PY_MPSTATE_H__
