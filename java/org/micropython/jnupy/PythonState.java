@@ -40,13 +40,17 @@ public class PythonState {
 		py.mp_test_jni();
 		py.mp_state_new();
 		py.mp_state_new();
-		py.mp_code_exec("print(3)");
+		py.mp_code_exec("print(3, 2)");
 	}
 	
 	public static final int APIVERSION = 1;
 	
+	// store pointer, never access on java side!
+	private long mpState;
+	
 	public PythonState() {
 		System.out.println("PythonState are generated.");
+		System.out.println(mpState);
 	}
 	
 	public void test() {

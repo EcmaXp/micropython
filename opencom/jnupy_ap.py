@@ -11,17 +11,40 @@ if __name__ != "__main__" or len(sys.argv) != 2:
 
 # how about use compiled jar?
 
-def build_parse_call(func, matcher="match"):
-    regexp = re.compile(r"{}\((.*?)\)".format(re.escape(func)))
-    def parse(pattern):
-        res = regexp.match(pattern)
-        if not res:
-            return None, None, None, pattern, ""
+def build_parse_call(func):
+    func_pc = func + "("
+    def parse(line):
+        if func_pc not in line:
+            return None, None, None, line, ""
+
+        start = line.index(func_pc)
+        idx = start + len(func)
+        end = len(line)
+        level = 0
+        while idx < end:
+            if line[idx] == "(":
+                level += 1
+            elif line[idx] == ")":
+                level -= 1
+            
+            if level <= -1:
+                return None, None, None, line, ""
         
-        args = tuple(map(str.strip, res.group(1).split(",")))
-        return res.group(), func, args, pattern[:res.start()], pattern[res.end() + 1:]
+            idx += 1
+            if level == 0:
+                end = idx
+                break
+        
+        args = tuple(map(str.strip, line[start + len(func) + 1:end - 1].split(",")))
+        return line[start:end], func, args, line[:start], line[end:]
     
-    return parse
+    def p(line):
+        result = parse(line)
+        #if result[0]:
+        #    print(result)
+        return result
+        
+    return p
 
 def build_call(func, *args):
     return "{}({})".format(func, ", ".join(args))
@@ -168,6 +191,21 @@ with open(sys.argv[1]) as fp:
 IS_JNUPY = False
 IS_EXPORT = False
 
+def get_hash(tag):
+    hash_value = ref.get(tag)
+    if hash_value is None:
+        for idx in range(256):
+            hash_value = tag[0][0] + hashlib.md5(repr(tag + (idx,)).encode()).hexdigest()[:HASH_LEVEL]
+            if hash_value not in href:
+                href.add(hash_value)
+                break
+        else:
+            raise RuntimeError("hash crash!")
+
+        ref[tag] = hash_value
+        
+    return hash_value
+
 for lineno, rawline in enumerate(lines):
     line = rawline.rstrip()
     if line == JNUPY_AP_DEFINE:
@@ -196,8 +234,8 @@ for lineno, rawline in enumerate(lines):
     
     for ref_type, parse_call, argnum in (
             (CLASS, JNUPY_CLASS_CALL, 1),
-            (METHOD, JNUPY_METHOD_CALL, 2),
-            (FIELD, JNUPY_FIELD_CALL, 2),
+            (METHOD, JNUPY_METHOD_CALL, 3),
+            (FIELD, JNUPY_FIELD_CALL, 3),
         ):
         
         lefted = line
@@ -214,28 +252,17 @@ for lineno, rawline in enumerate(lines):
             if ref_type == CLASS:
                 vname, = args[:1]
                 tag = ref_type, (vname,)
+                args = map(str, args[:argnum] + (get_hash(tag),))
             elif ref_type in (METHOD, FIELD):
                 class_, vname, vtype, = args[:3]
-                if (CLASS, (class_,)) not in ref:
+                class_hash = ref.get((CLASS, (class_,)))
+                if class_hash is None:
                     raise ValueError("class {} are not used".format(class_))
 
                 tag = ref_type, (class_, vname, vtype,)
+                args = map(str, args[:argnum] + (get_hash(tag),))
             else:
                 assert False
-            
-            hash_value = ref.get(tag)
-            if hash_value is None:
-                for idx in range(256):
-                    hash_value = hashlib.md5(repr(tag + (idx,)).encode()).hexdigest()[:HASH_LEVEL]
-                    if hash_value not in href:
-                        href.add(hash_value)
-                        break
-                else:
-                    raise RuntimeError("hash crash!")
-
-                ref[tag] = hash_value
-            
-            args = map(str, args[:argnum] + (hash_value,))
             
             result.append(build_call(func, *args))
             
@@ -265,33 +292,45 @@ fc = FileControl(lines)
 #define JNUPY_LOAD_FIELD(cls, name, type, id) \
 #    _JNUPY_LOAD(id, (*env)->GetFieldID(env, cls, name, type))
 
-"""
-	if (!(luadebug_class = referenceclass(env, "com/naef/jnlua/LuaState$LuaDebug"))
-			|| !(luadebug_init_id = (*env)->GetMethodID(env, luadebug_class, "<init>", "(JZ)V"))
-			|| !(luadebug_field_id = (*env)->GetFieldID(env, luadebug_class, "luaDebug", "J"))) {
-"""
+def unescape(x):
+    if isinstance(x, str):
+        if x.startswith('"') and x.endswith('"'):
+            return x[+1:-1]
+        return x
+    return str(x)
 
 ref_block = []
 tab = config[REF, TAB]
 out = ref_block.append
-for (ref_type, info), hash_value in ref.items():
-    out(tab + "#define _jnupy_REF_{} _jnupy_ref_{}".format(hash_value, hash_value))
+for (ref_type, info), hash_value in sorted(ref.items(), key=(lambda x: x[0])):
+    name = None
+    if ref_type == CLASS:
+        desc = unescape(info[0])
+    else:
+        desc = unescape(info[0]) + "->" + unescape(info[1]) + "[" + unescape(info[2]) + "]"
 
-for (ref_type, info), hash_value in ref.items():
+    out(tab + "// {}: {}".format(ref_type, desc))
+    # out(tab + "#define _jnupy_REF_{} _jnupy_ref_{}".format(hash_value, hash_value))
     out(tab + build_call("JNUPY_REF_" + ref_type, hash_value))
+
+if not ref_block:
+    out("")
 
 block_assign(fc, REF, ref_block)
 
 load_block = []
 tab = config[LOAD, TAB]
 out = load_block.append
-for (ref_type, info), hash_value in ref.items():
+for (ref_type, info), hash_value in sorted(ref.items(), key=(lambda x: x[0])):
     if ref_type == CLASS:
         args = info[0], hash_value
     else:
         args = info[0], info[1], info[2], ref[CLASS, (info[0],)], hash_value
     
     out(tab + build_call("JNUPY_LOAD_" + ref_type, *args))
+
+if not load_block:
+    out("")
 
 block_assign(fc, LOAD, load_block)
  

@@ -180,11 +180,11 @@ STATIC MP_THREAD jnupy_current_state_t jnupy_cur_state;
 STATIC JavaVM *jnupy_glob_java_vm;
 
 /** JNUPY MECRO **/
-// #if DEBUG
+#if DEBUG
 #define _D(x) printf(#x "\n")
-// #else
-// #define _D(x) (void)0
-// #endif
+#else
+#define _D(x) (void)0
+#endif
 
 #define _JNUPY_CUR_STATE(x) (jnupy_cur_state.x)
 #define JNUPY_G_VM jnupy_glob_java_vm
@@ -194,10 +194,8 @@ STATIC JavaVM *jnupy_glob_java_vm;
 #define NLR_GK_TOP _JNUPY_CUR_STATE(nlr_gk_top)
 
 /** JNUPY NLR GOAL KEEPER **/
-/*
-nlr goal keeper are wapper for java throw in nested function call.
-like assert fail.
-*/
+// nlr goal keeper are wapper for java throw in nested function call.
+// like assert fail.
 
 #define nlr_gk_set_buf(gk_buf) mp_nlr_top = &(gk_buf)->buf
 
@@ -229,7 +227,6 @@ NORETURN void nlr_gk_jump_raw(void *val) {
 
 /** JNI CLASS/VALUE REFERENCE MECRO **/
 #define _JNUPY_REF_ID(hash) _jnupy_REF_##hash
-// #define _jnupy_REF_##hash _jnupy_ref_real
 
 #define JNUPY_CLASS(name, id) _JNUPY_REF_ID(id)
 #define JNUPY_METHOD(class_, name, type, id) _JNUPY_REF_ID(id)
@@ -240,39 +237,44 @@ NORETURN void nlr_gk_jump_raw(void *val) {
 #define JNUPY_REF_METHOD(id) _JNUPY_REF(jmethodID, id, 0)
 #define JNUPY_REF_FIELD(id) _JNUPY_REF(jfieldID, id, 0)
 
-/*
-JNUPY_REF(CLASS, )
-	if (!(luaerror_class = referenceclass(env, "com/naef/jnlua/LuaError"))
-			|| !(luaerror_id = (*env)->GetMethodID(env, luaerror_class, "<init>", "(Ljava/lang/String;Ljava/lang/Throwable;)V"))
-			|| !(setluastacktrace_id = (*env)->GetMethodID(env, luaerror_class, "setLuaStackTrace", "([Lcom/naef/jnlua/LuaStackTraceElement;)V"))) {
-		return JNLUA_JNIVERSION;
-	}
-*/
-
-#define _JNUPY_LOAD(id, value) if (!(_JNUPY_REF(id) = (value))) break;
+#define _JNUPY_LOAD(id, value) if (!(_JNUPY_REF_ID(id) = (value))) break;
 #define JNUPY_LOAD_CLASS(name, id) \
-    _JNUPY_LOAD(id, referenceclass(env, (name)))
+    _JNUPY_LOAD(id, jnupy_refclass(env, (name)))
 #define JNUPY_LOAD_METHOD(clsname, name, type, clsid, id) \
-    _JNUPY_LOAD(id, (*env)->GetMethodID(env, _JNUPY_REF(clsid), name, type))
+    _JNUPY_LOAD(id, (*env)->GetMethodID(env, _JNUPY_REF_ID(clsid), name, type))
 #define JNUPY_LOAD_FIELD(clsname, name, type, clsid, id) \
-    _JNUPY_LOAD(id, (*env)->GetFieldID(env, _JNUPY_REF(clsid), name, type))
-
-/* TODO: how to auto pasing in c code?
-JNUPY_RE
-JNUPY_CLASS()
-JNUPY_FIELD(CLASS("java/lang/System.out", b), "Field Ljava/io/PrintStream;", c)
-JNUPY_REF("Method java/io/PrintStream.println:(Ljava/lang/String;)V", 0)
-*/
+    _JNUPY_LOAD(id, (*env)->GetFieldID(env, _JNUPY_REF_ID(clsid), name, type))
 
 /** JNUPY AUTO PARSER MECRO **/
 #define JNUPY_AP(...)
 
-/** JNI CLASS/VALUE REFERENCE **/
+/** JNI CLASS/VALUE AUTO REFERENCE **/
 JNUPY_AP(REF, START)
-
+// CLASS: org/micropython/jnupy/PythonState
+JNUPY_REF_CLASS(Ce487)
+// FIELD: org/micropython/jnupy/PythonState->mpState[J]
+JNUPY_REF_FIELD(Fdd41)
 JNUPY_AP(REF, END)
+JNUPY_AP(EXPORT)
+
+/** JNI CLASS/VALUE MANUAL REFERENCE **/
+#define JCLASS(x) JCLASS_##x
+#define JFIELD(x, y) ((void)JCLASS(x), JFIELD_##x##_##y)
+#define JMETHOD(x, y) ((void)JCLASS(x), JMETHOD_##x##_##y)
+
+#define JCLASS_PythonState JNUPY_CLASS("org/micropython/jnupy/PythonState", Ce487)
+#define JFIELD_PythonState_mpState JNUPY_FIELD("org/micropython/jnupy/PythonState", "mpState", "J", Fdd41)
 
 /** JNI LOAD/UNLOAD FUNCTIONS **/
+
+STATIC jclass jnupy_refclass(JNIEnv *env, const char *className) {
+	jclass class_ = (*env)->FindClass(env, className);
+	if (!class_) {
+		return NULL;
+	}
+
+	return (*env)->NewGlobalRef(env, class_);
+}
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 	JNIEnv *env;
@@ -284,18 +286,19 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 	if ((*env)->GetJavaVM(env, &JNUPY_G_VM) != JNI_OK) {
 	    return JNUPY_JNIVERSION;
 	}
-	
+
 	if (initialized) {
 	    return JNUPY_JNIVERSION;
 	}
-	
+
 	do {
     JNUPY_AP(LOAD, START)
-    
+    JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonState", Ce487)
+    JNUPY_LOAD_FIELD("org/micropython/jnupy/PythonState", "mpState", "J", Ce487, Fdd41)
 	JNUPY_AP(LOAD, END)
 	initialized = 1;
 	} while (false);
-	
+
 	return JNUPY_JNIVERSION;
 }
 
@@ -311,17 +314,20 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
 
 /** JNUPY INTERNAL FUNCTION **/
 bool jnupy_load_state() {
-    if (JNUPY_MP_STATE == NULL) {
+    mp_state_ctx_t *state = (mp_state_ctx_t *) (void *) (*JNUPY_ENV)->GetLongField(JNUPY_ENV, JNUPY_SELF, JFIELD(PythonState, mpState));
+
+    if (state == NULL) {
         (*JNUPY_ENV)->ThrowNew(JNUPY_ENV, (*JNUPY_ENV)->FindClass(JNUPY_ENV, "java/lang/AssertionError"), "There is no state");
         return false;
     }
 
-    mp_state_force_load(JNUPY_MP_STATE);
+    mp_state_force_load(state);
 
-    if (JNUPY_MP_STATE != mp_state_ctx) {
+    if (state != mp_state_ctx) {
         return false;
     }
 
+    JNUPY_MP_STATE = state;
     return true;
 }
 
@@ -435,7 +441,7 @@ NORETURN void mp_assert_fail(const char *assertion, const char *file,
 void nlr_jump_fail(void *val) {
     char buf[128];
     snprintf(buf, sizeof(buf), "<JNUPY>: FATAL: uncaught NLR %p (mp_state_ctx=%p)", val, mp_state_ctx);
-    
+
     if (JNUPY_ENV != NULL) {
         (*JNUPY_G_VM)->AttachCurrentThread(JNUPY_G_VM, (void **) &JNUPY_ENV, NULL);
         (*JNUPY_ENV)->FatalError(JNUPY_ENV, buf);
@@ -459,7 +465,7 @@ void nlr_jump_fail(void *val) {
             if (nlr_gk_push(&_nlr_gk) != 0) { \
                 break; \
             } \
-            
+
             /* body */
 
 #define _JNUPY_FUNC_BODY_END(ret_stmt) \
@@ -479,7 +485,6 @@ void nlr_jump_fail(void *val) {
 
 /** JNI EXPORT FUNCTIONS (org.micropython.jnupy.PythonState.mp_xxx **/
 // http://cafe.daum.net/oddtip/JxlJ/27?docid=1CBe5|JxlJ|27|20080424210900&q=java%20jni&srchid=CCB1CBe5|JxlJ|27|20080424210900
-JNUPY_AP(EXPORT)
 
 JNUPY_FUNC_DEF(void, mp_1test_1jni)
     (JNIEnv *env, jobject self) {
@@ -547,8 +552,9 @@ JNUPY_FUNC_DEF(jboolean, mp_1state_1new)
         mp_obj_list_init(mp_sys_path, 0);
         mp_obj_list_init(mp_sys_argv, 0);
 
-        JNUPY_MP_STATE = state;
         mp_state_store(state);
+        (*JNUPY_ENV)->SetLongField(JNUPY_ENV, JNUPY_SELF, JFIELD(PythonState, mpState), (mp_uint_t)state);
+        JNUPY_MP_STATE = state;
 
         nlr_gk_pop(&nlr_gk);
         return JNI_TRUE;
@@ -644,11 +650,3 @@ JNUPY_FUNC_DEF(jboolean, mp_1code_1exec)
 
 /** JNI EXPORT FUNCTION MECRO CLNEAUP **/
 #undef return
-
-/*
-JNUPY_CLASS("hello")
-JNUPY_CLASS("helloworld")
-JNUPY_CLASS("helloworld3")
-JNUPY_METHOD("helloworld3", "hello world", "?")
-
-*/
