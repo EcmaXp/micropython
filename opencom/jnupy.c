@@ -24,11 +24,7 @@
  * THE SOFTWARE.
  */
 
-/*
-https://github.com/buksy/jnlua/blob/master/src/main/c/jnlua.c
-https://github.com/buksy/jnlua/blob/master/src/main/java/com/naef/jnlua/LuaState.java
-*/
-/** ref: ../java/kr/pe/ecmaxp/micropython/PythonState.java **/
+/** ref: ../java/org/micropython/jnupy/PythonState.java **/
 
 /** JNLUA-LICENSE
 Copyright (C) 2008,2012 Andre Naef
@@ -162,10 +158,6 @@ typedef struct _jnupy_current_state_t {
     // JNUPY_MP_STATE
     // micropython state context
     mp_state_ctx_t *mp_state;
-
-    // JNUPY_MP_PRE_STATE
-    // just a dummy for nlr_top
-    mp_state_ctx_t *mp_pre_state;
     
     // JNUPY_NLR_GK_TOP
     // nlr goalkeeper top (for JNI function call warpper)
@@ -199,7 +191,6 @@ STATIC JavaVM *jnupy_glob_java_vm;
 #define JNUPY_ENV _JNUPY_CUR_STATE(java_env)
 #define JNUPY_SELF _JNUPY_CUR_STATE(java_self)
 #define JNUPY_MP_STATE _JNUPY_CUR_STATE(mp_state)
-#define JNUPY_MP_PRE_STATE _JNUPY_CUR_STATE(mp_pre_state)
 #define NLR_GK_TOP _JNUPY_CUR_STATE(nlr_gk_top)
 
 /** JNUPY NLR GOAL KEEPER **/
@@ -208,7 +199,7 @@ nlr goal keeper are wapper for java throw in nested function call.
 like assert fail.
 */
 
-#define _nlr_gk_set_buf(gk_buf) MP_STATE_VM(nlr_top) = &(gk_buf)->buf
+#define nlr_gk_set_buf(gk_buf) mp_nlr_top = &(gk_buf)->buf
 
 #define nlr_gk_new() {false}
 #define nlr_gk_push(gk_buf) (nlr_gk_push_raw(gk_buf), nlr_push(&(gk_buf)->buf))
@@ -218,7 +209,7 @@ like assert fail.
 void nlr_gk_push_raw(nlr_gk_buf_t *gk_buf) {
     gk_buf->is_used = true;
     
-    _nlr_gk_set_buf(NLR_GK_TOP);
+    nlr_gk_set_buf(NLR_GK_TOP);
     gk_buf->prev = NLR_GK_TOP;
     
     NLR_GK_TOP = gk_buf;
@@ -227,26 +218,27 @@ void nlr_gk_push_raw(nlr_gk_buf_t *gk_buf) {
 void nlr_gk_pop_raw(nlr_gk_buf_t *gk_buf) {
     if (gk_buf->is_used) {
         NLR_GK_TOP = NLR_GK_TOP->prev;
-        _nlr_gk_set_buf(NLR_GK_TOP);
+        nlr_gk_set_buf(NLR_GK_TOP);
     }
 }
 
 NORETURN void nlr_gk_jump_raw(void *val) {
-    _nlr_gk_set_buf(NLR_GK_TOP);
+    nlr_gk_set_buf(NLR_GK_TOP);
     nlr_jump(val);
 }
 
 /** JNI CLASS/VALUE REFERENCE MECRO **/
-#define _JNUPY_REF_ID(id) _jnupy_ref_##id
+#define _JNUPY_REF_ID(hash) _jnupy_REF_##hash
+// #define _jnupy_REF_##hash _jnupy_ref_real
 
 #define JNUPY_CLASS(name, id) _JNUPY_REF_ID(id)
-#define JNUPY_METHOD(class_, name, id) _JNUPY_REF_ID(id)
-#define JNUPY_FIELD(class_, name, id) _JNUPY_REF_ID(id)
+#define JNUPY_METHOD(class_, name, type, id) _JNUPY_REF_ID(id)
+#define JNUPY_FIELD(class_, name, type, id) _JNUPY_REF_ID(id)
 
 #define _JNUPY_REF(vtype, id, default) STATIC vtype _JNUPY_REF_ID(id) = default;
-#define JNUPY_REF_CLASS _JNUPY_REF(jclass, id, NULL)
-#define JNUPY_REF_METHOD _JNUPY_REF(jmethodID, id, 0)
-#define JNUPY_REF_FIELD _JNUPY_REF(jfieldID, id, 0)
+#define JNUPY_REF_CLASS(id) _JNUPY_REF(jclass, id, NULL)
+#define JNUPY_REF_METHOD(id) _JNUPY_REF(jmethodID, id, 0)
+#define JNUPY_REF_FIELD(id) _JNUPY_REF(jfieldID, id, 0)
 
 /*
 JNUPY_REF(CLASS, )
@@ -260,10 +252,10 @@ JNUPY_REF(CLASS, )
 #define _JNUPY_LOAD(id, value) if (!(_JNUPY_REF(id) = (value))) break;
 #define JNUPY_LOAD_CLASS(name, id) \
     _JNUPY_LOAD(id, referenceclass(env, (name)))
-#define JNUPY_LOAD_METHOD(cls, name, type, id) \
-    _JNUPY_LOAD(id, (*env)->GetMethodID(env, cls, name, type))
-#define JNUPY_LOAD_FIELD(cls, name, type, id) \
-    _JNUPY_LOAD(id, (*env)->GetFieldID(env, cls, name, type))
+#define JNUPY_LOAD_METHOD(clsname, name, type, clsid, id) \
+    _JNUPY_LOAD(id, (*env)->GetMethodID(env, _JNUPY_REF(clsid), name, type))
+#define JNUPY_LOAD_FIELD(clsname, name, type, clsid, id) \
+    _JNUPY_LOAD(id, (*env)->GetFieldID(env, _JNUPY_REF(clsid), name, type))
 
 /* TODO: how to auto pasing in c code?
 JNUPY_RE
@@ -277,9 +269,7 @@ JNUPY_REF("Method java/io/PrintStream.println:(Ljava/lang/String;)V", 0)
 
 /** JNI CLASS/VALUE REFERENCE **/
 JNUPY_AP(REF, START)
-/* REF A
-REF B
-REF C */
+
 JNUPY_AP(REF, END)
 
 /** JNI LOAD/UNLOAD FUNCTIONS **/
@@ -300,10 +290,8 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 	}
 	
 	do {
-	JNUPY_AP(LOAD, START)
-	/* LOAD A
-    LOAD B
-    LOAD C */
+    JNUPY_AP(LOAD, START)
+    
 	JNUPY_AP(LOAD, END)
 	initialized = 1;
 	} while (false);
@@ -322,50 +310,18 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
 }
 
 /** JNUPY INTERNAL FUNCTION **/
-bool jnupy_load_pre_state();
-
-void jnupy_force_load_state(mp_state_ctx_t *state) {
-    mp_state_force_load(state, &NLR_GK_TOP->buf);
-}
-
 bool jnupy_load_state() {
     if (JNUPY_MP_STATE == NULL) {
         (*JNUPY_ENV)->ThrowNew(JNUPY_ENV, (*JNUPY_ENV)->FindClass(JNUPY_ENV, "java/lang/AssertionError"), "There is no state");
         return false;
-    } else if (JNUPY_MP_PRE_STATE != NULL) {
-        if (JNUPY_MP_PRE_STATE == mp_state_ctx) {
-            mp_state_ctx = NULL;
-        }
-        mp_state_free(JNUPY_MP_PRE_STATE);
-        JNUPY_MP_PRE_STATE = NULL;
     }
 
-    jnupy_force_load_state(JNUPY_MP_STATE);
+    mp_state_force_load(JNUPY_MP_STATE);
 
     if (JNUPY_MP_STATE != mp_state_ctx) {
         return false;
     }
 
-    return true;
-}
-
-bool jnupy_load_pre_state() {
-    if (JNUPY_MP_STATE != NULL) {
-        if (jnupy_load_state()) {
-            return true;
-        }
-    }
-
-    if (JNUPY_MP_PRE_STATE == NULL) {
-        JNUPY_MP_PRE_STATE = mp_state_new();
-        if (JNUPY_MP_PRE_STATE == NULL) {
-            return false;
-        }
-    }
-
-    mp_state_ctx = JNUPY_MP_PRE_STATE;
-    MP_STATE_VM(nlr_top) = &NLR_GK_TOP->buf;
-    printf("NLR_GK_TOP: %p\n", NLR_GK_TOP);
     return true;
 }
 
@@ -491,38 +447,37 @@ void nlr_jump_fail(void *val) {
 }
 
 /** JNI EXPORT FUNCTION MECRO **/
-#define JNUPY_FUNC(name) Java_kr_pe_ecmaxp_micropython_PythonState_##name
+#define JNUPY_FUNC(name) Java_org_micropython_jnupy_PythonState_##name
 #define JNUPY_FUNC_DEF(ret, name) \
     JNIEXPORT ret JNICALL JNUPY_FUNC(name)
 
-#define _JNUPY_FUNC_BODY_START(init_func) \
+#define _JNUPY_FUNC_BODY_START(init_expr) \
     jnupy_setup_env(env, self); \
     nlr_gk_buf_t _nlr_gk = nlr_gk_new(); \
-    do { \
-        if (!init_func()) { \
-            break; \
-        } \
-        if (nlr_gk_push(&_nlr_gk) != 0) { \
-            break; \
-        } \
-        
-        /* body */
+    if (init_expr) { \
+        do { \
+            if (nlr_gk_push(&_nlr_gk) != 0) { \
+                break; \
+            } \
+            
+            /* body */
 
 #define _JNUPY_FUNC_BODY_END(ret_stmt) \
-    } while(0); \
+        } while(0); \
+    } \
     ret_stmt;
 
 #define return \
     nlr_gk_pop(&_nlr_gk); \
     return
 
-#define JNUPY_FUNC_START_WITH_STATE _JNUPY_FUNC_BODY_START(jnupy_load_state)
-#define JNUPY_FUNC_START _JNUPY_FUNC_BODY_START(jnupy_load_pre_state)
+#define JNUPY_FUNC_START_WITH_STATE _JNUPY_FUNC_BODY_START(jnupy_load_state())
+#define JNUPY_FUNC_START _JNUPY_FUNC_BODY_START(true)
 #define JNUPY_FUNC_END_VOID _JNUPY_FUNC_BODY_END(return)
 #define JNUPY_FUNC_END_VALUE(value) _JNUPY_FUNC_BODY_END(return (value))
 #define JNUPY_FUNC_END _JNUPY_FUNC_BODY_END(return 0)
 
-/** JNI EXPORT FUNCTIONS (kr.pe.ecmaxp.micropython.PythonState.mp_xxx **/
+/** JNI EXPORT FUNCTIONS (org.micropython.jnupy.PythonState.mp_xxx **/
 // http://cafe.daum.net/oddtip/JxlJ/27?docid=1CBe5|JxlJ|27|20080424210900&q=java%20jni&srchid=CCB1CBe5|JxlJ|27|20080424210900
 JNUPY_AP(EXPORT)
 
@@ -577,8 +532,7 @@ JNUPY_FUNC_DEF(jboolean, mp_1state_1new)
         mp_uint_t stack_size = MEM_SIZE(40, KB);
         mp_uint_t heap_size = MEM_SIZE(256, KB);
 
-        jnupy_force_load_state(state);
-
+        mp_state_force_load(state);
         mp_stack_set_limit(stack_size);
 
         heap = malloc(heap_size);
@@ -690,3 +644,11 @@ JNUPY_FUNC_DEF(jboolean, mp_1code_1exec)
 
 /** JNI EXPORT FUNCTION MECRO CLNEAUP **/
 #undef return
+
+/*
+JNUPY_CLASS("hello")
+JNUPY_CLASS("helloworld")
+JNUPY_CLASS("helloworld3")
+JNUPY_METHOD("helloworld3", "hello world", "?")
+
+*/

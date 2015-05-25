@@ -1,5 +1,7 @@
 ### This file is jnupy auto parser ###
 from __future__ import print_function
+import collections
+import hashlib
 import sys
 import os
 import re
@@ -9,10 +11,35 @@ if __name__ != "__main__" or len(sys.argv) != 2:
 
 # how about use compiled jar?
 
+def build_parse_call(func, matcher="match"):
+    regexp = re.compile(r"{}\((.*?)\)".format(re.escape(func)))
+    def parse(pattern):
+        res = regexp.match(pattern)
+        if not res:
+            return None, None, None, pattern, ""
+        
+        args = tuple(map(str.strip, res.group(1).split(",")))
+        return res.group(), func, args, pattern[:res.start()], pattern[res.end() + 1:]
+    
+    return parse
+
+def build_call(func, *args):
+    return "{}({})".format(func, ", ".join(args))
+
+
 JNUPY_AP = "JNUPY_AP"
 JNUPY_AP_DEFINE = "#define {}(...)".format(JNUPY_AP)
-JNUPY_AP_CALL = re.compile(r"{}\((.*?)\)".format(re.escape(JNUPY_AP)))
 
+JNUPY_CLASS = "JNUPY_CLASS"
+JNUPY_METHOD = "JNUPY_METHOD"
+JNUPY_FIELD = "JNUPY_FIELD"
+
+JNUPY_AP_CALL = build_parse_call(JNUPY_AP)
+JNUPY_CLASS_CALL = build_parse_call(JNUPY_CLASS)
+JNUPY_METHOD_CALL = build_parse_call(JNUPY_METHOD)
+JNUPY_FIELD_CALL = build_parse_call(JNUPY_FIELD)
+
+HASH_LEVEL = 4
 
 try:
     unicode
@@ -29,7 +56,7 @@ class FileControl():
     def __getitem__(self, x):
         getline = self.lines.__getitem__
         lines = []
-        for src, ref in self._getsource(x):
+        for _, ref in self._getsource(x):
             if ref is not None:
                 lines.append(getline(ref))
         
@@ -50,15 +77,16 @@ class FileControl():
         if isinstance(lines, StringTypes):
             lines = [lines]
 
-        first = True
-        for src, ref in self._getsource(x):
+        for _, ref in self._getsource(x):
             if ref is None:
                 raise KeyError
             self.lines[ref] = lines
             break
-        
+    
+    #TODO: insert method?
+    
     def __contains__(self, x):
-        for src, ref in self._getsource(x):
+        for _, ref in self._getsource(x):
             if ref is None:
                 return False
                         
@@ -90,30 +118,49 @@ class FileControl():
             if line is None:
                 continue
             
-            if isinstace(lines, types.StringTypes):
+            if isinstance(line, StringTypes):
                 result.append(line)
             else:
                 result.extend(line)
 
         return "\n".join(result)
 
-CFG = {}
-CFG_TAB = {}
+config = {}
+ref = {}
+href = set()
 
+# AP TAG
 REF = "REF"
 LOAD = "LOAD"
 EXPORT = "EXPORT"
+
+# AP BLOCK
 START = "START"
 END = "END"
 
-#define JNUPY_JCLASS(a, b) b
-#define JNUPY_JMETHOD(a, b) b
-#define JNUPY_JFIELD(a, b) b
-"""
-	if (!(luadebug_class = referenceclass(env, "com/naef/jnlua/LuaState$LuaDebug"))
-			|| !(luadebug_init_id = (*env)->GetMethodID(env, luadebug_class, "<init>", "(JZ)V"))
-			|| !(luadebug_field_id = (*env)->GetFieldID(env, luadebug_class, "luaDebug", "J"))) {
-"""
+# AP VIRTUAL CONFIG
+TAB = "TAB" # with START
+
+# AP TYPE
+CLASS = "CLASS"
+METHOD = "METHOD"
+FIELD = "FIELD"
+
+def block_assign(fc, tag, data):
+    try:
+        start = config[tag, START]
+        end = config[tag, END]
+    except KeyError as e:
+        raise ValueError("config[{}] block are not exists.".format(tag))
+    
+    size = len(range(start, end))
+    if size <= 1:
+        raise ValueError("config[{}] block are invaild. (size = {})".format(tag, size))
+    
+    del fc[start + 2:end]
+    fc[start + 1] = data
+    
+    return True
 
 with open(sys.argv[1]) as fp:
     lines = fp.read().splitlines()
@@ -130,22 +177,124 @@ for lineno, rawline in enumerate(lines):
     if not IS_JNUPY:
         continue
     
-    line = line.strip()
-    res = JNUPY_AP_CALL.match(line)
-    if res:
-        args = tuple(map(str.strip, res.group(1).split(",")))
-        CFG[args] = lineno
-        CFG_TAB[args] = rawline[len(rawline) - len(rawline.lstrip()):]
+    matched, _, args, _, _ = JNUPY_AP_CALL(line.strip())
+    if matched:
+        config[args] = lineno
+        
+        if args[-1] == START:
+            config[args[:-1] + (TAB,)] = rawline[:len(rawline) - len(rawline.lstrip())]
+
+        if args[0] == EXPORT:
+            assert not IS_EXPORT
+            IS_EXPORT = True
+
+    #define JNUPY_CLASS(name, id) _JNUPY_REF_ID(id)
+    #define JNUPY_METHOD(class_, name, id) _JNUPY_REF_ID(id)
+    #define JNUPY_FIELD(class_, name, id) _JNUPY_REF_ID(id)
+    if not IS_EXPORT:
+        continue
+    
+    for ref_type, parse_call, argnum in (
+            (CLASS, JNUPY_CLASS_CALL, 1),
+            (METHOD, JNUPY_METHOD_CALL, 2),
+            (FIELD, JNUPY_FIELD_CALL, 2),
+        ):
+        
+        lefted = line
+        result = []
+        while True:
+            matched, func, args, prefix, postfix = parse_call(lefted)
+            result.append(prefix)
+            lefted = postfix
+            
+            if not matched:
+                break
+            
+            assert argnum <= len(args)
+            if ref_type == CLASS:
+                vname, = args[:1]
+                tag = ref_type, (vname,)
+            elif ref_type in (METHOD, FIELD):
+                class_, vname, vtype, = args[:3]
+                if (CLASS, (class_,)) not in ref:
+                    raise ValueError("class {} are not used".format(class_))
+
+                tag = ref_type, (class_, vname, vtype,)
+            else:
+                assert False
+            
+            hash_value = ref.get(tag)
+            if hash_value is None:
+                for idx in range(256):
+                    hash_value = hashlib.md5(repr(tag + (idx,)).encode()).hexdigest()[:HASH_LEVEL]
+                    if hash_value not in href:
+                        href.add(hash_value)
+                        break
+                else:
+                    raise RuntimeError("hash crash!")
+
+                ref[tag] = hash_value
+            
+            args = map(str, args[:argnum] + (hash_value,))
+            
+            result.append(build_call(func, *args))
+            
+        result.append(lefted)
+        line = "".join(result)
+
+    lines[lineno] = line
 
 fc = FileControl(lines)
 
-print(fc[CFG[REF, START] + 1:CFG[REF, END]])
-print(fc[CFG[LOAD, START] + 1:CFG[LOAD, END]])
+#define JNUPY_JCLASS(a, b) b
+#define JNUPY_JMETHOD(a, b) b
+#define JNUPY_JFIELD(a, b) b
+#define JNUPY_CLASS(name, id) _JNUPY_REF_ID(id)
+#define JNUPY_METHOD(class_, name, id) _JNUPY_REF_ID(id)
+#define JNUPY_FIELD(class_, name, id) _JNUPY_REF_ID(id)
 
-print(CFG)
-print(CFG_TAB)
-sys.exit(1)
+#define _JNUPY_REF(vtype, id, default) STATIC vtype _JNUPY_REF_ID(id) = default;
+#define JNUPY_REF_CLASS(id) _JNUPY_REF(jclass, id, NULL)
+#define JNUPY_REF_METHOD(id) _JNUPY_REF(jmethodID, id, 0)
+#define JNUPY_REF_FIELD(id) _JNUPY_REF(jfieldID, id, 0)
 
+#define JNUPY_LOAD_CLASS(name, id) \
+#    _JNUPY_LOAD(id, referenceclass(env, (name)))
+#define JNUPY_LOAD_METHOD(cls, name, type, id) \
+#    _JNUPY_LOAD(id, (*env)->GetMethodID(env, cls, name, type))
+#define JNUPY_LOAD_FIELD(cls, name, type, id) \
+#    _JNUPY_LOAD(id, (*env)->GetFieldID(env, cls, name, type))
+
+"""
+	if (!(luadebug_class = referenceclass(env, "com/naef/jnlua/LuaState$LuaDebug"))
+			|| !(luadebug_init_id = (*env)->GetMethodID(env, luadebug_class, "<init>", "(JZ)V"))
+			|| !(luadebug_field_id = (*env)->GetFieldID(env, luadebug_class, "luaDebug", "J"))) {
+"""
+
+ref_block = []
+tab = config[REF, TAB]
+out = ref_block.append
+for (ref_type, info), hash_value in ref.items():
+    out(tab + "#define _jnupy_REF_{} _jnupy_ref_{}".format(hash_value, hash_value))
+
+for (ref_type, info), hash_value in ref.items():
+    out(tab + build_call("JNUPY_REF_" + ref_type, hash_value))
+
+block_assign(fc, REF, ref_block)
+
+load_block = []
+tab = config[LOAD, TAB]
+out = load_block.append
+for (ref_type, info), hash_value in ref.items():
+    if ref_type == CLASS:
+        args = info[0], hash_value
+    else:
+        args = info[0], info[1], info[2], ref[CLASS, (info[0],)], hash_value
+    
+    out(tab + build_call("JNUPY_LOAD_" + ref_type, *args))
+
+block_assign(fc, LOAD, load_block)
+ 
 with open(sys.argv[1], 'w') as fp:
     fp.write(fc.getvalue())
 

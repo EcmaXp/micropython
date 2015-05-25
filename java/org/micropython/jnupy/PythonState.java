@@ -24,7 +24,7 @@
  * THE SOFTWARE.
  */
 
-package kr.pe.ecmaxp.micropython;
+package org.micropython.jnupy;
 
 public class PythonState {
     static {
@@ -35,11 +35,12 @@ public class PythonState {
 	
 	public static void main(String args[]) {
 		PythonState py = new PythonState();
+		py.mp_state_new();
 		py.mp_test_jni_state();		
-		//py.mp_test_jni();
-		//py.mp_state_new();
-		//py.mp_state_new();
-		//py.mp_module_new("print(3)");
+		py.mp_test_jni();
+		py.mp_state_new();
+		py.mp_state_new();
+		py.mp_code_exec("print(3)");
 	}
 	
 	public static final int APIVERSION = 1;
