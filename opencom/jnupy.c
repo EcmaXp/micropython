@@ -191,9 +191,13 @@ STATIC JavaVM *jnupy_glob_java_vm;
 #define JNUPY_ENV _JNUPY_CUR_STATE(java_env)
 #define JNUPY_SELF _JNUPY_CUR_STATE(java_self)
 #define JNUPY_MP_STATE _JNUPY_CUR_STATE(mp_state)
-#define JNUPY_CALL(func, ...) (*JNUPY_ENV)->func(JNUPY_ENV, __VA_ARGS__)
-#define JNUPY_CHECK() ((*JNUPY_ENV)->ExceptionOccurred(JNUPY_ENV))
-#define JNUPY_AUTO_THROW (JNUPY_CHECK()? nlr_gk_jump(NULL): (void)0)
+
+/** JNUPY CALL MECRO **/
+#define JNUPY_RAW_CALL_WITH(env, func, ...) (*env)->func(env, __VA_ARGS__)
+#define JNUPY_RAW_CALL(func, ...) JNUPY_RAW_CALL_WITH(JNUPY_ENV, func, ...)
+#define JNUPY_IS_RAW_CALL_HAS_ERROR() JNUPY_RAW_CALL(ExceptionOccurred)
+#define JNUPY_RAW_AUTO_THROW (JNUPY_IS_RAW_CALL_HAS_ERROR()? nlr_gk_jump(NULL): (void)0)
+#define JNUPY_CALL(func, ...) JNUPY_RAW_CALL(func, __VA_ARGS__); JNUPY_RAW_AUTO_THROW
 
 #define NLR_GK_TOP _JNUPY_CUR_STATE(nlr_gk_top)
 
@@ -301,8 +305,8 @@ JNUPY_AP(EXPORT)
 #define JCLASS_JavaFunction JNUPY_CLASS("org/micropython/jnupy/JavaFunction", CiHJF)
 #define JMETHOD_JavaFunction_invoke JNUPY_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", MIWs5)
 
-#define JOBJECT_TRUE ((*JNUPY_ENV)->GetStaticObjectField(JNUPY_ENV, JCLASS(Boolean), JSTATICFIELD(Boolean, TRUE)))
-#define JOBJECT_FALSE ((*JNUPY_ENV)->GetStaticObjectField(JNUPY_ENV, JCLASS(Boolean), JSTATICFIELD(Boolean, FALSE)))
+#define JOBJECT_TRUE JNUPY_CALL(GetStaticObjectField, JCLASS(Boolean), JSTATICFIELD(Boolean, TRUE))
+#define JOBJECT_FALSE JNUPY_CALL(GetStaticObjectField, JCLASS(Boolean), JSTATICFIELD(Boolean, FALSE))
 
 /** JNI LOAD/UNLOAD FUNCTIONS **/
 
@@ -478,8 +482,8 @@ NORETURN void mp_assert_fail(const char *assertion, const char *file,
     }
 
     if (JNUPY_ENV != NULL) {
-        (*JNUPY_G_VM)->AttachCurrentThread(JNUPY_G_VM, (void **) &JNUPY_ENV, NULL);
-        (*JNUPY_ENV)->ThrowNew(JNUPY_ENV, (*JNUPY_ENV)->FindClass(JNUPY_ENV, "java/lang/AssertionError"), buf);
+        JNUPY_RAW_CALL_WITH(JNUPY_G_VM, AttachCurrentThread, (void **) &JNUPY_ENV, NULL);
+        JNUPY_RAW_CALL(ThrowNew, JNUPY_RAW_CALL(FindClass, "java/lang/AssertionError"), buf);
     } else {
         printf("%s\n", buf);
     }
@@ -492,8 +496,8 @@ void nlr_jump_fail(void *val) {
     snprintf(buf, sizeof(buf), "<JNUPY>: FATAL: uncaught NLR %p (mp_state_ctx=%p)", val, mp_state_ctx);
 
     if (JNUPY_ENV != NULL) {
-        (*JNUPY_G_VM)->AttachCurrentThread(JNUPY_G_VM, (void **) &JNUPY_ENV, NULL);
-        (*JNUPY_ENV)->FatalError(JNUPY_ENV, buf);
+        JNUPY_RAW_CALL_WITH(JNUPY_G_VM, AttachCurrentThread, (void **) &JNUPY_ENV, NULL);
+        JNUPY_RAW_CALL(FatalError, buf);
     } else {
         printf("%s\n", buf);
     }
@@ -511,7 +515,7 @@ typedef struct _mp_obj_jfunc_t {
 STATIC mp_obj_t jfunc_new(jobject jfunc) {
     mp_obj_jfunc_t *o = m_new_obj_with_finaliser(mp_obj_jfunc_t);
     o->base.type = &mp_type_jfunc;
-    o->jfunc = (*JNUPY_ENV)->NewGlobalRef(JNUPY_ENV, jfunc);
+    o->jfunc = JNUPY_CALL(NewGlobalRef, jfunc);
 
     return o;
 }
@@ -547,14 +551,14 @@ STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, c
     mp_arg_check_num(n_args, n_kw, 0, n_args, false);
     mp_obj_jfunc_t *o = self_in;
 
-    jobjectArray jargs = (*JNUPY_ENV)->NewObjectArray(JNUPY_ENV, n_args, JNUPY_CLASS("java/lang/Object", Cq0rS), NULL);
+    jobjectArray jargs = JNUPY_CALL(NewObjectArray, n_args, JNUPY_CLASS("java/lang/Object", Cq0rS), NULL);
+    
     for (int i = 0; i < n_args; i++) {
         JNUPY_CALL(SetObjectArrayElement, jargs, i, jnupy_obj_py2j(args[i]));
-        JNUPY_AUTO_THROW;
     }
 
-	jobject jresult = JNUPY_CALL(CallObjectMethod, o->jfunc, JMETHOD(JavaFunction, invoke), JNUPY_SELF, jargs);
-	if (JNUPY_CHECK()) {
+	jobject jresult = JNUPY_RAW_CALL(CallObjectMethod, o->jfunc, JMETHOD(JavaFunction, invoke), JNUPY_SELF, jargs);
+	if (JNUPY_IS_RAW_CALL_HAS_ERROR()) {
 	    // just throw java error, export to jnupy.
 		nlr_raise(mp_obj_new_exception(&mp_type_RuntimeError));
 	}
@@ -565,7 +569,7 @@ STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, c
 STATIC mp_obj_t jfunc_del(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
     mp_obj_jfunc_t *o = self_in;
 
-    (*JNUPY_ENV)->DeleteGlobalRef(JNUPY_ENV, o->jfunc);
+    JNUPY_CALL(DeleteGlobalRef, o->jfunc);
     printf("success delete;\n");
 
     return mp_const_none;
@@ -709,7 +713,7 @@ JNUPY_FUNC_DEF(jboolean, mp_1state_1new)
         mp_obj_list_init(mp_sys_argv, 0);
 
         mp_state_store(state);
-        (*JNUPY_ENV)->SetLongField(JNUPY_ENV, JNUPY_SELF, JFIELD(PythonState, mpState), (mp_uint_t)state);
+        JNUPY_CALL(SetLongField, JNUPY_SELF, JFIELD(PythonState, mpState), (mp_uint_t)state);
         JNUPY_MP_STATE = state;
 
         nlr_gk_pop(&nlr_gk);
