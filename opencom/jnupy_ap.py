@@ -203,7 +203,7 @@ def get_hash(tag):
     hash_value = ref.get(tag)
     if hash_value is None:
         for idx in range(256):
-            hash_value = tag[0][0] + base64.b64encode(hashlib.md5(repr(tag + (idx,)).encode()).digest())[:HASH_LEVEL]
+            hash_value = tag[0][0] + base64.b32encode(hashlib.md5(repr(tag + (idx,)).encode()).digest())[:HASH_LEVEL]
             if hash_value not in href:
                 href.add(hash_value)
                 break
