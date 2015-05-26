@@ -161,6 +161,7 @@ href = set()
 # AP TAG
 REF = "REF"
 LOAD = "LOAD"
+UNLOAD = "UNLOAD"
 EXPORT = "EXPORT"
 
 # AP BLOCK
@@ -343,6 +344,23 @@ if not load_block:
     out("")
 
 block_assign(fc, LOAD, load_block)
+
+unload_block = []
+tab = config[UNLOAD, TAB]
+out = unload_block.append
+for (ref_type, info), hash_value in sorted(ref.items(), key=(lambda x: (x[0], x))):
+    if ref_type == CLASS:
+        args = info[0], hash_value
+    else:
+        args = info[0], info[1], info[2], ref[CLASS, (info[0],)], hash_value
+    
+    out(tab + build_call("JNUPY_UNLOAD_" + ref_type, *args))
+
+if not unload_block:
+    out("")
+
+block_assign(fc, UNLOAD, unload_block)
+
  
 with open(sys.argv[1], 'w') as fp:
     fp.write(fc.getvalue())

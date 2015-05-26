@@ -270,15 +270,27 @@ NORETURN void nlr_gk_jump_raw(void *val) {
 
 #define _JNUPY_LOAD(id, value) if (!(_JNUPY_REF_ID(id) = (value))) break;
 #define JNUPY_LOAD_CLASS(name, id) \
-    _JNUPY_LOAD(id, jnupy_refclass(env, (name)))
+    _JNUPY_LOAD(id, jnupy_refclass(name))
 #define JNUPY_LOAD_METHOD(clsname, name, type, clsid, id) \
-    _JNUPY_LOAD(id, JNUPY_RAW_CALL_WITH(env, GetMethodID, _JNUPY_REF_ID(clsid), name, type))
+    _JNUPY_LOAD(id, JNUPY_RAW_CALL(GetMethodID, _JNUPY_REF_ID(clsid), name, type))
 #define JNUPY_LOAD_FIELD(clsname, name, type, clsid, id) \
-    _JNUPY_LOAD(id, JNUPY_RAW_CALL_WITH(env, GetFieldID, _JNUPY_REF_ID(clsid), name, type))
+    _JNUPY_LOAD(id, JNUPY_RAW_CALL(GetFieldID, _JNUPY_REF_ID(clsid), name, type))
 #define JNUPY_LOAD_STATICMETHOD(clsname, name, type, clsid, id) \
-    _JNUPY_LOAD(id, JNUPY_RAW_CALL_WITH(env, GetStaticMethodID, _JNUPY_REF_ID(clsid), name, type))
+    _JNUPY_LOAD(id, JNUPY_RAW_CALL(GetStaticMethodID, _JNUPY_REF_ID(clsid), name, type))
 #define JNUPY_LOAD_STATICFIELD(clsname, name, type, clsid, id) \
-    _JNUPY_LOAD(id, JNUPY_RAW_CALL_WITH(env, GetStaticFieldID, _JNUPY_REF_ID(clsid), name, type))
+    _JNUPY_LOAD(id, JNUPY_RAW_CALL(GetStaticFieldID, _JNUPY_REF_ID(clsid), name, type))
+
+#define _JNUPY_UNLOAD(id, value) _JNUPY_REF_ID(id) = value;
+#define JNUPY_UNLOAD_CLASS(name, id) \
+    _JNUPY_UNLOAD(id, ((_JNUPY_REF_ID(id) != NULL? JNUPY_RAW_CALL(DeleteGlobalRef, _JNUPY_REF_ID(id)): (void)0), NULL))
+#define JNUPY_UNLOAD_METHOD(clsname, name, type, clsid, id) \
+    _JNUPY_UNLOAD(id, 0)
+#define JNUPY_UNLOAD_FIELD(clsname, name, type, clsid, id) \
+    _JNUPY_UNLOAD(id, 0)
+#define JNUPY_UNLOAD_STATICMETHOD(clsname, name, type, clsid, id) \
+    _JNUPY_UNLOAD(id, 0)
+#define JNUPY_UNLOAD_STATICFIELD(clsname, name, type, clsid, id) \
+    _JNUPY_UNLOAD(id, 0)
 
 /** JNUPY AUTO PARSER MECRO **/
 #define JNUPY_AP(...)
@@ -330,28 +342,20 @@ JNUPY_AP(EXPORT)
 #define JOBJECT_FALSE JNUPY_CALL(GetStaticObjectField, JCLASS(Boolean), JSTATICFIELD(Boolean, FALSE))
 
 /** JNI LOAD/UNLOAD FUNCTIONS **/
-STATIC jclass jnupy_refclass(JNIEnv *env, const char *className) {
-	jclass class_ = (*env)->FindClass(env, className);
+STATIC jclass jnupy_refclass(const char *className) {
+	jclass class_ = JNUPY_RAW_CALL(FindClass, className);
 	if (!class_) {
 		return NULL;
 	}
 
-	return (*env)->NewGlobalRef(env, class_);
+	return JNUPY_RAW_CALL(NewGlobalRef, class_);
 }
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
-	JNIEnv *env;
+    JNUPY_G_VM = vm;
 
-    if ((*vm)->GetEnv(vm, (void **) &env, JNUPY_JNIVERSION) != JNI_OK) {
+    if (JNUPY_RAW_CALL_WITH(JNUPY_G_VM, GetEnv, (void **) &JNUPY_ENV, JNUPY_JNIVERSION) != JNI_OK) {
 		return JNUPY_JNIVERSION;
-	}
-
-	if ((*env)->GetJavaVM(env, &JNUPY_G_VM) != JNI_OK) {
-	    return JNUPY_JNIVERSION;
-	}
-
-	if (initialized) {
-	    return JNUPY_JNIVERSION;
 	}
 
 	do {
@@ -373,17 +377,26 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 }
 
 JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
-	JNIEnv *env;
+    JNUPY_G_VM = vm;
 
-	if ((*vm)->GetEnv(vm, (void **) &env, JNUPY_JNIVERSION) != JNI_OK) {
+	if (JNUPY_RAW_CALL_WITH(JNUPY_G_VM, GetEnv, (void **) &JNUPY_ENV, JNUPY_JNIVERSION) != JNI_OK) {
 		return;
 	}
 
+	initialized = 0;
+
 	do {
     JNUPY_AP(UNLOAD, START)
-    // TODO: building UNLOAD (very easy.)
+    JNUPY_UNLOAD_CLASS("java/lang/AssertionError", CM4H2)
+    JNUPY_UNLOAD_CLASS("java/lang/Boolean", CDKHI)
+    JNUPY_UNLOAD_CLASS("java/lang/Object", CVNFN)
+    JNUPY_UNLOAD_CLASS("org/micropython/jnupy/JavaFunction", CRBZE)
+    JNUPY_UNLOAD_CLASS("org/micropython/jnupy/PythonState", C4SDY)
+    JNUPY_UNLOAD_FIELD("org/micropython/jnupy/PythonState", "mpState", "J", C4SDY, F3VA2)
+    JNUPY_UNLOAD_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", CRBZE, MEFVT)
+    JNUPY_UNLOAD_STATICFIELD("java/lang/Boolean", "FALSE", "Ljava/lang/Boolean;", CDKHI, SYCJ2)
+    JNUPY_UNLOAD_STATICFIELD("java/lang/Boolean", "TRUE", "Ljava/lang/Boolean;", CDKHI, S3RTH)
 	JNUPY_AP(UNLOAD, END)
-	initialized = 1;
 	} while (false);
 
 	return;
