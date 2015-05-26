@@ -194,10 +194,28 @@ STATIC JavaVM *jnupy_glob_java_vm;
 
 /** JNUPY CALL MECRO **/
 #define JNUPY_RAW_CALL_WITH(env, func, ...) (*env)->func(env, __VA_ARGS__)
-#define JNUPY_RAW_CALL(func, ...) JNUPY_RAW_CALL_WITH(JNUPY_ENV, func, ...)
-#define JNUPY_IS_RAW_CALL_HAS_ERROR() JNUPY_RAW_CALL(ExceptionOccurred)
+#define JNUPY_RAW_CALL(func, ...) (*JNUPY_ENV)->func(JNUPY_ENV, __VA_ARGS__)
+#define JNUPY_IS_RAW_CALL_HAS_ERROR() (*JNUPY_ENV)->ExceptionOccurred(JNUPY_ENV)
 #define JNUPY_RAW_AUTO_THROW (JNUPY_IS_RAW_CALL_HAS_ERROR()? nlr_gk_jump(NULL): (void)0)
-#define JNUPY_CALL(func, ...) JNUPY_RAW_CALL(func, __VA_ARGS__); JNUPY_RAW_AUTO_THROW
+#define JNUPY_CALL(func, ...) (*JNUPY_ENV)->func(JNUPY_ENV, __VA_ARGS__); JNUPY_RAW_AUTO_THROW
+/*
+JNUPY_CALL usage:
+
+// With getting value
+jobject msg = JNUPY_CALL(GetLongField, JNUPY_SELF, JFIELD(PythonState, mpState));
+
+// With ignore value
+JNUPY_CALL(NewGlobalRef, jfunc);
+
+// It can't mix with if, for, while, return, or etc control block.
+// But you can use JNUPY_RAW_CALL, and after call, must check by JNUPY_IS_RAW_CALL_HAS_ERROR()
+if (JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/AssertionError", CM4H2), "There is no state") == 0) {
+    if (JNUPY_IS_RAW_CALL_HAS_ERROR()) {
+        return;
+    }
+}
+assret(! "throwing is failed.");
+*/
 
 #define NLR_GK_TOP _JNUPY_CUR_STATE(nlr_gk_top)
 
@@ -254,36 +272,39 @@ NORETURN void nlr_gk_jump_raw(void *val) {
 #define JNUPY_LOAD_CLASS(name, id) \
     _JNUPY_LOAD(id, jnupy_refclass(env, (name)))
 #define JNUPY_LOAD_METHOD(clsname, name, type, clsid, id) \
-    _JNUPY_LOAD(id, (*env)->GetMethodID(env, _JNUPY_REF_ID(clsid), name, type))
+    _JNUPY_LOAD(id, JNUPY_RAW_CALL_WITH(env, GetMethodID, _JNUPY_REF_ID(clsid), name, type))
 #define JNUPY_LOAD_FIELD(clsname, name, type, clsid, id) \
-    _JNUPY_LOAD(id, (*env)->GetFieldID(env, _JNUPY_REF_ID(clsid), name, type))
+    _JNUPY_LOAD(id, JNUPY_RAW_CALL_WITH(env, GetFieldID, _JNUPY_REF_ID(clsid), name, type))
 #define JNUPY_LOAD_STATICMETHOD(clsname, name, type, clsid, id) \
-    _JNUPY_LOAD(id, (*env)->GetStaticMethodID(env, _JNUPY_REF_ID(clsid), name, type))
+    _JNUPY_LOAD(id, JNUPY_RAW_CALL_WITH(env, GetStaticMethodID, _JNUPY_REF_ID(clsid), name, type))
 #define JNUPY_LOAD_STATICFIELD(clsname, name, type, clsid, id) \
-    _JNUPY_LOAD(id, (*env)->GetStaticFieldID(env, _JNUPY_REF_ID(clsid), name, type))
+    _JNUPY_LOAD(id, JNUPY_RAW_CALL_WITH(env, GetStaticFieldID, _JNUPY_REF_ID(clsid), name, type))
 
 /** JNUPY AUTO PARSER MECRO **/
 #define JNUPY_AP(...)
 
 /** JNI CLASS/VALUE AUTO REFERENCE **/
 JNUPY_AP(REF, START)
+// CLASS: java/lang/AssertionError
+JNUPY_REF_CLASS(CM4H2)
 // CLASS: java/lang/Boolean
-JNUPY_REF_CLASS(CGo6B)
+JNUPY_REF_CLASS(CDKHI)
 // CLASS: java/lang/Object
-JNUPY_REF_CLASS(Cq0rS)
+JNUPY_REF_CLASS(CVNFN)
 // CLASS: org/micropython/jnupy/JavaFunction
-JNUPY_REF_CLASS(CiHJF)
+JNUPY_REF_CLASS(CRBZE)
 // CLASS: org/micropython/jnupy/PythonState
-JNUPY_REF_CLASS(C5IeC)
+JNUPY_REF_CLASS(C4SDY)
 // FIELD: org/micropython/jnupy/PythonState->mpState[J]
-JNUPY_REF_FIELD(F3UGp)
+JNUPY_REF_FIELD(F3VA2)
 // METHOD: org/micropython/jnupy/JavaFunction->invoke[(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;]
-JNUPY_REF_METHOD(MIWs5)
+JNUPY_REF_METHOD(MEFVT)
 // STATICFIELD: java/lang/Boolean->FALSE[Ljava/lang/Boolean;]
-JNUPY_REF_STATICFIELD(SwJOv)
+JNUPY_REF_STATICFIELD(SYCJ2)
 // STATICFIELD: java/lang/Boolean->TRUE[Ljava/lang/Boolean;]
-JNUPY_REF_STATICFIELD(S3GZ3)
+JNUPY_REF_STATICFIELD(S3RTH)
 JNUPY_AP(REF, END)
+
 JNUPY_AP(EXPORT)
 
 /** JNI CLASS/VALUE MANUAL REFERENCE MECRO **/
@@ -295,21 +316,20 @@ JNUPY_AP(EXPORT)
 #define JOBJECT(x) JOBJECT_##x
 
 /** JNI CLASS/VALUE MANUAL REFERENCE **/
-#define JCLASS_Boolean JNUPY_CLASS("java/lang/Boolean", CGo6B)
-#define JSTATICFIELD_Boolean_TRUE JNUPY_STATICFIELD("java/lang/Boolean", "TRUE", "Ljava/lang/Boolean;", S3GZ3)
-#define JSTATICFIELD_Boolean_FALSE JNUPY_STATICFIELD("java/lang/Boolean", "FALSE", "Ljava/lang/Boolean;", SwJOv)
+#define JCLASS_Boolean JNUPY_CLASS("java/lang/Boolean", CDKHI)
+#define JSTATICFIELD_Boolean_TRUE JNUPY_STATICFIELD("java/lang/Boolean", "TRUE", "Ljava/lang/Boolean;", S3RTH)
+#define JSTATICFIELD_Boolean_FALSE JNUPY_STATICFIELD("java/lang/Boolean", "FALSE", "Ljava/lang/Boolean;", SYCJ2)
 
-#define JCLASS_PythonState JNUPY_CLASS("org/micropython/jnupy/PythonState", C5IeC)
-#define JFIELD_PythonState_mpState JNUPY_FIELD("org/micropython/jnupy/PythonState", "mpState", "J", F3UGp)
+#define JCLASS_PythonState JNUPY_CLASS("org/micropython/jnupy/PythonState", C4SDY)
+#define JFIELD_PythonState_mpState JNUPY_FIELD("org/micropython/jnupy/PythonState", "mpState", "J", F3VA2)
 
-#define JCLASS_JavaFunction JNUPY_CLASS("org/micropython/jnupy/JavaFunction", CiHJF)
-#define JMETHOD_JavaFunction_invoke JNUPY_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", MIWs5)
+#define JCLASS_JavaFunction JNUPY_CLASS("org/micropython/jnupy/JavaFunction", CRBZE)
+#define JMETHOD_JavaFunction_invoke JNUPY_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", MEFVT)
 
 #define JOBJECT_TRUE JNUPY_CALL(GetStaticObjectField, JCLASS(Boolean), JSTATICFIELD(Boolean, TRUE))
 #define JOBJECT_FALSE JNUPY_CALL(GetStaticObjectField, JCLASS(Boolean), JSTATICFIELD(Boolean, FALSE))
 
 /** JNI LOAD/UNLOAD FUNCTIONS **/
-
 STATIC jclass jnupy_refclass(JNIEnv *env, const char *className) {
 	jclass class_ = (*env)->FindClass(env, className);
 	if (!class_) {
@@ -336,14 +356,15 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 
 	do {
     JNUPY_AP(LOAD, START)
-    JNUPY_LOAD_CLASS("java/lang/Boolean", CGo6B)
-    JNUPY_LOAD_CLASS("java/lang/Object", Cq0rS)
-    JNUPY_LOAD_CLASS("org/micropython/jnupy/JavaFunction", CiHJF)
-    JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonState", C5IeC)
-    JNUPY_LOAD_FIELD("org/micropython/jnupy/PythonState", "mpState", "J", C5IeC, F3UGp)
-    JNUPY_LOAD_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", CiHJF, MIWs5)
-    JNUPY_LOAD_STATICFIELD("java/lang/Boolean", "FALSE", "Ljava/lang/Boolean;", CGo6B, SwJOv)
-    JNUPY_LOAD_STATICFIELD("java/lang/Boolean", "TRUE", "Ljava/lang/Boolean;", CGo6B, S3GZ3)
+    JNUPY_LOAD_CLASS("java/lang/AssertionError", CM4H2)
+    JNUPY_LOAD_CLASS("java/lang/Boolean", CDKHI)
+    JNUPY_LOAD_CLASS("java/lang/Object", CVNFN)
+    JNUPY_LOAD_CLASS("org/micropython/jnupy/JavaFunction", CRBZE)
+    JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonState", C4SDY)
+    JNUPY_LOAD_FIELD("org/micropython/jnupy/PythonState", "mpState", "J", C4SDY, F3VA2)
+    JNUPY_LOAD_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", CRBZE, MEFVT)
+    JNUPY_LOAD_STATICFIELD("java/lang/Boolean", "FALSE", "Ljava/lang/Boolean;", CDKHI, SYCJ2)
+    JNUPY_LOAD_STATICFIELD("java/lang/Boolean", "TRUE", "Ljava/lang/Boolean;", CDKHI, S3RTH)
 	JNUPY_AP(LOAD, END)
 	initialized = 1;
 	} while (false);
@@ -358,16 +379,22 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
 		return;
 	}
 
+	do {
+    JNUPY_AP(UNLOAD, START)
+    // TODO: building UNLOAD (very easy.)
+	JNUPY_AP(UNLOAD, END)
+	initialized = 1;
+	} while (false);
+
 	return;
 }
 
 /** JNUPY INTERNAL FUNCTION **/
 bool jnupy_load_state() {
     mp_state_ctx_t *state = (mp_state_ctx_t *) (void *) JNUPY_CALL(GetLongField, JNUPY_SELF, JFIELD(PythonState, mpState));
-    JNUPY_AUTO_THROW;
 
     if (state == NULL) {
-        JNUPY_CALL(ThrowNew, JNUPY_CALL(FindClass, "java/lang/AssertionError"), "There is no state");
+        JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/AssertionError", CM4H2), "There is no state");
 
         // just return, it will throw error.
         return false;
@@ -376,7 +403,7 @@ bool jnupy_load_state() {
     mp_state_force_load(state);
 
     if (state != mp_state_ctx) {
-        JNUPY_CALL(ThrowNew, JNUPY_CALL(FindClass, "java/lang/AssertionError"), "Invaild Load");
+        JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/AssertionError", CM4H2), "Invaild Load");
         return false;
     }
 
@@ -483,7 +510,7 @@ NORETURN void mp_assert_fail(const char *assertion, const char *file,
 
     if (JNUPY_ENV != NULL) {
         JNUPY_RAW_CALL_WITH(JNUPY_G_VM, AttachCurrentThread, (void **) &JNUPY_ENV, NULL);
-        JNUPY_RAW_CALL(ThrowNew, JNUPY_RAW_CALL(FindClass, "java/lang/AssertionError"), buf);
+        JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/AssertionError", CM4H2), buf);
     } else {
         printf("%s\n", buf);
     }
@@ -551,8 +578,8 @@ STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, c
     mp_arg_check_num(n_args, n_kw, 0, n_args, false);
     mp_obj_jfunc_t *o = self_in;
 
-    jobjectArray jargs = JNUPY_CALL(NewObjectArray, n_args, JNUPY_CLASS("java/lang/Object", Cq0rS), NULL);
-    
+    jobjectArray jargs = JNUPY_CALL(NewObjectArray, n_args, JNUPY_CLASS("java/lang/Object", CVNFN), NULL);
+
     for (int i = 0; i < n_args; i++) {
         JNUPY_CALL(SetObjectArrayElement, jargs, i, jnupy_obj_py2j(args[i]));
     }
