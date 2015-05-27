@@ -34,6 +34,8 @@ public class PythonState {
 	}
 	
 	public static void main(String args[]) {
+		System.gc(); // Remove incorrect reference.
+		
 		PythonState py = new PythonState();
 		py.mp_state_new();
 		py.mp_test_jni_state();		
@@ -47,7 +49,7 @@ public class PythonState {
 				return "?";
 			}
 		});
-		py.mp_code_exec("print(last_jfunc(321, True, None, 'hello 안녕'))");
+		py.mp_code_exec("print(last_jfunc(321, True, None, b'hello 안녕'))");
 	}
 	
 	public static final int APIVERSION = 1;

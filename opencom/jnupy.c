@@ -65,6 +65,8 @@ THE SOFTWARE.
 #include "py/nlr.h"
 #include "py/compile.h"
 #include "py/runtime.h"
+#include "py/runtime0.h"
+#include "py/objstr.h"
 #include "py/builtin.h"
 #include "py/repl.h"
 #include "py/gc.h"
@@ -149,7 +151,7 @@ STATIC bool execute(mp_state_ctx_t *state, mp_obj_t thread) {
 STATIC int initialized = 0;
 
 typedef struct _nlr_gk_buf_t {
-    bool is_used;
+    bool is_working;
     struct _nlr_gk_buf_t *prev;
     nlr_buf_t buf;
 } nlr_gk_buf_t;
@@ -223,32 +225,42 @@ assret(! "throwing is failed.");
 // nlr goal keeper are wapper for java throw in nested function call.
 // like assert fail.
 
-#define nlr_gk_set_buf(gk_buf) mp_nlr_top = &(gk_buf)->buf
-
+#define nlr_gk_set_buf(gk_buf) nlr_gk_set_buf_raw(gk_buf)
 #define nlr_gk_new() {false}
 #define nlr_gk_push(gk_buf) (nlr_gk_push_raw(gk_buf), nlr_push(&(gk_buf)->buf))
 #define nlr_gk_pop(gk_buf) (nlr_gk_pop_raw(gk_buf))
 #define nlr_gk_jump(val) (nlr_gk_jump_raw(val))
-#define nlr_gk_call(expr) (if ()) { nlr_gk_jump(NULL) }
+
+void nlr_gk_set_buf_raw(nlr_gk_buf_t *gk_buf) {
+    if (gk_buf == NULL) {
+        mp_nlr_top = NULL;
+    } else {
+        mp_nlr_top = &gk_buf->buf;
+    }
+}
 
 void nlr_gk_push_raw(nlr_gk_buf_t *gk_buf) {
-    gk_buf->is_used = true;
+    gk_buf->is_working = true;
     
-    nlr_gk_set_buf(NLR_GK_TOP);
     gk_buf->prev = NLR_GK_TOP;
+    nlr_gk_set_buf(gk_buf->prev);
     
     NLR_GK_TOP = gk_buf;
 }
 
 void nlr_gk_pop_raw(nlr_gk_buf_t *gk_buf) {
-    if (gk_buf->is_used) {
+    if (gk_buf->is_working) {
         NLR_GK_TOP = NLR_GK_TOP->prev;
         nlr_gk_set_buf(NLR_GK_TOP);
     }
 }
 
 NORETURN void nlr_gk_jump_raw(void *val) {
+    NLR_GK_TOP->is_working = false;
+    
     nlr_gk_set_buf(NLR_GK_TOP);
+    NLR_GK_TOP = NLR_GK_TOP->prev;
+    
     nlr_jump(val);
 }
 
@@ -321,10 +333,10 @@ JNUPY_REF_CLASS(C4SDY)
 JNUPY_REF_FIELD(F3VA2)
 // METHOD: java/lang/Integer-><init>[(I)V]
 JNUPY_REF_METHOD(MMSNU)
+// METHOD: java/lang/String-><init>[([BIII)V]
+JNUPY_REF_METHOD(M7EEC)
 // METHOD: java/lang/String-><init>[([BIILjava/lang/String;)V]
 JNUPY_REF_METHOD(MT7JN)
-// METHOD: java/lang/String-><init>[([C)V]
-JNUPY_REF_METHOD(MRZFN)
 // METHOD: org/micropython/jnupy/JavaFunction->invoke[(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;]
 JNUPY_REF_METHOD(MEFVT)
 // STATICFIELD: java/lang/Boolean->FALSE[Ljava/lang/Boolean;]
@@ -363,8 +375,8 @@ JNUPY_AP(EXPORT)
 #define JMETHOD_Integer_INIT JNUPY_METHOD("java/lang/Integer", "<init>", "(I)V", MMSNU)
 
 #define JCLASS_String JNUPY_CLASS("java/lang/String", CCHCW)
-#define JMETHOD_String_INIT_str JNUPY_METHOD("java/lang/String", "<init>", "([C)V", MRZFN)
-#define JMETHOD_String_INIT_bytes_with_encoding JNUPY_METHOD("java/lang/String", "<init>", "([BIILjava/lang/String;)V", MT7JN)
+#define JMETHOD_String_INIT_str JNUPY_METHOD("java/lang/String", "<init>", "([BIILjava/lang/String;)V", MT7JN)
+#define JMETHOD_String_INIT_bytes JNUPY_METHOD("java/lang/String", "<init>", "([BIII)V", M7EEC)
 
 #define JOBJECT_TRUE JNUPY_CALL(GetStaticObjectField, JCLASS(Boolean), JSTATICFIELD(Boolean, TRUE))
 #define JOBJECT_FALSE JNUPY_CALL(GetStaticObjectField, JCLASS(Boolean), JSTATICFIELD(Boolean, FALSE))
@@ -398,8 +410,8 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonState", C4SDY)
     JNUPY_LOAD_FIELD("org/micropython/jnupy/PythonState", "mpState", "J", C4SDY, F3VA2)
     JNUPY_LOAD_METHOD("java/lang/Integer", "<init>", "(I)V", CTOBT, MMSNU)
+    JNUPY_LOAD_METHOD("java/lang/String", "<init>", "([BIII)V", CCHCW, M7EEC)
     JNUPY_LOAD_METHOD("java/lang/String", "<init>", "([BIILjava/lang/String;)V", CCHCW, MT7JN)
-    JNUPY_LOAD_METHOD("java/lang/String", "<init>", "([C)V", CCHCW, MRZFN)
     JNUPY_LOAD_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", CRBZE, MEFVT)
     JNUPY_LOAD_STATICFIELD("java/lang/Boolean", "FALSE", "Ljava/lang/Boolean;", CDKHI, SYCJ2)
     JNUPY_LOAD_STATICFIELD("java/lang/Boolean", "TRUE", "Ljava/lang/Boolean;", CDKHI, S3RTH)
@@ -407,6 +419,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 
 	// section for load jany
 	JNUPY_LOAD_ANY(RUTF8, JNUPY_RAW_CALL(NewStringUTF, "utf-8"))
+	// Question: NewStringUTF require NewGlobalRef?
 
 	initialized = 1;
 	} while (false);
@@ -435,8 +448,8 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/PythonState", C4SDY)
     JNUPY_UNLOAD_FIELD("org/micropython/jnupy/PythonState", "mpState", "J", C4SDY, F3VA2)
     JNUPY_UNLOAD_METHOD("java/lang/Integer", "<init>", "(I)V", CTOBT, MMSNU)
+    JNUPY_UNLOAD_METHOD("java/lang/String", "<init>", "([BIII)V", CCHCW, M7EEC)
     JNUPY_UNLOAD_METHOD("java/lang/String", "<init>", "([BIILjava/lang/String;)V", CCHCW, MT7JN)
-    JNUPY_UNLOAD_METHOD("java/lang/String", "<init>", "([C)V", CCHCW, MRZFN)
     JNUPY_UNLOAD_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", CRBZE, MEFVT)
     JNUPY_UNLOAD_STATICFIELD("java/lang/Boolean", "FALSE", "Ljava/lang/Boolean;", CDKHI, SYCJ2)
     JNUPY_UNLOAD_STATICFIELD("java/lang/Boolean", "TRUE", "Ljava/lang/Boolean;", CDKHI, S3RTH)
@@ -636,21 +649,23 @@ STATIC jobject jnupy_obj_py2j(mp_obj_t obj) {
         // TODO: handle big num
         mp_int_t val = mp_obj_int_get_truncated(obj);
         jobj = JNUPY_CALL(NewObject, JCLASS(Integer), JMETHOD(Integer, INIT), val);
-    } else if (MP_OBJ_IS_STR(obj)) {
+    } else if (MP_OBJ_IS_STR_OR_BYTES(obj)) {
         mp_buffer_info_t objbuf;
         mp_get_buffer_raise(obj, &objbuf, MP_BUFFER_READ);
 
         jbyteArray bytearr = JNUPY_CALL(NewByteArray, objbuf.len);
         JNUPY_CALL(SetByteArrayRegion, bytearr, 0, objbuf.len, objbuf.buf);
 
-        jobj = JNUPY_RAW_CALL(NewObject, JCLASS(String), JMETHODV(String, INIT, bytes_with_encoding), bytearr, 0, objbuf.len, JANY(RUTF8));
-        bool has_error = JNUPY_IS_RAW_CALL_HAS_ERROR();
+        if (MP_OBJ_IS_STR(obj)) {
+            jobj = JNUPY_CALL(NewObject, JCLASS(String), JMETHODV(String, INIT, str), bytearr, 0, objbuf.len, JANY(RUTF8));
+        } else {
+            nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "invaild type"));
+            // jobj = JNUPY_CALL(NewObject, JCLASS(String), JMETHODV(String, INIT, bytes), bytearr, 0, objbuf.len);
+        }
 
         JNUPY_CALL(ReleaseByteArrayElements, bytearr, 0, objbuf.len);
-
-        if (has_error) {
-            return NULL;
-        }
+    } else {
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "invaild type"));
     }
 
     return jobj;
