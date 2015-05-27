@@ -363,6 +363,10 @@ block_assign(fc, UNLOAD, unload_block)
 
  
 with open(sys.argv[1], 'w') as fp:
-    fp.write(fc.getvalue())
+    content = fc.getvalue()
+    fp.write(content)
+    
+    if not content.endswith("\n\n"):
+        fp.write("\n")
 
 sys.exit(0)

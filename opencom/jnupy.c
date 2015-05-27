@@ -260,6 +260,7 @@ NORETURN void nlr_gk_jump_raw(void *val) {
 #define JNUPY_FIELD(class_, name, type, id) _JNUPY_REF_ID(id)
 #define JNUPY_STATICMETHOD(class_, name, type, id) _JNUPY_REF_ID(id)
 #define JNUPY_STATICFIELD(class_, name, type, id) _JNUPY_REF_ID(id)
+#define JNUPY_ANY(id) _JNUPY_REF_ID(id)
 
 #define _JNUPY_REF(vtype, id, default) STATIC vtype _JNUPY_REF_ID(id) = default;
 #define JNUPY_REF_CLASS(id) _JNUPY_REF(jclass, id, NULL)
@@ -267,6 +268,7 @@ NORETURN void nlr_gk_jump_raw(void *val) {
 #define JNUPY_REF_FIELD(id) _JNUPY_REF(jfieldID, id, 0)
 #define JNUPY_REF_STATICMETHOD(id) JNUPY_REF_METHOD(id)
 #define JNUPY_REF_STATICFIELD(id) JNUPY_REF_FIELD(id)
+#define JNUPY_REF_ANY(type, id, default) _JNUPY_REF(type, id, default)
 
 #define _JNUPY_LOAD(id, value) if (!(_JNUPY_REF_ID(id) = (value))) break;
 #define JNUPY_LOAD_CLASS(name, id) \
@@ -279,6 +281,8 @@ NORETURN void nlr_gk_jump_raw(void *val) {
     _JNUPY_LOAD(id, JNUPY_RAW_CALL(GetStaticMethodID, _JNUPY_REF_ID(clsid), name, type))
 #define JNUPY_LOAD_STATICFIELD(clsname, name, type, clsid, id) \
     _JNUPY_LOAD(id, JNUPY_RAW_CALL(GetStaticFieldID, _JNUPY_REF_ID(clsid), name, type))
+#define JNUPY_LOAD_ANY(id, stmt) \
+    _JNUPY_LOAD(id, stmt)
 
 #define _JNUPY_UNLOAD(id, value) _JNUPY_REF_ID(id) = value;
 #define JNUPY_UNLOAD_CLASS(name, id) \
@@ -291,6 +295,8 @@ NORETURN void nlr_gk_jump_raw(void *val) {
     _JNUPY_UNLOAD(id, 0)
 #define JNUPY_UNLOAD_STATICFIELD(clsname, name, type, clsid, id) \
     _JNUPY_UNLOAD(id, 0)
+#define JNUPY_UNLOAD_ANY(id, stmt, value) \
+    stmt; _JNUPY_UNLOAD(id, value)
 
 /** JNUPY AUTO PARSER MECRO **/
 #define JNUPY_AP(...)
@@ -301,14 +307,24 @@ JNUPY_AP(REF, START)
 JNUPY_REF_CLASS(CM4H2)
 // CLASS: java/lang/Boolean
 JNUPY_REF_CLASS(CDKHI)
+// CLASS: java/lang/Integer
+JNUPY_REF_CLASS(CTOBT)
 // CLASS: java/lang/Object
 JNUPY_REF_CLASS(CVNFN)
+// CLASS: java/lang/String
+JNUPY_REF_CLASS(CCHCW)
 // CLASS: org/micropython/jnupy/JavaFunction
 JNUPY_REF_CLASS(CRBZE)
 // CLASS: org/micropython/jnupy/PythonState
 JNUPY_REF_CLASS(C4SDY)
 // FIELD: org/micropython/jnupy/PythonState->mpState[J]
 JNUPY_REF_FIELD(F3VA2)
+// METHOD: java/lang/Integer-><init>[(I)V]
+JNUPY_REF_METHOD(MMSNU)
+// METHOD: java/lang/String-><init>[([BIILjava/lang/String;)V]
+JNUPY_REF_METHOD(MT7JN)
+// METHOD: java/lang/String-><init>[([C)V]
+JNUPY_REF_METHOD(MRZFN)
 // METHOD: org/micropython/jnupy/JavaFunction->invoke[(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;]
 JNUPY_REF_METHOD(MEFVT)
 // STATICFIELD: java/lang/Boolean->FALSE[Ljava/lang/Boolean;]
@@ -317,15 +333,20 @@ JNUPY_REF_STATICFIELD(SYCJ2)
 JNUPY_REF_STATICFIELD(S3RTH)
 JNUPY_AP(REF, END)
 
+/** JNI CLASS/VALUE NON-AUTO ANY REFERENCE **/
+JNUPY_REF_ANY(jstring, RUTF8, NULL)
+
 JNUPY_AP(EXPORT)
 
 /** JNI CLASS/VALUE MANUAL REFERENCE MECRO **/
 #define JCLASS(x) JCLASS_##x
 #define JFIELD(x, y) ((void)JCLASS(x), JFIELD_##x##_##y)
 #define JMETHOD(x, y) ((void)JCLASS(x), JMETHOD_##x##_##y)
+#define JMETHODV(x, y, z) ((void)JCLASS(x), JMETHOD_##x##_##y##_##z)
 #define JSTATICFIELD(x, y) ((void)JCLASS(x), JSTATICFIELD_##x##_##y)
 #define JSTATICMETHOD(x, y) ((void)JCLASS(x), JSTATICMETHOD_##x##_##y)
 #define JOBJECT(x) JOBJECT_##x
+#define JANY(x) JNUPY_ANY(x)
 
 /** JNI CLASS/VALUE MANUAL REFERENCE **/
 #define JCLASS_Boolean JNUPY_CLASS("java/lang/Boolean", CDKHI)
@@ -337,6 +358,13 @@ JNUPY_AP(EXPORT)
 
 #define JCLASS_JavaFunction JNUPY_CLASS("org/micropython/jnupy/JavaFunction", CRBZE)
 #define JMETHOD_JavaFunction_invoke JNUPY_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", MEFVT)
+
+#define JCLASS_Integer JNUPY_CLASS("java/lang/Integer", CTOBT)
+#define JMETHOD_Integer_INIT JNUPY_METHOD("java/lang/Integer", "<init>", "(I)V", MMSNU)
+
+#define JCLASS_String JNUPY_CLASS("java/lang/String", CCHCW)
+#define JMETHOD_String_INIT_str JNUPY_METHOD("java/lang/String", "<init>", "([C)V", MRZFN)
+#define JMETHOD_String_INIT_bytes_with_encoding JNUPY_METHOD("java/lang/String", "<init>", "([BIILjava/lang/String;)V", MT7JN)
 
 #define JOBJECT_TRUE JNUPY_CALL(GetStaticObjectField, JCLASS(Boolean), JSTATICFIELD(Boolean, TRUE))
 #define JOBJECT_FALSE JNUPY_CALL(GetStaticObjectField, JCLASS(Boolean), JSTATICFIELD(Boolean, FALSE))
@@ -359,17 +387,27 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 	}
 
 	do {
+    // section for load (DO NOT MODIFY)
     JNUPY_AP(LOAD, START)
     JNUPY_LOAD_CLASS("java/lang/AssertionError", CM4H2)
     JNUPY_LOAD_CLASS("java/lang/Boolean", CDKHI)
+    JNUPY_LOAD_CLASS("java/lang/Integer", CTOBT)
     JNUPY_LOAD_CLASS("java/lang/Object", CVNFN)
+    JNUPY_LOAD_CLASS("java/lang/String", CCHCW)
     JNUPY_LOAD_CLASS("org/micropython/jnupy/JavaFunction", CRBZE)
     JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonState", C4SDY)
     JNUPY_LOAD_FIELD("org/micropython/jnupy/PythonState", "mpState", "J", C4SDY, F3VA2)
+    JNUPY_LOAD_METHOD("java/lang/Integer", "<init>", "(I)V", CTOBT, MMSNU)
+    JNUPY_LOAD_METHOD("java/lang/String", "<init>", "([BIILjava/lang/String;)V", CCHCW, MT7JN)
+    JNUPY_LOAD_METHOD("java/lang/String", "<init>", "([C)V", CCHCW, MRZFN)
     JNUPY_LOAD_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", CRBZE, MEFVT)
     JNUPY_LOAD_STATICFIELD("java/lang/Boolean", "FALSE", "Ljava/lang/Boolean;", CDKHI, SYCJ2)
     JNUPY_LOAD_STATICFIELD("java/lang/Boolean", "TRUE", "Ljava/lang/Boolean;", CDKHI, S3RTH)
 	JNUPY_AP(LOAD, END)
+
+	// section for load jany
+	JNUPY_LOAD_ANY(RUTF8, JNUPY_RAW_CALL(NewStringUTF, "utf-8"))
+
 	initialized = 1;
 	} while (false);
 
@@ -386,17 +424,27 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
 	initialized = 0;
 
 	do {
+    // section for unload (DO NOT MODIFY)
     JNUPY_AP(UNLOAD, START)
     JNUPY_UNLOAD_CLASS("java/lang/AssertionError", CM4H2)
     JNUPY_UNLOAD_CLASS("java/lang/Boolean", CDKHI)
+    JNUPY_UNLOAD_CLASS("java/lang/Integer", CTOBT)
     JNUPY_UNLOAD_CLASS("java/lang/Object", CVNFN)
+    JNUPY_UNLOAD_CLASS("java/lang/String", CCHCW)
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/JavaFunction", CRBZE)
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/PythonState", C4SDY)
     JNUPY_UNLOAD_FIELD("org/micropython/jnupy/PythonState", "mpState", "J", C4SDY, F3VA2)
+    JNUPY_UNLOAD_METHOD("java/lang/Integer", "<init>", "(I)V", CTOBT, MMSNU)
+    JNUPY_UNLOAD_METHOD("java/lang/String", "<init>", "([BIILjava/lang/String;)V", CCHCW, MT7JN)
+    JNUPY_UNLOAD_METHOD("java/lang/String", "<init>", "([C)V", CCHCW, MRZFN)
     JNUPY_UNLOAD_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", CRBZE, MEFVT)
     JNUPY_UNLOAD_STATICFIELD("java/lang/Boolean", "FALSE", "Ljava/lang/Boolean;", CDKHI, SYCJ2)
     JNUPY_UNLOAD_STATICFIELD("java/lang/Boolean", "TRUE", "Ljava/lang/Boolean;", CDKHI, S3RTH)
 	JNUPY_AP(UNLOAD, END)
+
+	// section for unload jany
+	JNUPY_UNLOAD_ANY(RUTF8, JNUPY_RAW_CALL(ReleaseStringUTFChars, JANY(RUTF8), NULL), 0)
+
 	} while (false);
 
 	return;
@@ -578,12 +626,33 @@ STATIC jobject jnupy_obj_py2j(mp_obj_t obj) {
     } else if (obj == mp_const_none) {
         jobj = NULL;
     } else if (obj == mp_const_true) {
-        jobj = NULL;
+        jobj = JOBJECT_TRUE;
     } else if (obj == mp_const_false) {
-        jobj = NULL;
+        jobj = JOBJECT_FALSE;
+    } else if (MP_OBJ_IS_SMALL_INT(obj)) {
+        mp_int_t val = MP_OBJ_SMALL_INT_VALUE(obj);
+        jobj = JNUPY_CALL(NewObject, JCLASS(Integer), JMETHOD(Integer, INIT), val);
+    } else if (MP_OBJ_IS_INT(obj)) {
+        // TODO: handle big num
+        mp_int_t val = mp_obj_int_get_truncated(obj);
+        jobj = JNUPY_CALL(NewObject, JCLASS(Integer), JMETHOD(Integer, INIT), val);
+    } else if (MP_OBJ_IS_STR(obj)) {
+        mp_buffer_info_t objbuf;
+        mp_get_buffer_raise(obj, &objbuf, MP_BUFFER_READ);
+
+        jbyteArray bytearr = JNUPY_CALL(NewByteArray, objbuf.len);
+        JNUPY_CALL(SetByteArrayRegion, bytearr, 0, objbuf.len, objbuf.buf);
+
+        jobj = JNUPY_RAW_CALL(NewObject, JCLASS(String), JMETHODV(String, INIT, bytes_with_encoding), bytearr, 0, objbuf.len, JANY(RUTF8));
+        bool has_error = JNUPY_IS_RAW_CALL_HAS_ERROR();
+
+        JNUPY_CALL(ReleaseByteArrayElements, bytearr, 0, objbuf.len);
+
+        if (has_error) {
+            return NULL;
+        }
     }
 
-    return JOBJECT_TRUE;
     return jobj;
 }
 

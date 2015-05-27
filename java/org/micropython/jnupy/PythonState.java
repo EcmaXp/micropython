@@ -38,19 +38,16 @@ public class PythonState {
 		py.mp_state_new();
 		py.mp_test_jni_state();		
 		py.mp_test_jni();
-		py.mp_code_exec("print(3, 2)");
 		py.mp_put_java_func(new JavaFunction() {
 			@Override
 			public Object invoke(PythonState pythonState, Object ... args) {
-				System.out.println("Success!");
 			    for (Object o : args) {
 			        System.out.println(o);
 			    }
-			    System.out.println("Success?");
 				return "?";
 			}
 		});
-		py.mp_code_exec("print(last_jfunc(1, True, None, '3'))");
+		py.mp_code_exec("print(last_jfunc(321, True, None, 'hello 안녕'))");
 	}
 	
 	public static final int APIVERSION = 1;
@@ -83,11 +80,4 @@ public class PythonState {
 	public native boolean mp_code_exec(String nope);
 	public native void mp_put_java_func(JavaFunction jfunc);
 	
-	public boolean Boolean(boolean value) {
-		return false;
-	}
-	
-	public Object invoke(PythonState pythonState, Object... args) {
-		return 0;
-	}
 }
