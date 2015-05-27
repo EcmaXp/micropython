@@ -25,6 +25,7 @@
  */
 
 package org.micropython.jnupy;
+import java.io.ByteArrayInputStream;
 
 public class PythonState {
     static {
@@ -38,7 +39,7 @@ public class PythonState {
 		
 		PythonState py = new PythonState();
 		py.mp_state_new();
-		py.mp_test_jni_state();		
+		py.mp_test_jni_state();
 		py.mp_test_jni();
 		py.mp_put_java_func(new JavaFunction() {
 			@Override
@@ -49,7 +50,7 @@ public class PythonState {
 				return "?";
 			}
 		});
-		py.mp_code_exec("print(last_jfunc(321, True, None, b'hello 안녕'))");
+		py.mp_code_exec("print(last_jfunc(321, True, None, '안녕!'))");
 	}
 	
 	public static final int APIVERSION = 1;
