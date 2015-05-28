@@ -25,6 +25,7 @@
  */
 
 /** ref: ../java/org/micropython/jnupy/PythonState.java **/
+// TODO: Support JSR 223? (not in jnupy.c)
 
 /** JNLUA-LICENSE
 Copyright (C) 2008,2012 Andre Naef
@@ -317,6 +318,8 @@ NORETURN void nlr_gk_jump_raw(void *val) {
 JNUPY_AP(REF, START)
 // CLASS: java/io/ByteArrayInputStream
 JNUPY_REF_CLASS(CPYWG)
+// CLASS: java/io/ByteArrayOutputStream
+JNUPY_REF_CLASS(CPITF)
 // CLASS: java/lang/AssertionError
 JNUPY_REF_CLASS(CM4H2)
 // CLASS: java/lang/Boolean
@@ -335,10 +338,16 @@ JNUPY_REF_CLASS(C4SDY)
 JNUPY_REF_FIELD(F3VA2)
 // METHOD: java/io/ByteArrayInputStream-><init>[([B)V]
 JNUPY_REF_METHOD(MUZ6M)
+// METHOD: java/io/ByteArrayOutputStream->toByteArray[()[B]
+JNUPY_REF_METHOD(MHUAS)
+// METHOD: java/lang/Boolean->booleanValue[()Z]
+JNUPY_REF_METHOD(ME2HS)
 // METHOD: java/lang/Integer-><init>[(I)V]
 JNUPY_REF_METHOD(MMSNU)
 // METHOD: java/lang/String-><init>[([BIILjava/lang/String;)V]
 JNUPY_REF_METHOD(MT7JN)
+// METHOD: java/lang/String->getBytes[(Ljava/lang/String;)[B]
+JNUPY_REF_METHOD(MNONY)
 // METHOD: org/micropython/jnupy/JavaFunction->invoke[(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;]
 JNUPY_REF_METHOD(MEFVT)
 // STATICFIELD: java/lang/Boolean->FALSE[Ljava/lang/Boolean;]
@@ -364,6 +373,7 @@ JNUPY_AP(EXPORT)
 
 /** JNI CLASS/VALUE MANUAL REFERENCE **/
 #define JCLASS_Boolean JNUPY_CLASS("java/lang/Boolean", CDKHI)
+#define JMETHOD_Boolean_booleanValue JNUPY_METHOD("java/lang/Boolean", "booleanValue", "()Z", ME2HS)
 #define JSTATICFIELD_Boolean_TRUE JNUPY_STATICFIELD("java/lang/Boolean", "TRUE", "Ljava/lang/Boolean;", S3RTH)
 #define JSTATICFIELD_Boolean_FALSE JNUPY_STATICFIELD("java/lang/Boolean", "FALSE", "Ljava/lang/Boolean;", SYCJ2)
 
@@ -378,9 +388,13 @@ JNUPY_AP(EXPORT)
 
 #define JCLASS_String JNUPY_CLASS("java/lang/String", CCHCW)
 #define JMETHOD_String_INIT_str JNUPY_METHOD("java/lang/String", "<init>", "([BIILjava/lang/String;)V", MT7JN)
+#define JMETHOD_String_getBytes JNUPY_METHOD("java/lang/String", "getBytes", "(Ljava/lang/String;)[B", MNONY)
 
 #define JCLASS_ByteArrayInputStream JNUPY_CLASS("java/io/ByteArrayInputStream", CPYWG)
 #define JMETHOD_ByteArrayInputStream_INIT JNUPY_METHOD("java/io/ByteArrayInputStream", "<init>", "([B)V", MUZ6M)
+
+#define JCLASS_ByteArrayOutputStream JNUPY_CLASS("java/io/ByteArrayOutputStream", CPITF)
+#define JMETHOD_ByteArrayOutputStream_toByteArray JNUPY_METHOD("java/io/ByteArrayOutputStream", "toByteArray", "()[B", MHUAS)
 
 #define JOBJECT_TRUE JNUPY_CALL(GetStaticObjectField, JCLASS(Boolean), JSTATICFIELD(Boolean, TRUE))
 #define JOBJECT_FALSE JNUPY_CALL(GetStaticObjectField, JCLASS(Boolean), JSTATICFIELD(Boolean, FALSE))
@@ -406,6 +420,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     // section for load (DO NOT MODIFY)
     JNUPY_AP(LOAD, START)
     JNUPY_LOAD_CLASS("java/io/ByteArrayInputStream", CPYWG)
+    JNUPY_LOAD_CLASS("java/io/ByteArrayOutputStream", CPITF)
     JNUPY_LOAD_CLASS("java/lang/AssertionError", CM4H2)
     JNUPY_LOAD_CLASS("java/lang/Boolean", CDKHI)
     JNUPY_LOAD_CLASS("java/lang/Integer", CTOBT)
@@ -415,8 +430,11 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonState", C4SDY)
     JNUPY_LOAD_FIELD("org/micropython/jnupy/PythonState", "mpState", "J", C4SDY, F3VA2)
     JNUPY_LOAD_METHOD("java/io/ByteArrayInputStream", "<init>", "([B)V", CPYWG, MUZ6M)
+    JNUPY_LOAD_METHOD("java/io/ByteArrayOutputStream", "toByteArray", "()[B", CPITF, MHUAS)
+    JNUPY_LOAD_METHOD("java/lang/Boolean", "booleanValue", "()Z", CDKHI, ME2HS)
     JNUPY_LOAD_METHOD("java/lang/Integer", "<init>", "(I)V", CTOBT, MMSNU)
     JNUPY_LOAD_METHOD("java/lang/String", "<init>", "([BIILjava/lang/String;)V", CCHCW, MT7JN)
+    JNUPY_LOAD_METHOD("java/lang/String", "getBytes", "(Ljava/lang/String;)[B", CCHCW, MNONY)
     JNUPY_LOAD_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", CRBZE, MEFVT)
     JNUPY_LOAD_STATICFIELD("java/lang/Boolean", "FALSE", "Ljava/lang/Boolean;", CDKHI, SYCJ2)
     JNUPY_LOAD_STATICFIELD("java/lang/Boolean", "TRUE", "Ljava/lang/Boolean;", CDKHI, S3RTH)
@@ -445,6 +463,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     // section for unload (DO NOT MODIFY)
     JNUPY_AP(UNLOAD, START)
     JNUPY_UNLOAD_CLASS("java/io/ByteArrayInputStream", CPYWG)
+    JNUPY_UNLOAD_CLASS("java/io/ByteArrayOutputStream", CPITF)
     JNUPY_UNLOAD_CLASS("java/lang/AssertionError", CM4H2)
     JNUPY_UNLOAD_CLASS("java/lang/Boolean", CDKHI)
     JNUPY_UNLOAD_CLASS("java/lang/Integer", CTOBT)
@@ -454,8 +473,11 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/PythonState", C4SDY)
     JNUPY_UNLOAD_FIELD("org/micropython/jnupy/PythonState", "mpState", "J", C4SDY, F3VA2)
     JNUPY_UNLOAD_METHOD("java/io/ByteArrayInputStream", "<init>", "([B)V", CPYWG, MUZ6M)
+    JNUPY_UNLOAD_METHOD("java/io/ByteArrayOutputStream", "toByteArray", "()[B", CPITF, MHUAS)
+    JNUPY_UNLOAD_METHOD("java/lang/Boolean", "booleanValue", "()Z", CDKHI, ME2HS)
     JNUPY_UNLOAD_METHOD("java/lang/Integer", "<init>", "(I)V", CTOBT, MMSNU)
     JNUPY_UNLOAD_METHOD("java/lang/String", "<init>", "([BIILjava/lang/String;)V", CCHCW, MT7JN)
+    JNUPY_UNLOAD_METHOD("java/lang/String", "getBytes", "(Ljava/lang/String;)[B", CCHCW, MNONY)
     JNUPY_UNLOAD_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", CRBZE, MEFVT)
     JNUPY_UNLOAD_STATICFIELD("java/lang/Boolean", "FALSE", "Ljava/lang/Boolean;", CDKHI, SYCJ2)
     JNUPY_UNLOAD_STATICFIELD("java/lang/Boolean", "TRUE", "Ljava/lang/Boolean;", CDKHI, S3RTH)
@@ -616,73 +638,102 @@ void nlr_jump_fail(void *val) {
 const mp_obj_type_t mp_type_jfunc;
 typedef struct _mp_obj_jfunc_t {
     mp_obj_base_t base;
+    mp_obj_t name;
     jobject jfunc;
 } mp_obj_jfunc_t;
 
-STATIC mp_obj_t jfunc_new(jobject jfunc) {
+STATIC mp_obj_t jfunc_new(mp_obj_t name, jobject jfunc) {
     mp_obj_jfunc_t *o = m_new_obj_with_finaliser(mp_obj_jfunc_t);
     o->base.type = &mp_type_jfunc;
+    o->name = name;
     o->jfunc = JNUPY_CALL(NewGlobalRef, jfunc);
 
     return o;
 }
 
 // TODO: check modmsgpack.c will help coding!
-
+#define IsInstanceOf(obj, class_) (JNUPY_RAW_CALL(IsInstanceOf, obj, class_) == JNI_TRUE)
 STATIC mp_obj_t jnupy_obj_j2py(jobject obj) {
-    // mp_obj_t pobj = mp_const_none;
-    // jclass cls = JNUPY_CALL(GetObjectClass, jobj);
-    
-    // TODO: check class and convert!
-    // http://stackoverflow.com/questions/12719766/can-i-know-the-name-of-the-class-that-calls-a-jni-c-method
-    
-    JNIEnv *env = JNUPY_ENV;
-    jclass cls = (*env)->GetObjectClass(env, obj);
+    // TODO: warp handler for java exception
+    bool is_str = false, is_bytes = false;
 
-    // First get the class object
-    jmethodID mid = (*env)->GetMethodID(env, cls, "getClass", "()Ljava/lang/Class;");
-    jobject clsObj = (*env)->CallObjectMethod(env, obj, mid);
+    if (0) {
+    } else if (obj == NULL) {
+        return mp_const_none;
+    } else if (IsInstanceOf(obj, JCLASS(Boolean))) {
+        jboolean val = JNUPY_CALL(CallBooleanMethod, obj, JMETHOD(Boolean, booleanValue));
 
-    // Now get the class object's class descriptor
-    cls = (*env)->GetObjectClass(env, clsObj);
+        if (val == JNI_TRUE) {
+            return mp_const_true;
+        } else if (val == JNI_FALSE) {
+            return mp_const_false;
+        }
 
-    // Find the getName() method on the class object
-    mid = (*env)->GetMethodID(env, cls, "getName", "()Ljava/lang/String;");
+        assert(! "invaild control flow");
+    } else if (0) {
+        // TODO: handle int
+    } else if (0) {
+        // TODO: handle long
+    } else if (0) {
+        // TODO: handle float
+    } else if ((is_str = IsInstanceOf(obj, JCLASS(String))) || \
+               (is_bytes = IsInstanceOf(obj, JCLASS(ByteArrayOutputStream)))) {
+        jarray bytearr = NULL;
+        if (is_str) {
+            bytearr = (jarray)JNUPY_CALL(CallObjectMethod, obj, JMETHOD(String, getBytes), JANY(RUTF8));
+        } else {
+            bytearr = (jarray)JNUPY_CALL(CallObjectMethod, obj, JMETHOD(ByteArrayOutputStream, toByteArray));
+        }
 
-    // Call the getName() to get a jstring object back
-    jstring strObj = (jstring)(*env)->CallObjectMethod(env, clsObj, mid);
+        jsize arrsize = JNUPY_CALL(GetArrayLength, bytearr);
+        jbyte *buf = malloc(arrsize);
 
-    // Now get the c string from the java jstring object
-    const char* str = (*env)->GetStringUTFChars(env, strObj, NULL);
+        JNUPY_CALL(GetByteArrayRegion, bytearr, 0, arrsize, buf);
 
-    // Print the class name
-    printf("\nCalling class is: %s\n", str);
+        mp_obj_t pobj = MP_OBJ_NULL;
+        if (is_str) {
+            pobj = mp_obj_new_str((char *)buf, arrsize, false);
+        } else {
+            pobj = mp_obj_new_bytes((byte *)buf, arrsize);
+        }
 
-    // Release the memory pinned char array
-    (*env)->ReleaseStringUTFChars(env, strObj, str);
+        JNUPY_CALL(ReleaseByteArrayElements, bytearr, buf, 0);
 
-    // java/lang/Boolean
+        return pobj;
+    } else if (0) {
+        // TODO: handle array
+        // (Entry? no way...)
+    } else if (0) {
+        // TODO: handle dictionary
+    } else if (0) {
+        // TODO: handle set?
+    } else {
+        // TODO: handle raw java object? (only allowed for warpped object?)
+        // ...
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "invaild type (java object to python object)"));
+    }
 
-    return mp_const_none;
+    // TODO: raise error...
+    nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "invaild value (java object to python object)"));
 }
+#undef IsInstanceOf
 
 STATIC jobject jnupy_obj_py2j(mp_obj_t obj) {
-    jobject jobj = NULL;
 
     if (0) {
     } else if (obj == mp_const_none) {
-        jobj = NULL;
+        return NULL;
     } else if (obj == mp_const_true) {
-        jobj = JOBJECT_TRUE;
+        return JOBJECT_TRUE;
     } else if (obj == mp_const_false) {
-        jobj = JOBJECT_FALSE;
+        return JOBJECT_FALSE;
     } else if (MP_OBJ_IS_SMALL_INT(obj)) {
         mp_int_t val = MP_OBJ_SMALL_INT_VALUE(obj);
-        jobj = JNUPY_CALL(NewObject, JCLASS(Integer), JMETHOD(Integer, INIT), val);
+        return JNUPY_CALL(NewObject, JCLASS(Integer), JMETHOD(Integer, INIT), val);
     } else if (MP_OBJ_IS_INT(obj)) {
         // TODO: handle big num
         mp_int_t val = mp_obj_int_get_truncated(obj);
-        jobj = JNUPY_CALL(NewObject, JCLASS(Integer), JMETHOD(Integer, INIT), val);
+        return JNUPY_CALL(NewObject, JCLASS(Integer), JMETHOD(Integer, INIT), val);
     } else if (0) {
         // TODO: handle float
     } else if (MP_OBJ_IS_STR_OR_BYTES(obj)) {
@@ -692,13 +743,15 @@ STATIC jobject jnupy_obj_py2j(mp_obj_t obj) {
         jbyteArray bytearr = JNUPY_CALL(NewByteArray, objbuf.len);
         JNUPY_CALL(SetByteArrayRegion, bytearr, 0, objbuf.len, objbuf.buf);
 
+        jobject jobj;
         if (MP_OBJ_IS_STR(obj)) {
             jobj = JNUPY_CALL(NewObject, JCLASS(String), JMETHODV(String, INIT, str), bytearr, 0, objbuf.len, JANY(RUTF8));
         } else {
             jobj = JNUPY_CALL(NewObject, JCLASS(ByteArrayInputStream), JMETHOD(ByteArrayInputStream, INIT), bytearr);
         }
 
-        JNUPY_CALL(ReleaseByteArrayElements, bytearr, 0, objbuf.len);
+        JNUPY_CALL(ReleaseByteArrayElements, bytearr, NULL, JNI_ABORT);
+        return jobj;
     } else if (0) {
         // TODO: handle tuple, list
     } else if (0) {
@@ -706,10 +759,10 @@ STATIC jobject jnupy_obj_py2j(mp_obj_t obj) {
     } else if (0) {
         // TODO: handle set?
     } else {
-        nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "invaild type"));
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "invaild type (python object to java object)"));
     }
 
-    return jobj;
+    nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "invaild value (python object to java object)"));
 }
 
 STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
@@ -717,6 +770,7 @@ STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, c
     mp_obj_jfunc_t *o = self_in;
 
     // TODO: if argument convert provided by keyword value, convert by custom converter...
+    // TODO: more detail value convert required.
 
     jobjectArray jargs = JNUPY_CALL(NewObjectArray, n_args, JNUPY_CLASS("java/lang/Object", CVNFN), NULL);
 
@@ -725,19 +779,42 @@ STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, c
     }
 
 	jobject jresult = JNUPY_RAW_CALL(CallObjectMethod, o->jfunc, JMETHOD(JavaFunction, invoke), JNUPY_SELF, jargs);
-	if (JNUPY_IS_RAW_CALL_HAS_ERROR()) {
+    jthrowable error = JNUPY_IS_RAW_CALL_HAS_ERROR();
+	if (error) {
 	    // just throw java error, export to jnupy.
-		nlr_raise(mp_obj_new_exception(&mp_type_RuntimeError));
+	    // and if error are not captured by python, raise it to java...?
+	    // TODO: how to handle JavaError? ...
+		nlr_raise(mp_obj_new_exception_msg(&mp_type_RuntimeError, "error raised from java"));
 	}
 
 	return jnupy_obj_j2py(jresult);
 }
 
+STATIC void jfunc_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
+    mp_obj_jfunc_t *self = self_in;
+
+    if (dest[0] != MP_OBJ_NULL) {
+        // not load attribute
+        return;
+    }
+    if (attr == MP_QSTR___name__) {
+        dest[0] = self->name;
+    }
+}
+
+#if MICROPY_CPYTHON_COMPAT
+STATIC void jfunc_print(const mp_print_t *print, mp_obj_t o_in, mp_print_kind_t kind) {
+    mp_obj_jfunc_t *o = o_in;
+
+    mp_print_str(print, "<JFunction ");
+    mp_obj_print_helper(print, o->name, kind);
+    mp_print_str(print, ">");
+}
+#endif
+
 STATIC mp_obj_t jfunc_del(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
     mp_obj_jfunc_t *o = self_in;
-
     JNUPY_CALL(DeleteGlobalRef, o->jfunc);
-    printf("success delete;\n");
 
     return mp_const_none;
 }
@@ -754,20 +831,24 @@ const mp_obj_type_t mp_type_jfunc = {
     { &mp_type_type },
     .name = MP_QSTR_JFunction,
     .call = jfunc_call,
+    .attr = jfunc_attr,
+    #if MICROPY_CPYTHON_COMPAT
+    .print = jfunc_print,
+    #endif
     .locals_dict = (mp_obj_t)&jfunc_locals_dict,
 };
 
-STATIC const mp_map_elem_t mp_module_jnupy_globals_table[] = {
+STATIC const mp_map_elem_t mp_module_ujnupy_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_micropython) },
     { MP_OBJ_NEW_QSTR(MP_QSTR_JFunction), (mp_obj_t)&mp_type_jfunc },
 };
 
-STATIC MP_DEFINE_CONST_DICT(mp_module_jnupy_globals, mp_module_jnupy_globals_table);
+STATIC MP_DEFINE_CONST_DICT(mp_module_ujnupy_globals, mp_module_ujnupy_globals_table);
 
 const mp_obj_module_t mp_module_jnupy = {
     .base = { &mp_type_module },
-    .name = MP_QSTR_jnupy,
-    .globals = (mp_obj_dict_t*)&mp_module_jnupy_globals,
+    .name = MP_QSTR_ujnupy,
+    .globals = (mp_obj_dict_t*)&mp_module_ujnupy_globals,
 };
 
 /** JNI EXPORT FUNCTION MECRO **/
@@ -829,16 +910,6 @@ JNUPY_FUNC_DEF(void, mp_1test_1jni_1state)
     JNUPY_FUNC_END_VOID;
 }
 
-JNUPY_FUNC_DEF(void, mp_1put_1java_1func)
-    (JNIEnv *env, jobject self, jobject jfunc) {
-    JNUPY_FUNC_START_WITH_STATE;
-
-    mp_obj_t jfunc_obj = jfunc_new(jfunc);
-    mp_obj_subscr(mp_globals_get(), MP_OBJ_NEW_QSTR(MP_QSTR_last_jfunc), jfunc_obj);
-
-    JNUPY_FUNC_END_VOID;
-}
-
 JNUPY_FUNC_DEF(jboolean, mp_1state_1new)
     (JNIEnv *env, jobject self) {
     JNUPY_FUNC_START;
@@ -878,6 +949,11 @@ JNUPY_FUNC_DEF(jboolean, mp_1state_1new)
 
         mp_obj_list_init(mp_sys_path, 0);
         mp_obj_list_init(mp_sys_argv, 0);
+
+        mp_obj_module_t *module_jnupy = mp_obj_new_module(MP_QSTR_jnupy);
+        mp_obj_dict_t *module_jnupy_dict = mp_call_function_0(mp_load_attr(mp_module_jnupy.globals, MP_QSTR_copy));
+        mp_obj_dict_store(module_jnupy_dict, MP_OBJ_NEW_QSTR(MP_QSTR_jfuncs), mp_obj_new_dict(0));
+        module_jnupy->globals = module_jnupy_dict;
 
         mp_state_store(state);
         JNUPY_CALL(SetLongField, JNUPY_SELF, JFIELD(PythonState, mpState), (mp_uint_t)state);
@@ -941,15 +1017,14 @@ JNUPY_FUNC_DEF(jboolean, mp_1code_1exec)
 
     nlr_buf_t nlr;
     if (nlr_push(&nlr) == 0) {
-        char *filename = "<CODE>";
-        const char *codebuf = (*env)->GetStringUTFChars(env, code, 0);
+        const char *name = "<CODE from JAVA>";
+        const char *codebuf = JNUPY_CALL(GetStringUTFChars, code, 0);
 
         vstr_t *vstr = vstr_new();
         vstr_add_str(vstr, codebuf);
+        JNUPY_CALL(ReleaseStringUTFChars, code, codebuf);
 
-        (*env)->ReleaseStringUTFChars(env, code, codebuf);
-
-        mp_lexer_t *lex = mp_lexer_new_from_vstr(filename, vstr);
+        mp_lexer_t *lex = mp_lexer_new_from_vstr(name, vstr);
         if (lex == NULL) {
             return JNI_FALSE;
         }
@@ -964,15 +1039,43 @@ JNUPY_FUNC_DEF(jboolean, mp_1code_1exec)
         }
 
         mp_call_function_0(module_fun);
+        
         nlr_pop();
-
         return JNI_TRUE;
     } else {
+        // TODO: how to handle exception on java side?
         mp_obj_print_exception(&mp_plat_print, nlr.ret_val);
         return JNI_FALSE;
     }
 
     JNUPY_FUNC_END;
+}
+
+JNUPY_FUNC_DEF(jboolean, mp_1jfunc_1set)
+    (JNIEnv *env, jobject self, jstring name, jobject jfunc) {
+    JNUPY_FUNC_START_WITH_STATE;
+
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) == 0) {
+        const char *namebuf = JNUPY_CALL(GetStringUTFChars, name, 0);
+        mp_obj_t name_obj = mp_obj_new_str(namebuf, strlen(namebuf), true);
+        JNUPY_CALL(ReleaseStringUTFChars, name, namebuf);
+
+        mp_obj_t jfunc_obj = jfunc_new(name_obj, jfunc);
+
+        mp_obj_t module_jnupy = mp_module_get(MP_QSTR_jnupy);
+        mp_obj_t jfuncs_dict = mp_load_attr(module_jnupy, MP_QSTR_jfuncs);
+        mp_obj_subscr(jfuncs_dict, name_obj, jfunc_obj);
+
+        nlr_pop();
+        return JNI_TRUE;
+    } else {
+        // TODO: how to handle exception on java side?
+        mp_obj_print_exception(&mp_plat_print, nlr.ret_val);
+        return JNI_FALSE;
+    }
+
+    JNUPY_FUNC_END_VALUE(JNI_FALSE);
 }
 
 /** JNI EXPORT FUNCTION MECRO CLNEAUP **/

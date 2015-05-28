@@ -150,5 +150,6 @@ Q(test2)
 
 // jnupy
 Q(jnupy)
+Q(ujnupy)
 Q(JFunction)
-Q(last_jfunc)
+Q(jfuncs)

@@ -41,16 +41,18 @@ public class PythonState {
 		py.mp_state_new();
 		py.mp_test_jni_state();
 		py.mp_test_jni();
-		py.mp_put_java_func(new JavaFunction() {
+		py.mp_jfunc_set("hello", new JavaFunction() {
 			@Override
 			public Object invoke(PythonState pythonState, Object ... args) {
 			    for (Object o : args) {
 			        System.out.println(o);
 			    }
-				return "?";
+				return true;
 			}
 		});
-		py.mp_code_exec("print(last_jfunc(321, True, None, '안녕!'))");
+		py.mp_code_exec("from jnupy import jfuncs");
+		py.mp_code_exec("print(jfuncs)");
+		py.mp_code_exec("print('[', jfuncs['hello'](321, True, None, '안녕!'), ']')");
 	}
 	
 	public static final int APIVERSION = 1;
@@ -60,6 +62,7 @@ public class PythonState {
 	
 	public PythonState() {
 		System.out.println("PythonState are generated.");
+		mp_state_new();
 		System.out.println(mpState);
 	}
 	
@@ -81,6 +84,6 @@ public class PythonState {
 	public native boolean mp_state_exist();
 	public native boolean mp_state_check();
 	public native boolean mp_code_exec(String nope);
-	public native void mp_put_java_func(JavaFunction jfunc);
+	public native boolean mp_jfunc_set(String name, JavaFunction jfunc);
 	
 }
