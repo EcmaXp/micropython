@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2014 Damien P. George
+ * Copyright (c) 2015 Damien P. George
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,11 +24,16 @@
  * THE SOFTWARE.
  */
 
-#define PYB_CAN_1 (1)
-#define PYB_CAN_2 (2)
+#ifndef CHAR_CTRL_C
+#define CHAR_CTRL_C (3)
+#endif
 
-extern const mp_obj_type_t pyb_can_type;
+void mp_hal_set_interrupt_char(char c);
 
-void can_init0(void);
-void can_deinit(void);
-void can_rx_irq_handler(uint can_id, uint fifo_id);
+void mp_hal_stdio_mode_raw(void);
+void mp_hal_stdio_mode_orig(void);
+
+int mp_hal_stdin_rx_chr(void);
+void mp_hal_stdout_tx_str(const char *str);
+void mp_hal_stdout_tx_strn(const char *str, mp_uint_t len);
+void mp_hal_stdout_tx_strn_cooked(const char *str, mp_uint_t len);

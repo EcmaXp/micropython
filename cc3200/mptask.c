@@ -105,7 +105,6 @@ void TASK_Micropython (void *pvParameters) {
     uint32_t sp = gc_helper_get_sp();
     gc_collect_init (sp);
     bool safeboot = false;
-    FRESULT res;
 
     mptask_pre_init();
 
@@ -140,8 +139,8 @@ soft_reset:
 #ifdef LAUNCHXL
     // configure the stdio uart pins with the correct alternate functions
     // param 3 ("mode") is DON'T CARE" for AFs others than GPIO
-    pin_config ((pin_obj_t *)&pin_GPIO1, PIN_MODE_3, 0, PIN_TYPE_STD_PU, PIN_STRENGTH_2MA);
-    pin_config ((pin_obj_t *)&pin_GPIO2, PIN_MODE_3, 0, PIN_TYPE_STD_PU, PIN_STRENGTH_2MA);
+    pin_config ((pin_obj_t *)&MICROPY_STDIO_UART_TX_PIN, MICROPY_STDIO_UART_TX_PIN_AF, 0, PIN_TYPE_STD_PU, PIN_STRENGTH_2MA);
+    pin_config ((pin_obj_t *)&MICROPY_STDIO_UART_RX_PIN, MICROPY_STDIO_UART_RX_PIN_AF, 0, PIN_TYPE_STD_PU, PIN_STRENGTH_2MA);
     // instantiate the stdio uart
     mp_obj_t args[2] = {
             mp_obj_new_int(MICROPY_STDIO_UART),
@@ -184,18 +183,14 @@ soft_reset:
     MP_STATE_PORT(pyb_config_main) = MP_OBJ_NULL;
 
     if (!safeboot) {
-        // run boot.py, if it exists
-        const char *boot_py = "boot.py";
-        res = f_stat(boot_py, NULL);
-        if (res == FR_OK) {
-            int ret = pyexec_file(boot_py);
-            if (ret & PYEXEC_FORCED_EXIT) {
-                goto soft_reset_exit;
-            }
-            if (!ret) {
-                // flash the system led
-                mperror_signal_error();
-            }
+        // run boot.py
+        int ret = pyexec_file("boot.py");
+        if (ret & PYEXEC_FORCED_EXIT) {
+            goto soft_reset_exit;
+        }
+        if (!ret) {
+            // flash the system led
+            mperror_signal_error();
         }
     }
 
@@ -214,16 +209,13 @@ soft_reset:
             } else {
                 main_py = mp_obj_str_get_str(MP_STATE_PORT(pyb_config_main));
             }
-            res = f_stat(main_py, NULL);
-            if (res == FR_OK) {
-                int ret = pyexec_file(main_py);
-                if (ret & PYEXEC_FORCED_EXIT) {
-                    goto soft_reset_exit;
-                }
-                if (!ret) {
-                    // flash the system led
-                    mperror_signal_error();
-                }
+            int ret = pyexec_file(main_py);
+            if (ret & PYEXEC_FORCED_EXIT) {
+                goto soft_reset_exit;
+            }
+            if (!ret) {
+                // flash the system led
+                mperror_signal_error();
             }
         }
     }

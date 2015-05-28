@@ -160,6 +160,8 @@ Q(FLOW_TXRX)
 
 // for I2C class
 Q(I2C)
+Q(mode)
+Q(baudrate)
 Q(addr)
 Q(data)
 Q(memaddr)
@@ -172,6 +174,7 @@ Q(send)
 Q(recv)
 Q(mem_read)
 Q(mem_write)
+Q(MASTER)
 
 // for ADC class
 Q(ADC)
@@ -272,7 +275,6 @@ Q(WPS_PIN)
 
 // for WDT class
 Q(WDT)
-Q(enable)
 Q(kick)
 
 // for HeartBeat class
@@ -312,15 +314,18 @@ Q(RTC_WAKE)
 
 // for SPI class
 Q(SPI)
+Q(mode)
 Q(baudrate)
 Q(bits)
-Q(submode)
-Q(cs)
+Q(polarity)
+Q(phase)
+Q(nss)
 Q(init)
 Q(deinit)
 Q(send)
 Q(recv)
 Q(send_recv)
+Q(MASTER)
 Q(ACTIVE_LOW)
 Q(ACTIVE_HIGH)
 

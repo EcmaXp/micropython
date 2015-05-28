@@ -34,9 +34,13 @@
 #define MICROPY_HW_ENABLE_RNG                       (1)
 #define MICROPY_HW_ENABLE_RTC                       (1)
 
-#define MICROPY_STDIO_UART                          PYB_UART_0
+#define MICROPY_STDIO_UART                          1
 #define MICROPY_STDIO_UART_BAUD                     115200
 #define MICROPY_STDIO_UART_RX_BUF_SIZE              128
+#define MICROPY_STDIO_UART_TX_PIN                   (pin_GPIO1)
+#define MICROPY_STDIO_UART_RX_PIN                   (pin_GPIO2)
+#define MICROPY_STDIO_UART_TX_PIN_AF                PIN_MODE_3
+#define MICROPY_STDIO_UART_RX_PIN_AF                PIN_MODE_3
 
 #define MICROPY_SYS_LED_PRCM                        PRCM_GPIOA1
 #define MICROPY_SAFE_BOOT_PRCM                      PRCM_GPIOA2
