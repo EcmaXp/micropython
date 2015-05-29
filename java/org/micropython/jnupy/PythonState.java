@@ -47,12 +47,12 @@ public class PythonState {
 			    for (Object o : args) {
 			        System.out.println(o);
 			    }
-				return true;
+				return py;
 			}
 		});
 		py.mp_code_exec("from jnupy import jfuncs");
 		py.mp_code_exec("print(jfuncs)");
-		py.mp_code_exec("print('[', jfuncs['hello'](321, True, None, '안녕!'), ']')");
+		py.mp_code_exec("x = jfuncs['hello'](321, True, None, '안녕!', 3.14); y = jfuncs['hello']('again', x); print('[', x, ']; [', y, ']')");
 	}
 	
 	public static final int APIVERSION = 1;
