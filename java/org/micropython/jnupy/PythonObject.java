@@ -26,23 +26,6 @@
 
 package org.micropython.jnupy;
 
-public class PythonObject {
-    private PythonState pythonState;
-    private long mpObject;
-
-    private PythonObject(PythonState pyState, long mpStateId, long objectId) {
-        if (!pyState.checkState(mpStateId)) {
-            throw new RuntimeException("invaild state");
-        }
-        
-        pythonState = pyState;
-        mpObject = objectId;     
-        pythonState.mp_ref_incr(this);
-    }
-
-    @Override
-    protected void finalize() throws Throwable {
-        pythonState.mp_ref_derc(this);
-    }
+public interface PythonObject {
     
 }
