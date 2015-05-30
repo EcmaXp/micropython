@@ -47,12 +47,12 @@ public class PythonState {
 			    for (Object o : args) {
 			        System.out.println(o);
 			    }
-				return py;
+				return args[0];
 			}
 		});
 		py.mp_code_exec("from jnupy import jfuncs");
 		py.mp_code_exec("print(jfuncs)");
-		py.mp_code_exec("x = jfuncs['hello'](321, True, None, '안녕!', 3.14); y = jfuncs['hello']('again', x); print('[', x, ']; [', y, ']')");
+		py.mp_code_exec("x = jfuncs['hello']([], 321, True, None, '안녕!', 3.14); y = jfuncs['hello'](x); print('[', x, ']; [', y, ']')");
 	}
 	
 	public static final int APIVERSION = 1;
@@ -70,6 +70,10 @@ public class PythonState {
 		System.out.println("hello from java");
 		mp_test_jni();
 		System.out.println("hello from java2");
+	}
+	
+	public boolean checkState(long mpStateId) {
+		return (mpState == mpStateId);
 	}
 	
 	// TODO: public as private (until test done?)
