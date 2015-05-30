@@ -76,6 +76,7 @@ THE SOFTWARE.
 #include "py/stackctrl.h"
 #include "py/statectrl.h"
 #include "py/objmodule.h"
+#include "py/objint.h"
 #include "genhdr/mpversion.h"
 
 /** BUILD LIMITER **/
@@ -101,6 +102,11 @@ THE SOFTWARE.
 
 #if !MICROPY_PY_BUILTINS_FLOAT
 #error jnupy require MICROPY_PY_BUILTINS_FLOAT
+#endif
+
+#if MICROPY_LONGINT_IMPL != MICROPY_LONGINT_IMPL_LONGLONG
+#error jnupy support only MICROPY_LONGINT_IMPL_LONGLONG
+// TODO: support MICROPY_LONGINT_IMPL_MPZ...
 #endif
 
 /** Legacy Code **/ // TODO: remove this block
@@ -313,8 +319,12 @@ JNUPY_REF_CLASS(CTOBT)
 JNUPY_REF_CLASS(CJACF)
 // CLASS: java/lang/Object
 JNUPY_REF_CLASS(CVNFN)
+// CLASS: java/lang/Short
+JNUPY_REF_CLASS(CMUMS)
 // CLASS: java/lang/String
 JNUPY_REF_CLASS(CCHCW)
+// CLASS: java/util/HashMap
+JNUPY_REF_CLASS(CEKJY)
 // CLASS: org/micropython/jnupy/JavaFunction
 JNUPY_REF_CLASS(CRBZE)
 // CLASS: org/micropython/jnupy/PythonObject
@@ -347,12 +357,20 @@ JNUPY_REF_METHOD(MAHUY)
 JNUPY_REF_METHOD(MMSNU)
 // METHOD: java/lang/Integer->intValue[()I]
 JNUPY_REF_METHOD(MIDRV)
+// METHOD: java/lang/Long-><init>[(J)V]
+JNUPY_REF_METHOD(MPPJO)
 // METHOD: java/lang/Long->longValue[()J]
 JNUPY_REF_METHOD(ME7YL)
+// METHOD: java/lang/Short->intValue[()I]
+JNUPY_REF_METHOD(ML5BW)
 // METHOD: java/lang/String-><init>[([BIILjava/lang/String;)V]
 JNUPY_REF_METHOD(MT7JN)
 // METHOD: java/lang/String->getBytes[(Ljava/lang/String;)[B]
 JNUPY_REF_METHOD(MNONY)
+// METHOD: java/util/HashMap-><init>[(I)V]
+JNUPY_REF_METHOD(M4HPE)
+// METHOD: java/util/HashMap->put[(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;]
+JNUPY_REF_METHOD(MSG5B)
 // METHOD: org/micropython/jnupy/JavaFunction->invoke[(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;]
 JNUPY_REF_METHOD(MEFVT)
 // METHOD: org/micropython/jnupy/PythonObject-><init>[(Lorg/micropython/jnupy/PythonState;JJ)V]
@@ -395,11 +413,17 @@ JNUPY_AP(EXPORT)
 #define JCLASS_JavaFunction JNUPY_CLASS("org/micropython/jnupy/JavaFunction", CRBZE)
 #define JMETHOD_JavaFunction_invoke JNUPY_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", MEFVT)
 
+#define JCLASS_Object JNUPY_CLASS("java/lang/Object", CVNFN)
+
+#define JCLASS_Short JNUPY_CLASS("java/lang/Short", CMUMS)
+#define JMETHOD_Short_intValue JNUPY_METHOD("java/lang/Short", "intValue", "()I", ML5BW)
+
 #define JCLASS_Integer JNUPY_CLASS("java/lang/Integer", CTOBT)
 #define JMETHOD_Integer_INIT JNUPY_METHOD("java/lang/Integer", "<init>", "(I)V", MMSNU)
 #define JMETHOD_Integer_intValue JNUPY_METHOD("java/lang/Integer", "intValue", "()I", MIDRV)
 
 #define JCLASS_Long JNUPY_CLASS("java/lang/Long", CJACF)
+#define JMETHOD_Long_INIT JNUPY_METHOD("java/lang/Long", "<init>", "(J)V", MPPJO)
 #define JMETHOD_Long_longValue JNUPY_METHOD("java/lang/Long", "longValue", "()J", ME7YL)
 
 #define JCLASS_Float JNUPY_CLASS("java/lang/Float", CLJBD)
@@ -421,6 +445,10 @@ JNUPY_AP(EXPORT)
 
 #define JCLASS_ByteArrayOutputStream JNUPY_CLASS("java/io/ByteArrayOutputStream", CPITF)
 #define JMETHOD_ByteArrayOutputStream_toByteArray JNUPY_METHOD("java/io/ByteArrayOutputStream", "toByteArray", "()[B", MHUAS)
+
+#define JCLASS_HashMap JNUPY_CLASS("java/util/HashMap", CEKJY)
+#define JMETHOD_HashMap_INIT JNUPY_METHOD("java/util/HashMap", "<init>", "(I)V", M4HPE)
+#define JMETHOD_HashMap_put JNUPY_METHOD("java/util/HashMap", "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;", MSG5B)
 
 #define JOBJECT_TRUE JNUPY_CALL(GetStaticObjectField, JCLASS(Boolean), JSTATICFIELD(Boolean, TRUE))
 #define JOBJECT_FALSE JNUPY_CALL(GetStaticObjectField, JCLASS(Boolean), JSTATICFIELD(Boolean, FALSE))
@@ -454,7 +482,9 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNUPY_LOAD_CLASS("java/lang/Integer", CTOBT)
     JNUPY_LOAD_CLASS("java/lang/Long", CJACF)
     JNUPY_LOAD_CLASS("java/lang/Object", CVNFN)
+    JNUPY_LOAD_CLASS("java/lang/Short", CMUMS)
     JNUPY_LOAD_CLASS("java/lang/String", CCHCW)
+    JNUPY_LOAD_CLASS("java/util/HashMap", CEKJY)
     JNUPY_LOAD_CLASS("org/micropython/jnupy/JavaFunction", CRBZE)
     JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonObject", CKZG7)
     JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonState", C4SDY)
@@ -471,9 +501,13 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNUPY_LOAD_METHOD("java/lang/Float", "floatValue", "()F", CLJBD, MAHUY)
     JNUPY_LOAD_METHOD("java/lang/Integer", "<init>", "(I)V", CTOBT, MMSNU)
     JNUPY_LOAD_METHOD("java/lang/Integer", "intValue", "()I", CTOBT, MIDRV)
+    JNUPY_LOAD_METHOD("java/lang/Long", "<init>", "(J)V", CJACF, MPPJO)
     JNUPY_LOAD_METHOD("java/lang/Long", "longValue", "()J", CJACF, ME7YL)
+    JNUPY_LOAD_METHOD("java/lang/Short", "intValue", "()I", CMUMS, ML5BW)
     JNUPY_LOAD_METHOD("java/lang/String", "<init>", "([BIILjava/lang/String;)V", CCHCW, MT7JN)
     JNUPY_LOAD_METHOD("java/lang/String", "getBytes", "(Ljava/lang/String;)[B", CCHCW, MNONY)
+    JNUPY_LOAD_METHOD("java/util/HashMap", "<init>", "(I)V", CEKJY, M4HPE)
+    JNUPY_LOAD_METHOD("java/util/HashMap", "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;", CEKJY, MSG5B)
     JNUPY_LOAD_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", CRBZE, MEFVT)
     JNUPY_LOAD_METHOD("org/micropython/jnupy/PythonObject", "<init>", "(Lorg/micropython/jnupy/PythonState;JJ)V", CKZG7, MHTAY)
     JNUPY_LOAD_STATICFIELD("java/lang/Boolean", "FALSE", "Ljava/lang/Boolean;", CDKHI, SYCJ2)
@@ -511,7 +545,9 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     JNUPY_UNLOAD_CLASS("java/lang/Integer", CTOBT)
     JNUPY_UNLOAD_CLASS("java/lang/Long", CJACF)
     JNUPY_UNLOAD_CLASS("java/lang/Object", CVNFN)
+    JNUPY_UNLOAD_CLASS("java/lang/Short", CMUMS)
     JNUPY_UNLOAD_CLASS("java/lang/String", CCHCW)
+    JNUPY_UNLOAD_CLASS("java/util/HashMap", CEKJY)
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/JavaFunction", CRBZE)
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/PythonObject", CKZG7)
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/PythonState", C4SDY)
@@ -528,9 +564,13 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     JNUPY_UNLOAD_METHOD("java/lang/Float", "floatValue", "()F", CLJBD, MAHUY)
     JNUPY_UNLOAD_METHOD("java/lang/Integer", "<init>", "(I)V", CTOBT, MMSNU)
     JNUPY_UNLOAD_METHOD("java/lang/Integer", "intValue", "()I", CTOBT, MIDRV)
+    JNUPY_UNLOAD_METHOD("java/lang/Long", "<init>", "(J)V", CJACF, MPPJO)
     JNUPY_UNLOAD_METHOD("java/lang/Long", "longValue", "()J", CJACF, ME7YL)
+    JNUPY_UNLOAD_METHOD("java/lang/Short", "intValue", "()I", CMUMS, ML5BW)
     JNUPY_UNLOAD_METHOD("java/lang/String", "<init>", "([BIILjava/lang/String;)V", CCHCW, MT7JN)
     JNUPY_UNLOAD_METHOD("java/lang/String", "getBytes", "(Ljava/lang/String;)[B", CCHCW, MNONY)
+    JNUPY_UNLOAD_METHOD("java/util/HashMap", "<init>", "(I)V", CEKJY, M4HPE)
+    JNUPY_UNLOAD_METHOD("java/util/HashMap", "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;", CEKJY, MSG5B)
     JNUPY_UNLOAD_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", CRBZE, MEFVT)
     JNUPY_UNLOAD_METHOD("org/micropython/jnupy/PythonObject", "<init>", "(Lorg/micropython/jnupy/PythonState;JJ)V", CKZG7, MHTAY)
     JNUPY_UNLOAD_STATICFIELD("java/lang/Boolean", "FALSE", "Ljava/lang/Boolean;", CDKHI, SYCJ2)
@@ -593,9 +633,6 @@ void jnupy_setup_env(JNIEnv *env, jobject self) {
 #define _MEM_SIZE_MB (1024 * 1024)
 
 #define MEM_SIZE(x, y) ((x) * _MEM_SIZE_##y * (BYTES_PER_WORD / 4))
-
-/** UPY INTERNAL VALUE **/
-// STATIC uint emit_opt = MP_EMIT_OPT_NONE;
 
 /** PORT IMPL VALUE/FUNCTIONS **/
 MP_THREAD mp_uint_t mp_verbose_flag = 0;
@@ -705,6 +742,8 @@ mp_obj_t jnupy_pyobj_get(jobject jobj) {
 // TODO: check modmsgpack.c will help coding!
 #define IsInstanceOf(obj, class_) (JNUPY_RAW_CALL(IsInstanceOf, obj, class_) == JNI_TRUE)
 mp_obj_t jnupy_obj_j2py(jobject obj) {
+    MP_STACK_CHECK();
+
     // TODO: warp handler for java exception
     bool is_str = false, is_bytes = false;
 
@@ -721,15 +760,14 @@ mp_obj_t jnupy_obj_j2py(jobject obj) {
         }
 
         assert(! "invaild control flow");
+    } else if (IsInstanceOf(obj, JCLASS(Short))) {
+        jint val = JNUPY_CALL(CallIntMethod, obj, JMETHOD(Short, intValue));
+
+        return mp_obj_new_int(val);
     } else if (IsInstanceOf(obj, JCLASS(Integer))) {
         jint val = JNUPY_CALL(CallIntMethod, obj, JMETHOD(Integer, intValue));
 
-        mp_obj_t obj = MP_OBJ_NEW_SMALL_INT(val);
-        if (MP_OBJ_SMALL_INT_VALUE(obj) == val) {
-            return obj;
-        } else {
-            return mp_obj_new_int(val);
-        }
+        return mp_obj_new_int(val);
     } else if (IsInstanceOf(obj, JCLASS(Long))) {
         jlong val = JNUPY_CALL(CallLongMethod, obj, JMETHOD(Long, longValue));
 
@@ -784,6 +822,8 @@ mp_obj_t jnupy_obj_j2py(jobject obj) {
 #undef IsInstanceOf
 
 jobject jnupy_obj_py2j(mp_obj_t obj) {
+    MP_STACK_CHECK();
+
     if (0) {
     } else if (obj == mp_const_none) {
         return NULL;
@@ -797,10 +837,10 @@ jobject jnupy_obj_py2j(mp_obj_t obj) {
         jobject jobj = JNUPY_CALL(NewObject, JCLASS(Integer), JMETHOD(Integer, INIT), val);
         return jobj;
     } else if (MP_OBJ_IS_INT(obj)) {
-        // TODO: handle big num
-        mp_int_t val = mp_obj_int_get_truncated(obj);
+        mp_obj_int_t *intobj = obj;
+        long long val = intobj->val;
 
-        jobject jobj = JNUPY_CALL(NewObject, JCLASS(Integer), JMETHOD(Integer, INIT), val);
+        jobject jobj = JNUPY_CALL(NewObject, JCLASS(Long), JMETHOD(Long, INIT), val);
         return jobj;
     } else if (MP_OBJ_IS_TYPE(obj, &mp_type_float)) {
         mp_float_t val = mp_obj_get_float(obj);
@@ -823,10 +863,40 @@ jobject jnupy_obj_py2j(mp_obj_t obj) {
 
         JNUPY_CALL(ReleaseByteArrayElements, bytearr, NULL, JNI_ABORT);
         return jobj;
-    } else if (0) {
-        // TODO: handle tuple, list
-    } else if (0) {
-        // TODO: handle dict
+    } else if (MP_OBJ_IS_TYPE(obj, &mp_type_list) || MP_OBJ_IS_TYPE(obj, &mp_type_tuple)) {
+        mp_obj_t iter = mp_getiter(obj);
+        mp_int_t size = mp_obj_get_int(mp_obj_len(obj));
+
+        jobjectArray jresult = JNUPY_CALL(NewObjectArray, size, JCLASS(Object), NULL);
+
+        for (mp_int_t i = 0; i < size; i++){
+            mp_obj_t cur = mp_iternext(iter);
+            JNUPY_CALL(SetObjectArrayElement, jresult, i, jnupy_obj_py2j(cur));
+        }
+
+        return jresult;
+    } else if (MP_OBJ_IS_TYPE(obj, &mp_type_dict)) {
+        mp_obj_t iter = mp_getiter(mp_call_function_0(mp_load_attr(obj, MP_QSTR_items)));
+        mp_int_t size = mp_obj_get_int(mp_obj_len(obj));
+        jobject jresult = JNUPY_CALL(NewObject, JCLASS(HashMap), JMETHOD(HashMap, INIT), size);
+
+        while (true) {
+            mp_obj_t cur = mp_iternext(iter);
+            if (cur == MP_OBJ_STOP_ITERATION) {
+                break;
+            }
+
+            mp_uint_t csize = 0;
+            mp_obj_t *items = NULL;
+            mp_obj_tuple_get(cur, &csize, &items);
+            assert(csize == 2);
+
+            jobject jkey = jnupy_obj_py2j(items[0]);
+            jobject jvalue = jnupy_obj_py2j(items[1]);
+            JNUPY_CALL(CallObjectMethod, jresult, JMETHOD(HashMap, put), jkey, jvalue);
+        }
+
+        return jresult;
     } else if (0) {
         // TODO: handle set?
     } else if (MP_OBJ_IS_TYPE(obj, &mp_type_jobject)) {
@@ -928,7 +998,7 @@ STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, c
     // TODO: more detail value convert required.
     JNUPY_PY_JSTATE = o->jstate;
 
-    jobjectArray jargs = JNUPY_CALL(NewObjectArray, n_args, JNUPY_CLASS("java/lang/Object", CVNFN), NULL);
+    jobjectArray jargs = JNUPY_CALL(NewObjectArray, n_args, JCLASS(Object), NULL);
 
     for (int i = 0; i < n_args; i++) {
         JNUPY_CALL(SetObjectArrayElement, jargs, i, jnupy_obj_py2j(args[i]));

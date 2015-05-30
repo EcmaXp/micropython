@@ -26,6 +26,8 @@
 
 package org.micropython.jnupy;
 import java.io.ByteArrayInputStream;
+import java.util.ArrayList;
+import java.util.Map;
 
 public class PythonState {
     static {
@@ -45,14 +47,22 @@ public class PythonState {
 			@Override
 			public Object invoke(PythonState pythonState, Object ... args) {
 			    for (Object o : args) {
+			    	if (o instanceof Object[]) {
+			    		Object[] array = (Object[])o;
+			    		System.out.println("start");
+			    		for (int i=0; i < array.length; i++) {
+						    System.out.println(array[i]);
+						}
+			    		System.out.println("end");
+			    	}
 			        System.out.println(o);
 			    }
-				return 3.14;
+				return args[0];
 			}
 		});
 		py.mp_code_exec("from jnupy import jfuncs, pyrefs; import jnupy");
 		py.mp_code_exec("print(jfuncs)");
-		py.mp_code_exec("x = jfuncs['hello']([3, 2], 321, True, None, '안녕!', 3.14); y = jfuncs['hello'](x); print('[', x, ']; [', y, ']')");
+		py.mp_code_exec("x = jfuncs['hello']({3: 2}, object()); y = jfuncs['hello'](x); print('[', x, ']; [', y, ']')");
 		py.mp_code_exec("print(pyrefs)");
 		System.out.println(py.mp_code_eval("3 + 2"));
 		System.gc();
