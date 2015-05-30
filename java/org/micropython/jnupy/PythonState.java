@@ -47,19 +47,19 @@ public class PythonState {
 			    for (Object o : args) {
 			        System.out.println(o);
 			    }
-				return args[0];
+				return 3.14;
 			}
 		});
 		py.mp_code_exec("from jnupy import jfuncs, pyrefs; import jnupy");
 		py.mp_code_exec("print(jfuncs)");
 		py.mp_code_exec("x = jfuncs['hello']([3, 2], 321, True, None, '안녕!', 3.14); y = jfuncs['hello'](x); print('[', x, ']; [', y, ']')");
-		py.mp_code_exec("print(pyrefs)");	
+		py.mp_code_exec("print(pyrefs)");
 		System.out.println(py.mp_code_eval("3 + 2"));
 		System.gc();
 		py.mp_code_exec("print(pyrefs)");	
 		System.gc();
 		System.out.println(py.mp_code_eval("3 + 2"));
-		py.mp_code_exec("print(pyrefs)");	
+		py.mp_code_exec("print(pyrefs)");
 	}
 	
 	public static final int APIVERSION = 1;

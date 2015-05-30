@@ -76,7 +76,6 @@ THE SOFTWARE.
 #include "py/stackctrl.h"
 #include "py/statectrl.h"
 #include "py/objmodule.h"
-#include "modmicrothread.h"
 #include "genhdr/mpversion.h"
 
 /** BUILD LIMITER **/
@@ -100,49 +99,20 @@ THE SOFTWARE.
 #error jnupy require MICROPY_ENABLE_GC
 #endif
 
-// and other limiter require for building.
+#if !MICROPY_PY_BUILTINS_FLOAT
+#error jnupy require MICROPY_PY_BUILTINS_FLOAT
+#endif
 
 /** Legacy Code **/ // TODO: remove this block
 /*
-TODO: should i make many functions for
-    - make / control state
-    - convert value (msgpack method or other method)
-      (and it should support userdata, or native micropython ptr?)
-    - execute source from file or buffer
-    - handle assert failure or nlr_raise
-    - use coffeecatch library or other signal capture handler?
-    - safe warpper or sandbox for something.
-*/
-/*
-
-STATIC mp_obj_t get_executor(mp_obj_t module_fun) {
-    mp_obj_t module_mt = mp_module_get(MP_QSTR_umicrothread);
-    mp_obj_t thread = mp_call_function_2(mp_load_attr(module_mt, MP_QSTR_MicroThread), MP_OBJ_NEW_QSTR(MP_QSTR_module), module_fun);
-    return thread;
-}
-
-STATIC bool execute(mp_state_ctx_t *state, mp_obj_t thread) {
-    // TODO: handle error?
-
-    mp_state_load(state);
-
-    bool continue_execute = true;
-    mp_obj_t result;
-    mp_mrk_t kind = microthread_resume(thread, mp_const_none, &result);
-
-    switch (kind) {
-        case MP_MRK_STOP:
-            continue_execute = false;
-            break;
-        case MP_MRK_EXCEPTION:
-            handle_uncaught_exception(result);
-        default:
-            continue_execute = true;
-    }
-
-    mp_state_store(state);
-    return continue_execute;
-}
+TODO: should i programming
+    - make / control state [OK]
+    - convert value [OK]
+    - execute source from file or buffer [OK, but without building module.]
+    - handle assert failure or nlr_raise [OK?]
+    - use coffeecatch library or other signal capture handler? [IGNORE]
+    - safe warpper or sandbox for something. [OK?]
+    - support PythonFunction...?
 */
 
 /** JNUPY INFO **/
@@ -769,8 +739,7 @@ mp_obj_t jnupy_obj_j2py(jobject obj) {
 
         return mp_obj_new_float(val);
     } else if (IsInstanceOf(obj, JCLASS(Double))) {
-        // TODO: handle Double correct... (invaild value when calling double.doubleValue()...)
-        jfloat val = JNUPY_CALL(CallFloatMethod, obj, JMETHOD(Double, floatValue));
+        jdouble val = JNUPY_CALL(CallDoubleMethod, obj, JMETHOD(Double, doubleValue));
 
         return mp_obj_new_float(val);
     } else if ((is_str = IsInstanceOf(obj, JCLASS(String))) || \
@@ -833,13 +802,11 @@ jobject jnupy_obj_py2j(mp_obj_t obj) {
 
         jobject jobj = JNUPY_CALL(NewObject, JCLASS(Integer), JMETHOD(Integer, INIT), val);
         return jobj;
-    #if MICROPY_PY_BUILTINS_FLOAT
     } else if (MP_OBJ_IS_TYPE(obj, &mp_type_float)) {
         mp_float_t val = mp_obj_get_float(obj);
 
         jobject jobj = JNUPY_CALL(NewObject, JCLASS(Float), JMETHOD(Float, INIT), (jfloat)val);
         return jobj;
-    #endif
     } else if (MP_OBJ_IS_STR_OR_BYTES(obj)) {
         mp_buffer_info_t objbuf;
         mp_get_buffer_raise(obj, &objbuf, MP_BUFFER_READ);

@@ -32,7 +32,7 @@ public class PythonObject {
 
     private PythonObject(PythonState pyState, long mpStateId, long objectId) {
         if (!pyState.checkState(mpStateId)) {
-            throw new RuntimeException("invaild state id.");
+            throw new RuntimeException("invaild state");
         }
         
         pythonState = pyState;
