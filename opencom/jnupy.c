@@ -162,7 +162,12 @@ typedef struct _jnupy_current_state_t {
     // micropython state context
     mp_state_ctx_t *mp_state;
     
-    // JNUPY_NLR_GK_TOP
+    // JNUPY_STACK_TOP
+    // micropython stack top
+    // TODO: use this?
+    mp_uint_t *stack_top;
+    
+    // NLR_GK_TOP
     // nlr goalkeeper top (for JNI function call warpper)
     nlr_gk_buf_t *nlr_gk_top;
 
@@ -173,7 +178,10 @@ typedef struct _jnupy_current_state_t {
     // JNUPY_SELF
     // java self (vaild only current thread)
     jobject java_self;
-    
+
+    // JNUPY_PY_STATE
+    // java PythonState (vaild only current thread)
+    jobject java_pystate;
 } jnupy_current_state_t;
 
 // _JNUPY_CUR_STATE(x)
@@ -194,6 +202,8 @@ STATIC JavaVM *jnupy_glob_java_vm;
 #define JNUPY_ENV _JNUPY_CUR_STATE(java_env)
 #define JNUPY_SELF _JNUPY_CUR_STATE(java_self)
 #define JNUPY_MP_STATE _JNUPY_CUR_STATE(mp_state)
+#define JNUPY_STACK_TOP _JNUPY_CUR_STATE(stack_top)
+#define JNUPY_PY_JSTATE _JNUPY_CUR_STATE(java_pystate)
 
 /** JNUPY CALL MECRO **/
 #define JNUPY_RAW_CALL_WITH(env, func, ...) (*env)->func(env, __VA_ARGS__)
@@ -225,6 +235,7 @@ assret(! "throwing is failed.");
 /** JNUPY NLR GOAL KEEPER **/
 // nlr goal keeper are wapper for java throw in nested function call.
 // like assert fail.
+// TODO: nlr_gk are currently getting heavy bug... fix them......
 
 #define nlr_gk_set_buf(gk_buf) nlr_gk_set_buf_raw(gk_buf)
 #define nlr_gk_new() {false}
@@ -234,7 +245,7 @@ assret(! "throwing is failed.");
 
 void nlr_gk_set_buf_raw(nlr_gk_buf_t *gk_buf) {
     if (gk_buf == NULL) {
-        mp_nlr_top = NULL;
+        // mp_nlr_top = NULL;
     } else {
         mp_nlr_top = &gk_buf->buf;
     }
@@ -244,8 +255,6 @@ void nlr_gk_push_raw(nlr_gk_buf_t *gk_buf) {
     gk_buf->is_working = true;
     
     gk_buf->prev = NLR_GK_TOP;
-    nlr_gk_set_buf(gk_buf->prev);
-    
     NLR_GK_TOP = gk_buf;
 }
 
@@ -576,7 +585,6 @@ bool jnupy_load_state(mp_state_ctx_t *state) {
     }
 
     mp_state_force_load(state);
-
     if (state != mp_state_ctx) {
         JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/AssertionError", CM4H2), "Invaild Load");
         return false;
@@ -592,12 +600,14 @@ mp_state_ctx_t *jnupy_get_state_from_pythonstate(jobject pythonState) {
 }
 
 bool jnupy_load_state_from_pythonstate() {
+    JNUPY_PY_JSTATE = JNUPY_SELF;
     mp_state_ctx_t *state = jnupy_get_state_from_pythonstate(JNUPY_SELF);
     return jnupy_load_state(state);
 }
 
 bool jnupy_load_state_from_pythonobject() {
     jobject pythonState = JNUPY_CALL(GetObjectField, JNUPY_SELF, JFIELD(PythonObject, pythonState));
+    JNUPY_PY_JSTATE = pythonState;
     mp_state_ctx_t *state = jnupy_get_state_from_pythonstate(pythonState);
     return jnupy_load_state(state);
 }
@@ -616,48 +626,6 @@ void jnupy_setup_env(JNIEnv *env, jobject self) {
 
 /** UPY INTERNAL VALUE **/
 // STATIC uint emit_opt = MP_EMIT_OPT_NONE;
-
-/** UPY INTERNAL TYPE/FUNCTIONS **/
-#include "py/lexer.h"
-
-typedef struct _mp_lexer_vstr_buf_t {
-    vstr_t *vstr;
-    char *buf;
-    mp_uint_t len;
-    mp_uint_t pos;
-} mp_lexer_vstr_buf_t;
-
-STATIC mp_uint_t vstr_buf_next_byte(mp_lexer_vstr_buf_t *vb) {
-    if (vb->pos >= vb->len) {
-        return MP_LEXER_EOF;
-    }
-
-    return vb->buf[vb->pos++];
-}
-
-STATIC void vstr_buf_close(mp_lexer_vstr_buf_t *vb) {
-    vstr_free(vb->vstr);
-    m_del_obj(mp_lexer_vstr_buf_t, vb);
-}
-
-mp_lexer_t *mp_lexer_new_from_vstr(const char *filename, vstr_t *vstr) {
-    char *buf = vstr_str(vstr);
-    if (buf == NULL) {
-        return NULL;
-    }
-
-    mp_lexer_vstr_buf_t *vb = m_new_obj_maybe(mp_lexer_vstr_buf_t);
-    if (vb == NULL) {
-        return NULL;
-    }
-
-    vb->vstr = vstr;
-    vb->buf = buf;
-    vb->len = vstr_len(vstr);
-    vb->pos = 0;
-
-    return mp_lexer_new(qstr_from_str(filename), vb, (mp_lexer_stream_next_byte_t)vstr_buf_next_byte, (mp_lexer_stream_close_t)vstr_buf_close);
-}
 
 /** PORT IMPL VALUE/FUNCTIONS **/
 MP_THREAD mp_uint_t mp_verbose_flag = 0;
@@ -726,11 +694,11 @@ void nlr_jump_fail(void *val) {
 /** JNUPY INTERNAL MODULE **/
 
 const mp_obj_type_t mp_type_jobject;
-mp_obj_t mp_obj_jobject_new(jobject jobj);
-jobject mp_obj_jobject_get(mp_obj_t self_in);
+mp_obj_t jnupy_jobj_new(jobject jobj);
+jobject jnupy_jobj_get(mp_obj_t self_in);
 
 const mp_obj_type_t mp_type_jfunc;
-mp_obj_t mp_obj_jfunc_new(mp_obj_t name, jobject jfunc);
+mp_obj_t mp_obj_jfunc_new(jobject jstate, mp_obj_t name, jobject jfunc);
 jobject mp_obj_jfunc_get(mp_obj_t self_in);
 
 /* in li.cil.oc.server.machine.Machine.scala ...
@@ -749,6 +717,20 @@ TODO: support convert it (jnupy_obj_j2py, jnupy_obj_py2j)
 - Map<String, String> = dict? [-]
 - NBTTagCompound = JObject => arg [-]
 */
+
+jobject jnupy_pyobj_new(jobject pythonState, mp_obj_t pyobj) {
+    jobject pyState = JNUPY_CALL(NewGlobalRef, pythonState);
+    jobject jobj = JNUPY_CALL(NewObject, JCLASS(PythonObject), JMETHOD(PythonObject, INIT), pyState, (jlong)(void *)JNUPY_MP_STATE, (jlong)(void *)pyobj);
+
+    return jobj;
+}
+
+mp_obj_t jnupy_pyobj_get(jobject jobj) {
+    assert(JNUPY_RAW_CALL(IsInstanceOf, jobj, JCLASS(PythonObject)) == JNI_TRUE);
+
+    mp_obj_t pyobj = (mp_obj_t)JNUPY_CALL(GetLongField, jobj, JFIELD(PythonObject, mpObject));
+    return pyobj;
+}
 
 // TODO: check modmsgpack.c will help coding!
 #define IsInstanceOf(obj, class_) (JNUPY_RAW_CALL(IsInstanceOf, obj, class_) == JNI_TRUE)
@@ -823,22 +805,16 @@ mp_obj_t jnupy_obj_j2py(jobject obj) {
     } else if (0) {
         // TODO: handle set?
     } else if (IsInstanceOf(obj, JCLASS(PythonObject))) {
-        mp_obj_t pyobj = (mp_obj_t)JNUPY_CALL(GetLongField, obj, JFIELD(PythonObject, mpObject));
-        return pyobj;
+        return jnupy_pyobj_get(obj);
     } else {
-        // TODO: handle raw java object? (only allowed for warpped object?)
-        // ...
-        return mp_obj_jobject_new(obj);
-        // nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "invaild type (java object to python object)"));
+        return jnupy_jobj_new(obj);
     }
 
-    // TODO: raise error...
-    nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "invaild value (java object to python object)"));
+    return mp_const_none;
 }
 #undef IsInstanceOf
 
 jobject jnupy_obj_py2j(mp_obj_t obj) {
-
     if (0) {
     } else if (obj == mp_const_none) {
         return NULL;
@@ -887,39 +863,35 @@ jobject jnupy_obj_py2j(mp_obj_t obj) {
     } else if (0) {
         // TODO: handle set?
     } else if (MP_OBJ_IS_TYPE(obj, &mp_type_jobject)) {
-        return mp_obj_jobject_get(obj);
+        return jnupy_jobj_get(obj);
     } else {
-        // TODO: handle raw python object?
-        // ...
-        jobject jobj = JNUPY_CALL(NewObject, JCLASS(PythonObject), JMETHOD(PythonObject, INIT), JNUPY_SELF, (jlong)JNUPY_MP_STATE, (jlong)(void *)obj);
-        return jobj;
-        // nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "invaild type (python object to java object)"));
+        return jnupy_pyobj_new(JNUPY_PY_JSTATE, obj);
     }
 
-    nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "invaild value (python object to java object)"));
+    return NULL;
 }
 
-typedef struct _mp_obj_jobject_t {
+typedef struct _jnupy_jobj_t {
     mp_obj_base_t base;
     jobject jobj;
-} mp_obj_jobject_t;
+} jnupy_jobj_t;
 
-mp_obj_t mp_obj_jobject_new(jobject jobj) {
-    mp_obj_jobject_t *o = m_new_obj_with_finaliser(mp_obj_jobject_t);
+mp_obj_t jnupy_jobj_new(jobject jobj) {
+    jnupy_jobj_t *o = m_new_obj_with_finaliser(jnupy_jobj_t);
     o->base.type = &mp_type_jobject;
     o->jobj = JNUPY_CALL(NewGlobalRef, jobj);
 
     return (mp_obj_t)o;
 }
 
-jobject mp_obj_jobject_get(mp_obj_t self_in) {
+jobject jnupy_jobj_get(mp_obj_t self_in) {
     assert(MP_OBJ_IS_TYPE(self_in, &mp_type_jobject));
-    mp_obj_jobject_t *self = self_in;
+    jnupy_jobj_t *self = self_in;
     return self->jobj;
 }
 
 STATIC void jobject_print(const mp_print_t *print, mp_obj_t o_in, mp_print_kind_t kind) {
-    jobject jobj = mp_obj_jobject_get(o_in);
+    jobject jobj = jnupy_jobj_get(o_in);
 
     jclass class_ = JNUPY_CALL(GetObjectClass, jobj);
     jmethodID mid = JNUPY_CALL(GetMethodID, class_, "toString", "()Ljava/lang/String;");
@@ -937,7 +909,7 @@ STATIC void jobject_print(const mp_print_t *print, mp_obj_t o_in, mp_print_kind_
 }
 
 STATIC mp_obj_t jobject_del(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
-    mp_obj_jobject_t *self = self_in;
+    jnupy_jobj_t *self = self_in;
     JNUPY_CALL(DeleteGlobalRef, self->jobj);
 
     return mp_const_none;
@@ -961,13 +933,15 @@ const mp_obj_type_t mp_type_jobject = {
 typedef struct _mp_obj_jfunc_t {
     mp_obj_base_t base;
     mp_obj_t name;
+    jobject jstate;
     jobject jfunc;
 } mp_obj_jfunc_t;
 
-mp_obj_t mp_obj_jfunc_new(mp_obj_t name, jobject jfunc) {
+mp_obj_t mp_obj_jfunc_new(jobject jstate, mp_obj_t name, jobject jfunc) {
     mp_obj_jfunc_t *o = m_new_obj_with_finaliser(mp_obj_jfunc_t);
     o->base.type = &mp_type_jfunc;
     o->name = name;
+    o->jstate = JNUPY_CALL(NewGlobalRef, jstate);
     o->jfunc = JNUPY_CALL(NewGlobalRef, jfunc);
 
     return (mp_obj_t)o;
@@ -985,6 +959,7 @@ STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, c
 
     // TODO: if argument convert provided by keyword value, convert by custom converter...
     // TODO: more detail value convert required.
+    JNUPY_PY_JSTATE = o->jstate;
 
     jobjectArray jargs = JNUPY_CALL(NewObjectArray, n_args, JNUPY_CLASS("java/lang/Object", CVNFN), NULL);
 
@@ -1001,7 +976,9 @@ STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, c
 		nlr_raise(mp_obj_new_exception_msg(&mp_type_RuntimeError, "error raised from java"));
 	}
 
-	return jnupy_obj_j2py(jresult);
+    mp_obj_t pyresult = jnupy_obj_j2py(jresult);
+
+	return pyresult;
 }
 
 STATIC void jfunc_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
@@ -1028,6 +1005,7 @@ STATIC void jfunc_print(const mp_print_t *print, mp_obj_t o_in, mp_print_kind_t 
 
 STATIC mp_obj_t jfunc_del(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
     mp_obj_jfunc_t *o = self_in;
+    JNUPY_CALL(DeleteGlobalRef, o->jstate);
     JNUPY_CALL(DeleteGlobalRef, o->jfunc);
 
     return mp_const_none;
@@ -1071,10 +1049,19 @@ const mp_obj_module_t mp_module_jnupy = {
 #define JNUPY_FUNC_DEF(ret, name) \
     JNIEXPORT ret JNICALL JNUPY_FUNC(name)
 
-#define _JNUPY_FUNC_BODY_START(init_expr) \
+// TODO: cleanup body... (nlr_gk, nlr_top, stack_top, etc...)
+
+#define _JNUPY_FUNC_BODY_START(_with_state, init_expr) \
     jnupy_setup_env(env, self); \
+    bool with_state = _with_state; \
+    void *stack_top = NULL; \
+    nlr_buf_t *nlr_ptr = mp_nlr_top; \
     nlr_gk_buf_t _nlr_gk = nlr_gk_new(); \
     if (init_expr) { \
+        if (with_state) { \
+            stack_top = MP_STATE_VM(stack_top); \
+            mp_stack_ctrl_init(); \
+        } \
         do { \
             if (nlr_gk_push(&_nlr_gk) != 0) { \
                 break; \
@@ -1088,12 +1075,16 @@ const mp_obj_module_t mp_module_jnupy = {
     ret_stmt;
 
 #define return \
+    if (with_state) { \
+        MP_STATE_VM(stack_top) = stack_top; \
+    } \
     nlr_gk_pop(&_nlr_gk); \
+    mp_nlr_top = nlr_ptr; \
     return
 
 #define JNUPY_FUNC_STATE_LOADER
-#define JNUPY_FUNC_START_WITH_STATE _JNUPY_FUNC_BODY_START(JNUPY_FUNC_STATE_LOADER())
-#define JNUPY_FUNC_START _JNUPY_FUNC_BODY_START(true)
+#define JNUPY_FUNC_START_WITH_STATE _JNUPY_FUNC_BODY_START(true, JNUPY_FUNC_STATE_LOADER())
+#define JNUPY_FUNC_START _JNUPY_FUNC_BODY_START(false, true)
 #define JNUPY_FUNC_END_VOID _JNUPY_FUNC_BODY_END(return)
 #define JNUPY_FUNC_END_VALUE(value) _JNUPY_FUNC_BODY_END(return (value))
 #define JNUPY_FUNC_END _JNUPY_FUNC_BODY_END(return 0)
@@ -1176,6 +1167,7 @@ JNUPY_FUNC_DEF(jboolean, mp_1state_1new)
         mp_obj_module_t *module_jnupy = mp_obj_new_module(MP_QSTR_jnupy);
         mp_obj_dict_t *module_jnupy_dict = mp_call_function_0(mp_load_attr(mp_module_jnupy.globals, MP_QSTR_copy));
         mp_obj_dict_store(module_jnupy_dict, MP_OBJ_NEW_QSTR(MP_QSTR_jfuncs), mp_obj_new_dict(0));
+        mp_obj_dict_store(module_jnupy_dict, MP_OBJ_NEW_QSTR(MP_QSTR_pyrefs), mp_obj_new_dict(0));
         module_jnupy->globals = module_jnupy_dict;
 
         mp_state_store(state);
@@ -1238,23 +1230,22 @@ JNUPY_FUNC_DEF(jboolean, mp_1code_1exec)
     (JNIEnv *env, jobject self, jstring code) {
     JNUPY_FUNC_START_WITH_STATE;
 
-    nlr_buf_t nlr;
-    if (nlr_push(&nlr) == 0) {
-        const char *name = "<CODE from JAVA>";
+    nlr_gk_buf_t nlr_gk;
+    if (nlr_gk_push(&nlr_gk) == 0) {
+        qstr name = qstr_from_str("<CODE from JAVA>");
         const char *codebuf = JNUPY_CALL(GetStringUTFChars, code, 0);
 
-        vstr_t *vstr = vstr_new();
-        vstr_add_str(vstr, codebuf);
-        JNUPY_CALL(ReleaseStringUTFChars, code, codebuf);
+        mp_lexer_t *lex = mp_lexer_new_from_str_len(name, codebuf, strlen(codebuf), 0);
 
-        mp_lexer_t *lex = mp_lexer_new_from_vstr(name, vstr);
         if (lex == NULL) {
+            JNUPY_CALL(ReleaseStringUTFChars, code, codebuf);
             return JNI_FALSE;
         }
 
         qstr source_name = lex->source_name;
-
         mp_parse_node_t pn = mp_parse(lex, MP_PARSE_FILE_INPUT);
+
+        JNUPY_CALL(ReleaseStringUTFChars, code, codebuf);
 
         mp_obj_t module_fun = mp_compile(pn, source_name, MP_EMIT_OPT_NONE, false);
         if (module_fun == NULL) {
@@ -1263,12 +1254,56 @@ JNUPY_FUNC_DEF(jboolean, mp_1code_1exec)
 
         mp_call_function_0(module_fun);
 
-        nlr_pop();
+        nlr_gk_pop(&nlr_gk);
         return JNI_TRUE;
     } else {
         // TODO: how to handle exception on java side?
-        mp_obj_print_exception(&mp_plat_print, nlr.ret_val);
+        mp_obj_print_exception(&mp_plat_print, nlr_gk.buf.ret_val);
         return JNI_FALSE;
+    }
+
+    JNUPY_FUNC_END;
+}
+
+JNUPY_FUNC_DEF(jobject, mp_1code_1eval)
+    (JNIEnv *env, jobject self, jstring code) {
+    JNUPY_FUNC_START_WITH_STATE;
+
+    nlr_gk_buf_t nlr_gk;
+    if (nlr_gk_push(&nlr_gk) == 0) {
+        qstr name = qstr_from_str("<CODE from JAVA>");
+        const char *codebuf = JNUPY_CALL(GetStringUTFChars, code, 0);
+
+        mp_lexer_t *lex = mp_lexer_new_from_str_len(name, codebuf, strlen(codebuf), 0);
+
+        if (lex == NULL) {
+            JNUPY_CALL(ReleaseStringUTFChars, code, codebuf);
+            return NULL;
+        }
+
+        qstr source_name = lex->source_name;
+        mp_parse_node_t pn = mp_parse(lex, MP_PARSE_EVAL_INPUT);
+
+        JNUPY_CALL(ReleaseStringUTFChars, code, codebuf);
+
+        mp_obj_t module_fun = mp_compile(pn, source_name, MP_EMIT_OPT_NONE, false);
+        if (module_fun == NULL) {
+            return NULL;
+        }
+
+        mp_obj_t result = mp_call_function_0(module_fun);
+        jobject jresult = jnupy_obj_py2j(result);
+
+        nlr_gk_pop(&nlr_gk);
+        return jresult;
+    } else {
+        // TODO: how to handle exception on java side?
+        if (nlr_gk.buf.ret_val == NULL) {
+            nlr_gk_jump(NULL);
+        }
+
+        mp_obj_print_exception(&mp_plat_print, nlr_gk.buf.ret_val);
+        return NULL;
     }
 
     JNUPY_FUNC_END;
@@ -1284,7 +1319,7 @@ JNUPY_FUNC_DEF(jboolean, mp_1jfunc_1set)
         mp_obj_t name_obj = mp_obj_new_str(namebuf, strlen(namebuf), true);
         JNUPY_CALL(ReleaseStringUTFChars, name, namebuf);
 
-        mp_obj_t jfunc_obj = mp_obj_jfunc_new(name_obj, jfunc);
+        mp_obj_t jfunc_obj = mp_obj_jfunc_new(JNUPY_PY_JSTATE, name_obj, jfunc);
 
         mp_obj_t module_jnupy = mp_module_get(MP_QSTR_jnupy);
         mp_obj_t jfuncs_dict = mp_load_attr(module_jnupy, MP_QSTR_jfuncs);
@@ -1303,12 +1338,56 @@ JNUPY_FUNC_DEF(jboolean, mp_1jfunc_1set)
 
 // TODO: add mp_jobject_set?
 
-#undef JNUPY_FUNC
-#undef JNUPY_FUNC_STATE_LOADER
-// org.micropython.jnupy.PythonObject
-#define JNUPY_FUNC(name) Java_org_micropython_jnupy_PythonState_##name
-#define JNUPY_FUNC_STATE_LOADER jnupy_load_state_from_pythonobject
+JNUPY_FUNC_DEF(void, mp_1ref_1incr)
+    (JNIEnv *env, jobject self, jobject jobj) {
+    JNUPY_FUNC_START_WITH_STATE;
 
+    mp_obj_t obj = jnupy_pyobj_get(jobj);
+    if (!MP_OBJ_IS_OBJ(obj)) {
+        return;
+    }
+
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) == 0) {
+        mp_int_t objid = ((mp_int_t)obj) >> 2;
+
+        mp_obj_t module_jnupy = mp_module_get(MP_QSTR_jnupy);
+        mp_obj_t pyrefs_dict = mp_load_attr(module_jnupy, MP_QSTR_pyrefs);
+        mp_obj_subscr(pyrefs_dict, MP_OBJ_NEW_SMALL_INT(objid), obj);
+
+        nlr_pop();
+    } else {
+        // TODO: how to handle exception on java side?
+        mp_obj_print_exception(&mp_plat_print, nlr.ret_val);
+    }
+    JNUPY_FUNC_END_VOID;
+}
+
+JNUPY_FUNC_DEF(void, mp_1ref_1derc)
+    (JNIEnv *env, jobject self, jobject jobj) {
+    JNUPY_FUNC_START_WITH_STATE;
+
+    mp_obj_t obj = jnupy_pyobj_get(jobj);
+    if (!MP_OBJ_IS_OBJ(obj)) {
+        return;
+    }
+
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) == 0) {
+        mp_int_t objid = ((mp_int_t)obj) >> 2;
+
+        mp_obj_t module_jnupy = mp_module_get(MP_QSTR_jnupy);
+        mp_obj_t pyrefs_dict = mp_load_attr(module_jnupy, MP_QSTR_pyrefs);
+        mp_obj_subscr(pyrefs_dict, MP_OBJ_NEW_SMALL_INT(objid), obj); // TODO: remove safety with no setitem.
+        mp_obj_subscr(pyrefs_dict, MP_OBJ_NEW_SMALL_INT(objid), MP_OBJ_NULL);
+
+        nlr_pop();
+    } else {
+        // TODO: how to handle exception on java side?
+        mp_obj_print_exception(&mp_plat_print, nlr.ret_val);
+    }
+    JNUPY_FUNC_END_VOID;
+}
 
 /** JNI EXPORT FUNCTION MECRO CLNEAUP **/
 #undef return

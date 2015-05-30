@@ -50,9 +50,16 @@ public class PythonState {
 				return args[0];
 			}
 		});
-		py.mp_code_exec("from jnupy import jfuncs");
+		py.mp_code_exec("from jnupy import jfuncs, pyrefs; import jnupy");
 		py.mp_code_exec("print(jfuncs)");
-		py.mp_code_exec("x = jfuncs['hello']([], 321, True, None, '안녕!', 3.14); y = jfuncs['hello'](x); print('[', x, ']; [', y, ']')");
+		py.mp_code_exec("x = jfuncs['hello']([3, 2], 321, True, None, '안녕!', 3.14); y = jfuncs['hello'](x); print('[', x, ']; [', y, ']')");
+		py.mp_code_exec("print(pyrefs)");	
+		System.out.println(py.mp_code_eval("3 + 2"));
+		System.gc();
+		py.mp_code_exec("print(pyrefs)");	
+		System.gc();
+		System.out.println(py.mp_code_eval("3 + 2"));
+		py.mp_code_exec("print(pyrefs)");	
 	}
 	
 	public static final int APIVERSION = 1;
@@ -80,14 +87,16 @@ public class PythonState {
 	// TODO: build this first, and define in jnupy.c later
 	// this is native function list
 	
-	public native void mp_test_jni();
-	public native void mp_test_jni_state();
-	public native void mp_test_jni_fail();
-	public native boolean mp_state_new();
-	public native boolean mp_state_free();
-	public native boolean mp_state_exist();
-	public native boolean mp_state_check();
-	public native boolean mp_code_exec(String nope);
-	public native boolean mp_jfunc_set(String name, JavaFunction jfunc);
-	
+	public native synchronized void mp_test_jni();
+	public native synchronized void mp_test_jni_state();
+	public native synchronized void mp_test_jni_fail();
+	public native synchronized boolean mp_state_new();
+	public native synchronized boolean mp_state_free();
+	public native synchronized boolean mp_state_exist();
+	public native synchronized boolean mp_state_check();
+	public native synchronized boolean mp_code_exec(String code);
+	public native synchronized Object mp_code_eval(String code);
+	public native synchronized boolean mp_jfunc_set(String name, JavaFunction jfunc);
+    public native synchronized void mp_ref_incr(PythonObject pyobj);
+    public native synchronized void mp_ref_derc(PythonObject pyobj);
 }
