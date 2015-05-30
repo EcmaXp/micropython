@@ -313,6 +313,8 @@ JNUPY_REF_CLASS(CDKHI)
 JNUPY_REF_CLASS(CMCKJ)
 // CLASS: java/lang/Float
 JNUPY_REF_CLASS(CLJBD)
+// CLASS: java/lang/IllegalStateException
+JNUPY_REF_CLASS(CQIAK)
 // CLASS: java/lang/Integer
 JNUPY_REF_CLASS(CTOBT)
 // CLASS: java/lang/Long
@@ -479,6 +481,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNUPY_LOAD_CLASS("java/lang/Boolean", CDKHI)
     JNUPY_LOAD_CLASS("java/lang/Double", CMCKJ)
     JNUPY_LOAD_CLASS("java/lang/Float", CLJBD)
+    JNUPY_LOAD_CLASS("java/lang/IllegalStateException", CQIAK)
     JNUPY_LOAD_CLASS("java/lang/Integer", CTOBT)
     JNUPY_LOAD_CLASS("java/lang/Long", CJACF)
     JNUPY_LOAD_CLASS("java/lang/Object", CVNFN)
@@ -542,6 +545,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     JNUPY_UNLOAD_CLASS("java/lang/Boolean", CDKHI)
     JNUPY_UNLOAD_CLASS("java/lang/Double", CMCKJ)
     JNUPY_UNLOAD_CLASS("java/lang/Float", CLJBD)
+    JNUPY_UNLOAD_CLASS("java/lang/IllegalStateException", CQIAK)
     JNUPY_UNLOAD_CLASS("java/lang/Integer", CTOBT)
     JNUPY_UNLOAD_CLASS("java/lang/Long", CJACF)
     JNUPY_UNLOAD_CLASS("java/lang/Object", CVNFN)
@@ -588,7 +592,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
 /** JNUPY INTERNAL FUNCTION **/
 bool jnupy_load_state(mp_state_ctx_t *state) {
     if (state == NULL) {
-        JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/AssertionError", CM4H2), "There is no state");
+        JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/IllegalStateException", CQIAK), "Python state is closed.");
 
         // just return, it will throw error.
         return false;
@@ -596,7 +600,7 @@ bool jnupy_load_state(mp_state_ctx_t *state) {
 
     mp_state_force_load(state);
     if (state != mp_state_ctx) {
-        JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/AssertionError", CM4H2), "Invaild Load");
+        JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/IllegalStateException", CQIAK), "Python state is Invaild.");
         return false;
     }
 
@@ -1162,7 +1166,7 @@ JNUPY_FUNC_DEF(void, mp_1test_1jni_1state)
 }
 
 JNUPY_FUNC_DEF(jboolean, mp_1state_1new)
-    (JNIEnv *env, jobject self) {
+    (JNIEnv *env, jobject self, jlong stack_size, jlong heap_size) {
     JNUPY_FUNC_START;
 
     if (!initialized) {
@@ -1183,9 +1187,6 @@ JNUPY_FUNC_DEF(jboolean, mp_1state_1new)
 
     nlr_gk_buf_t nlr_gk = nlr_gk_new();
     if (nlr_gk_push(&nlr_gk) == 0) {
-        mp_uint_t stack_size = MEM_SIZE(40, KB);
-        mp_uint_t heap_size = MEM_SIZE(256, KB);
-
         mp_state_force_load(state);
         mp_stack_set_limit(stack_size);
 
@@ -1204,6 +1205,7 @@ JNUPY_FUNC_DEF(jboolean, mp_1state_1new)
         mp_obj_module_t *module_jnupy = mp_obj_new_module(MP_QSTR_jnupy);
         mp_obj_dict_t *module_jnupy_dict = mp_call_function_0(mp_load_attr(mp_module_jnupy.globals, MP_QSTR_copy));
         mp_obj_dict_store(module_jnupy_dict, MP_OBJ_NEW_QSTR(MP_QSTR_jfuncs), mp_obj_new_dict(0));
+        mp_obj_dict_store(module_jnupy_dict, MP_OBJ_NEW_QSTR(MP_QSTR_jrefs), mp_obj_new_dict(0));
         mp_obj_dict_store(module_jnupy_dict, MP_OBJ_NEW_QSTR(MP_QSTR_pyrefs), mp_obj_new_dict(0));
         module_jnupy->globals = module_jnupy_dict;
 
@@ -1233,7 +1235,9 @@ JNUPY_FUNC_DEF(jboolean, mp_1state_1check)
     (JNIEnv *env, jobject self) {
     JNUPY_FUNC_START;
 
-	if (JNUPY_MP_STATE != NULL) {
+    mp_state_ctx_t *state = jnupy_get_state_from_pythonstate(JNUPY_SELF);
+
+	if (state != NULL) {
 	    return JNI_TRUE;
 	} else {
 	    return JNI_FALSE;
@@ -1242,25 +1246,19 @@ JNUPY_FUNC_DEF(jboolean, mp_1state_1check)
     JNUPY_FUNC_END;
 }
 
-JNUPY_FUNC_DEF(jboolean, mp_1state_1free)
+JNUPY_FUNC_DEF(void, mp_1state_1free)
     (JNIEnv *env, jobject self) {
-    JNUPY_FUNC_START;
+    JNUPY_FUNC_START_WITH_STATE;
 
-	if (JNUPY_MP_STATE != NULL) {
-	    if (!mp_state_is_loaded(JNUPY_MP_STATE)) {
-    	    mp_state_load(JNUPY_MP_STATE);
-	    }
+    assert(mp_state_is_loaded(JNUPY_MP_STATE));
 
-        mp_deinit();
-        free(MP_STATE_MEM(gc_alloc_table_start));
-        mp_state_store(JNUPY_MP_STATE);
+    mp_deinit();
+    free(MP_STATE_MEM(gc_alloc_table_start));
+    mp_state_store(JNUPY_MP_STATE);
 
-	    mp_state_free(JNUPY_MP_STATE);
-	}
+    mp_state_free(JNUPY_MP_STATE);
 
-	return JNI_TRUE;
-
-    JNUPY_FUNC_END;
+    JNUPY_FUNC_END_VOID;
 }
 
 JNUPY_FUNC_DEF(jboolean, mp_1code_1exec)
@@ -1373,7 +1371,32 @@ JNUPY_FUNC_DEF(jboolean, mp_1jfunc_1set)
     JNUPY_FUNC_END_VALUE(JNI_FALSE);
 }
 
-// TODO: add mp_jobject_set?
+JNUPY_FUNC_DEF(jboolean, mp_1jobj_1set)
+    (JNIEnv *env, jobject self, jstring name, jobject jobj) {
+    JNUPY_FUNC_START_WITH_STATE;
+
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) == 0) {
+        const char *namebuf = JNUPY_CALL(GetStringUTFChars, name, 0);
+        mp_obj_t name_obj = mp_obj_new_str(namebuf, strlen(namebuf), true);
+        JNUPY_CALL(ReleaseStringUTFChars, name, namebuf);
+
+        mp_obj_t pyobj = jnupy_jobj_new(jobj);
+
+        mp_obj_t module_jnupy = mp_module_get(MP_QSTR_jnupy);
+        mp_obj_t jrefs_dict = mp_load_attr(module_jnupy, MP_QSTR_jrefs);
+        mp_obj_subscr(jrefs_dict, name_obj, pyobj);
+
+        nlr_pop();
+        return JNI_TRUE;
+    } else {
+        // TODO: how to handle exception on java side?
+        mp_obj_print_exception(&mp_plat_print, nlr.ret_val);
+        return JNI_FALSE;
+    }
+
+    JNUPY_FUNC_END_VALUE(JNI_FALSE);
+}
 
 JNUPY_FUNC_DEF(jlong, mp_1ref_1incr)
     (JNIEnv *env, jobject self, jobject jobj) {

@@ -30,6 +30,24 @@ import java.util.ArrayList;
 import java.util.Map;
 
 public class PythonState {
+	public static final int MEMORY_SCALE;
+	static {
+		String model = System.getProperty("sun.arch.data.model");
+		switch (model) {
+			case "32":
+				MEMORY_SCALE = 1;
+				break;
+			case "64":
+				MEMORY_SCALE = 2;
+				break;
+			default:
+				MEMORY_SCALE = 1;
+		}
+	}
+	
+	public static final long DEFAULT_STACK_SIZE = 1024 * 32 * MEMORY_SCALE; // 32 KB
+	public static final long DEFAULT_HEAP_SIZE = 1024 * 256 * MEMORY_SCALE; // 256 KB
+	
     static {
     	System.load(System.getenv("MICROPYTHON_LIB"));
 		// NativeSupport.getInstance().getLoader().load();
@@ -60,11 +78,9 @@ public class PythonState {
 				return args[0];
 			}
 		});
-		py.mp_code_exec("from jnupy import jfuncs, pyrefs; import jnupy");
-		py.mp_code_exec("print(jfuncs)");
-		py.mp_code_exec("x = jfuncs['hello']({3: 2}, object()); y = jfuncs['hello'](x); print('[', x, ']; [', y, ']')");
-		System.out.println(py.mp_code_eval("3 + 2"));
-		System.out.println(py.mp_code_eval("__import__"));
+		py.mp_jobj_set("hello", new Object());
+		System.out.println(py.mp_code_eval("jnupy.jfuncs['hello'](1, 2, 3.4, None)"));
+		py.mp_code_eval("print(repr(jnupy.jrefs['hello']))");
 	}
 	
 	public static final int APIVERSION = 1;
@@ -73,11 +89,19 @@ public class PythonState {
 	private long mpState;
 	
 	public PythonState() {
-		if (!mp_state_new()) {
-			// TODO: change exception/message
-			throw new RuntimeException("invaild result...");
+		this(DEFAULT_STACK_SIZE, DEFAULT_HEAP_SIZE);
+	}
+
+	public PythonState(long heap_size) {
+		this(DEFAULT_STACK_SIZE, heap_size);
+	}
+
+	public PythonState(long stack_size, long heap_size) {
+		if (!mp_state_new(stack_size, heap_size)) {
+			throw new IllegalStateException("Generate python state is failed.");
 		}
 		
+		// jnupy is python-side module
 		mp_code_exec("import jnupy");
 	}
 
@@ -85,20 +109,36 @@ public class PythonState {
 		return (mpState == mpStateId);
 	}
 	
-	// TODO: public as private (until test done?)
-	// TODO: build this first, and define in jnupy.c later
-	// this is native function list
+	public final synchronized boolean isOpen() {
+		return mp_state_check();
+	}
+	
+	public synchronized void close() {
+		if (mp_state_check()) {
+			mp_state_free();
+		}
+	}
+	
+	private void check() {
+		if (!mp_state_check()) {
+			throw new IllegalStateException("Python state is closed");
+		}
+	}
+	
+	// TODO: public as private
+	// native function list: jnupy.c
 	
 	public native synchronized void mp_test_jni();
 	public native synchronized void mp_test_jni_state();
 	public native synchronized void mp_test_jni_fail();
-	public native synchronized boolean mp_state_new();
-	public native synchronized boolean mp_state_free();
+	public native synchronized boolean mp_state_new(long stack_size, long heap_size);
+	public native synchronized void mp_state_free();
 	public native synchronized boolean mp_state_exist();
 	public native synchronized boolean mp_state_check();
 	public native synchronized boolean mp_code_exec(String code);
 	public native synchronized Object mp_code_eval(String code);
 	public native synchronized boolean mp_jfunc_set(String name, JavaFunction jfunc);
+    public native synchronized boolean mp_jobj_set(String name, Object jobj);
     public native synchronized long mp_ref_incr(PythonNativeObject pyobj);
     public native synchronized void mp_ref_derc(PythonNativeObject pyobj);
 }
