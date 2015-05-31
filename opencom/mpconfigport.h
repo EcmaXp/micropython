@@ -149,7 +149,7 @@ extern const struct _mp_obj_module_t mp_module_jnupy;
 #define MICROPY_PY_MICROTHREAD_DEF
 #endif
 #if MICROPY_BUILD_JNI_LIBRARY
-#define MICROPY_PY_JNUPY_DEF { MP_OBJ_NEW_QSTR(MP_QSTR_jnupy), (mp_obj_t)&mp_module_jnupy },
+#define MICROPY_PY_JNUPY_DEF { MP_OBJ_NEW_QSTR(MP_QSTR_ujnupy), (mp_obj_t)&mp_module_ujnupy },
 #else
 #define MICROPY_PY_JNUPY_DEF
 #endif

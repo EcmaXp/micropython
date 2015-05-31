@@ -78,15 +78,17 @@ public class PythonState {
 				return args[0];
 			}
 		});
+		System.out.println("helloX");
 		py.mp_jobj_set("hello", new Object());
-		System.out.println(py.mp_code_eval("jnupy.jfuncs['hello'](1, 2, 3.4, None)"));
+		System.out.println("helloY");
+		System.out.println(py.mp_code_exec("x=jnupy.jfuncs['hello']; print(repr(jnupy.jfuncs['hello']), x); x(1, 2, 3.4, None)"));
+		System.out.println("helloZ");
 		py.mp_code_eval("print(repr(jnupy.jrefs['hello']))");
 		py.mp_code_exec("jnupy.pyfuncs['print'] = print; jnupy.pyfuncs['str'] = str;");
 		System.out.println(py.mp_func_vaild("print"));
 		System.out.println(py.mp_func_call("print", 3, 4, 12, 45));
 		
 		PythonFunction print = new PythonNativeFunction(py, "print");
-		PythonFunction str = new PythonNativeFunction(py, "str");
 
 		System.out.println(print.invoke("[", 1, 3, 4, 5, 4, 2, 3, 4));
 	}

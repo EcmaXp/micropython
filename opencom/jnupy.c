@@ -1092,7 +1092,7 @@ STATIC const mp_map_elem_t mp_module_ujnupy_globals_table[] = {
 
 STATIC MP_DEFINE_CONST_DICT(mp_module_ujnupy_globals, mp_module_ujnupy_globals_table);
 
-const mp_obj_module_t mp_module_jnupy = {
+const mp_obj_module_t mp_module_ujnupy = {
     .base = { &mp_type_module },
     .name = MP_QSTR_ujnupy,
     .globals = (mp_obj_dict_t*)&mp_module_ujnupy_globals,
@@ -1216,7 +1216,7 @@ JNUPY_FUNC_DEF(jboolean, mp_1state_1new)
         mp_obj_list_init(mp_sys_argv, 0);
 
         mp_obj_module_t *module_jnupy = mp_obj_new_module(MP_QSTR_jnupy);
-        mp_obj_dict_t *module_jnupy_dict = mp_call_function_0(mp_load_attr(mp_module_jnupy.globals, MP_QSTR_copy));
+        mp_obj_dict_t *module_jnupy_dict = mp_call_function_0(mp_load_attr(mp_module_ujnupy.globals, MP_QSTR_copy));
         mp_obj_dict_store(module_jnupy_dict, MP_OBJ_NEW_QSTR(MP_QSTR_jfuncs), mp_obj_new_dict(0));
         mp_obj_dict_store(module_jnupy_dict, MP_OBJ_NEW_QSTR(MP_QSTR_jrefs), mp_obj_new_dict(0));
         mp_obj_dict_store(module_jnupy_dict, MP_OBJ_NEW_QSTR(MP_QSTR_pyfuncs), mp_obj_new_dict(0));
@@ -1366,7 +1366,7 @@ JNUPY_FUNC_DEF(jboolean, mp_1jfunc_1set)
     if (nlr_push(&nlr) == 0) {
         mp_obj_t nameobj = jnupy_obj_str_new(name);
         mp_obj_t funcobj = mp_obj_jfunc_new(JNUPY_PY_JSTATE, nameobj, jfunc);
-        mp_obj_subscr(jnupy_getattr(MP_QSTR_jfuncs), nameobj, funcobj);
+        mp_obj_dict_store(jnupy_getattr(MP_QSTR_jfuncs), nameobj, funcobj);
 
         nlr_pop();
         return JNI_TRUE;
@@ -1390,7 +1390,7 @@ JNUPY_FUNC_DEF(jboolean, mp_1jobj_1set)
 
         mp_obj_t module_jnupy = mp_module_get(MP_QSTR_jnupy);
         mp_obj_t jrefs_dict = mp_load_attr(module_jnupy, MP_QSTR_jrefs);
-        mp_obj_subscr(jrefs_dict, nameobj, pyobj);
+        mp_obj_dict_store(jrefs_dict, nameobj, pyobj);
 
         nlr_pop();
         return JNI_TRUE;
@@ -1415,7 +1415,7 @@ JNUPY_FUNC_DEF(jlong, mp_1ref_1incr)
     nlr_buf_t nlr;
     if (nlr_push(&nlr) == 0) {
         mp_int_t objid = ((mp_int_t)obj) >> 2;
-        mp_obj_subscr(jnupy_getattr(MP_QSTR_pyrefs), MP_OBJ_NEW_SMALL_INT(objid), obj);
+        mp_obj_dict_store(jnupy_getattr(MP_QSTR_pyrefs), MP_OBJ_NEW_SMALL_INT(objid), obj);
 
         nlr_pop();
         return objid;
@@ -1440,8 +1440,8 @@ JNUPY_FUNC_DEF(void, mp_1ref_1derc)
     if (nlr_push(&nlr) == 0) {
         mp_int_t objid = ((mp_int_t)obj) >> 2;
         mp_obj_t pyrefs_dict = jnupy_getattr(MP_QSTR_pyrefs);
-        mp_obj_subscr(pyrefs_dict, MP_OBJ_NEW_SMALL_INT(objid), obj); // TODO: remove safety with no setitem.
-        mp_obj_subscr(pyrefs_dict, MP_OBJ_NEW_SMALL_INT(objid), MP_OBJ_NULL);
+        mp_obj_dict_store(pyrefs_dict, MP_OBJ_NEW_SMALL_INT(objid), obj); // TODO: remove safety with no setitem.
+        mp_obj_dict_delete(pyrefs_dict, MP_OBJ_NEW_SMALL_INT(objid));
 
         nlr_pop();
     } else {
