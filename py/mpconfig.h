@@ -782,7 +782,16 @@ endif
   #elif defined(__BIG_ENDIAN__) || defined(__BIG_ENDIAN) || defined (_BIG_ENDIAN)
     #define MP_ENDIANNESS_LITTLE (0)
   #else
-    #error endianness not defined and cannot detect it
+    #include <endian.h>
+      #if defined(__BYTE_ORDER)
+        #if __BYTE_ORDER == __LITTLE_ENDIAN
+          #define MP_ENDIANNESS_LITTLE (1)
+        #else
+          #define MP_ENDIANNESS_LITTLE (0)
+        #endif
+      #else
+        #error endianness not defined and cannot detect it
+      #endif
   #endif
   #define MP_ENDIANNESS_BIG (!MP_ENDIANNESS_LITTLE)
 #endif
