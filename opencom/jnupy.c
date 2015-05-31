@@ -167,11 +167,11 @@ STATIC MP_THREAD jnupy_current_state_t jnupy_cur_state;
 STATIC JavaVM *jnupy_glob_java_vm;
 
 /** JNUPY MECRO **/
-#if DEBUG
+//#if DEBUG
 #define _D(x) printf(#x "\n")
-#else
-#define _D(x) (void)0
-#endif
+//#else
+//#define _D(x) (void)0
+//#endif
 
 #define _JNUPY_CUR_STATE(x) (jnupy_cur_state.x)
 #define JNUPY_G_VM jnupy_glob_java_vm
@@ -712,6 +712,19 @@ const mp_obj_type_t mp_type_jfunc;
 mp_obj_t mp_obj_jfunc_new(jobject jstate, mp_obj_t name, jobject jfunc);
 jobject mp_obj_jfunc_get(mp_obj_t self_in);
 
+mp_obj_t jnupy_obj_str_new(jstring jstr) {
+    const char *strbuf = JNUPY_CALL(GetStringUTFChars, jstr, 0);
+    mp_obj_t str_obj = mp_obj_new_str(strbuf, strlen(strbuf), true);
+    JNUPY_CALL(ReleaseStringUTFChars, jstr, strbuf);
+
+    return str_obj;
+}
+
+mp_obj_t jnupy_getattr(qstr attr) {
+    mp_obj_t module_jnupy = mp_module_get(MP_QSTR_jnupy);
+    return mp_load_attr(module_jnupy, attr);
+}
+
 /* in li.cil.oc.server.machine.Machine.scala ...
 TODO: support convert it (jnupy_obj_j2py, jnupy_obj_py2j)
 - NULL = None [OK]
@@ -1206,6 +1219,7 @@ JNUPY_FUNC_DEF(jboolean, mp_1state_1new)
         mp_obj_dict_t *module_jnupy_dict = mp_call_function_0(mp_load_attr(mp_module_jnupy.globals, MP_QSTR_copy));
         mp_obj_dict_store(module_jnupy_dict, MP_OBJ_NEW_QSTR(MP_QSTR_jfuncs), mp_obj_new_dict(0));
         mp_obj_dict_store(module_jnupy_dict, MP_OBJ_NEW_QSTR(MP_QSTR_jrefs), mp_obj_new_dict(0));
+        mp_obj_dict_store(module_jnupy_dict, MP_OBJ_NEW_QSTR(MP_QSTR_pyfuncs), mp_obj_new_dict(0));
         mp_obj_dict_store(module_jnupy_dict, MP_OBJ_NEW_QSTR(MP_QSTR_pyrefs), mp_obj_new_dict(0));
         module_jnupy->globals = module_jnupy_dict;
 
@@ -1350,15 +1364,9 @@ JNUPY_FUNC_DEF(jboolean, mp_1jfunc_1set)
 
     nlr_buf_t nlr;
     if (nlr_push(&nlr) == 0) {
-        const char *namebuf = JNUPY_CALL(GetStringUTFChars, name, 0);
-        mp_obj_t name_obj = mp_obj_new_str(namebuf, strlen(namebuf), true);
-        JNUPY_CALL(ReleaseStringUTFChars, name, namebuf);
-
-        mp_obj_t jfunc_obj = mp_obj_jfunc_new(JNUPY_PY_JSTATE, name_obj, jfunc);
-
-        mp_obj_t module_jnupy = mp_module_get(MP_QSTR_jnupy);
-        mp_obj_t jfuncs_dict = mp_load_attr(module_jnupy, MP_QSTR_jfuncs);
-        mp_obj_subscr(jfuncs_dict, name_obj, jfunc_obj);
+        mp_obj_t nameobj = jnupy_obj_str_new(name);
+        mp_obj_t funcobj = mp_obj_jfunc_new(JNUPY_PY_JSTATE, nameobj, jfunc);
+        mp_obj_subscr(jnupy_getattr(MP_QSTR_jfuncs), nameobj, funcobj);
 
         nlr_pop();
         return JNI_TRUE;
@@ -1377,15 +1385,12 @@ JNUPY_FUNC_DEF(jboolean, mp_1jobj_1set)
 
     nlr_buf_t nlr;
     if (nlr_push(&nlr) == 0) {
-        const char *namebuf = JNUPY_CALL(GetStringUTFChars, name, 0);
-        mp_obj_t name_obj = mp_obj_new_str(namebuf, strlen(namebuf), true);
-        JNUPY_CALL(ReleaseStringUTFChars, name, namebuf);
-
+        mp_obj_t nameobj = jnupy_obj_str_new(name);
         mp_obj_t pyobj = jnupy_jobj_new(jobj);
 
         mp_obj_t module_jnupy = mp_module_get(MP_QSTR_jnupy);
         mp_obj_t jrefs_dict = mp_load_attr(module_jnupy, MP_QSTR_jrefs);
-        mp_obj_subscr(jrefs_dict, name_obj, pyobj);
+        mp_obj_subscr(jrefs_dict, nameobj, pyobj);
 
         nlr_pop();
         return JNI_TRUE;
@@ -1410,10 +1415,7 @@ JNUPY_FUNC_DEF(jlong, mp_1ref_1incr)
     nlr_buf_t nlr;
     if (nlr_push(&nlr) == 0) {
         mp_int_t objid = ((mp_int_t)obj) >> 2;
-
-        mp_obj_t module_jnupy = mp_module_get(MP_QSTR_jnupy);
-        mp_obj_t pyrefs_dict = mp_load_attr(module_jnupy, MP_QSTR_pyrefs);
-        mp_obj_subscr(pyrefs_dict, MP_OBJ_NEW_SMALL_INT(objid), obj);
+        mp_obj_subscr(jnupy_getattr(MP_QSTR_pyrefs), MP_OBJ_NEW_SMALL_INT(objid), obj);
 
         nlr_pop();
         return objid;
@@ -1437,9 +1439,7 @@ JNUPY_FUNC_DEF(void, mp_1ref_1derc)
     nlr_buf_t nlr;
     if (nlr_push(&nlr) == 0) {
         mp_int_t objid = ((mp_int_t)obj) >> 2;
-
-        mp_obj_t module_jnupy = mp_module_get(MP_QSTR_jnupy);
-        mp_obj_t pyrefs_dict = mp_load_attr(module_jnupy, MP_QSTR_pyrefs);
+        mp_obj_t pyrefs_dict = jnupy_getattr(MP_QSTR_pyrefs);
         mp_obj_subscr(pyrefs_dict, MP_OBJ_NEW_SMALL_INT(objid), obj); // TODO: remove safety with no setitem.
         mp_obj_subscr(pyrefs_dict, MP_OBJ_NEW_SMALL_INT(objid), MP_OBJ_NULL);
 
@@ -1449,6 +1449,80 @@ JNUPY_FUNC_DEF(void, mp_1ref_1derc)
         mp_obj_print_exception(&mp_plat_print, nlr.ret_val);
     }
     JNUPY_FUNC_END_VOID;
+}
+
+JNUPY_FUNC_DEF(jboolean, mp_1func_1vaild)
+    (JNIEnv *env, jobject self, jstring name, jobject jobj) {
+    JNUPY_FUNC_START_WITH_STATE;
+
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) == 0) {
+        mp_obj_t nameobj = jnupy_obj_str_new(name);
+        mp_obj_t pyfuncs_dict = jnupy_getattr(MP_QSTR_pyfuncs);
+
+        jboolean result;
+        nlr_buf_t nlr2;
+        if (nlr_push(&nlr2) == 0) {
+            mp_obj_dict_get(pyfuncs_dict, nameobj);
+            result = JNI_TRUE;
+            nlr_pop();
+        } else {
+            result = JNI_FALSE;
+        }
+
+        nlr_pop();
+        return result;
+    } else {
+        // TODO: how to handle exception on java side?
+        mp_obj_print_exception(&mp_plat_print, nlr.ret_val);
+        return JNI_FALSE;
+    }
+
+    JNUPY_FUNC_END_VALUE(JNI_FALSE);
+}
+
+JNUPY_FUNC_DEF(jobject, mp_1func_1call)
+    (JNIEnv *env, jobject self, jstring name, jarray jargs) {
+    JNUPY_FUNC_START_WITH_STATE;
+
+    mp_obj_t *args = MP_OBJ_NULL;
+    jsize jargs_length = 0;
+
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) == 0) {
+        mp_obj_t nameobj = jnupy_obj_str_new(name);
+        mp_obj_t pyobj = mp_obj_dict_get(jnupy_getattr(MP_QSTR_pyfuncs), nameobj);
+
+        jargs_length = JNUPY_CALL(GetArrayLength, jargs);
+        args = m_new(mp_obj_t, jargs_length);
+
+        for (mp_uint_t i = 0; i < jargs_length; i++) {
+            jobject jarg = JNUPY_CALL(GetObjectArrayElement, jargs, i);
+            mp_obj_t arg = jnupy_obj_j2py(jarg);
+            args[i] = arg;
+        }
+
+        mp_obj_t result = mp_call_function_n_kw(pyobj, jargs_length, 0, args);
+        jobject jresult = jnupy_obj_py2j(result);
+
+        nlr_pop();
+
+        if (args != MP_OBJ_NULL) {
+            m_free(args, jargs_length);
+        }
+
+        return jresult;
+    } else {
+        if (args != MP_OBJ_NULL) {
+            m_free(args, jargs_length);
+        }
+
+        // TODO: how to handle exception on java side?
+        mp_obj_print_exception(&mp_plat_print, nlr.ret_val);
+        return JNI_FALSE;
+    }
+
+    JNUPY_FUNC_END_VALUE(JNI_FALSE);
 }
 
 // TODO: support PythonFunction

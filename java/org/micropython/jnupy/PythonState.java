@@ -81,6 +81,14 @@ public class PythonState {
 		py.mp_jobj_set("hello", new Object());
 		System.out.println(py.mp_code_eval("jnupy.jfuncs['hello'](1, 2, 3.4, None)"));
 		py.mp_code_eval("print(repr(jnupy.jrefs['hello']))");
+		py.mp_code_exec("jnupy.pyfuncs['print'] = print; jnupy.pyfuncs['str'] = str;");
+		System.out.println(py.mp_func_vaild("print"));
+		System.out.println(py.mp_func_call("print", 3, 4, 12, 45));
+		
+		PythonFunction print = new PythonNativeFunction(py, "print");
+		PythonFunction str = new PythonNativeFunction(py, "str");
+
+		System.out.println(print.invoke("[", 1, 3, 4, 5, 4, 2, 3, 4));
 	}
 	
 	public static final int APIVERSION = 1;
@@ -141,4 +149,8 @@ public class PythonState {
     public native synchronized boolean mp_jobj_set(String name, Object jobj);
     public native synchronized long mp_ref_incr(PythonNativeObject pyobj);
     public native synchronized void mp_ref_derc(PythonNativeObject pyobj);
+    public native synchronized boolean mp_func_vaild(String name);
+    public native synchronized Object mp_func_call(String name, Object ...args);
+
+    // How to persist? no idea...
 }
