@@ -27,25 +27,22 @@
 package org.micropython.jnupy;
 
 public class PythonNativeObject implements PythonObject {
-    private PythonState pythonState;
+    PythonState pythonState;
     private long mpObject;
-    private long mpObjectId;
 
-    private PythonNativeObject(PythonState pyState, long mpStateId, long objectId) {
+    PythonNativeObject(PythonState pyState, long mpStateId, long objectId) {
         if (!pyState.checkState(mpStateId)) {
             throw new RuntimeException("invaild state");
         }
         
         pythonState = pyState;
-        mpObject = objectId;     
-        mpObjectId = pythonState.mp_ref_incr(this);
+        mpObject = objectId;
+        pythonState.mp_ref_incr(this);
     }
     
     public String toString() {
-        // TODO: replace this.
-        String code = "repr(jnupy.pyrefs[" + mpObjectId + "])";
-        String result = (String)pythonState.mp_code_eval(code);
-        return getClass().getName() + "[" + result + "]";
+        Object result = pythonState.mp_obj_repr(this);
+        return getClass().getName() + "[" + result.toString() + "]";
     }
 
     protected void finalize() throws Throwable {

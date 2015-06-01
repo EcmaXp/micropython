@@ -29,4 +29,6 @@ package org.micropython.jnupy;
 public interface PythonFunction {
     public Object invoke(PythonState pythonState, Object... args);
     public Object invoke(Object... args);
+    public Object rawInvoke(PythonState pythonState, Object... args);
+    public Object rawInvoke(Object... args);
 }

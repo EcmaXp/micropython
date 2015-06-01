@@ -26,37 +26,40 @@
 
 package org.micropython.jnupy;
 
-public class PythonNativeFunction implements PythonFunction {
-    private PythonState pythonState;
-    private String functionName;
+// TODO: remove PythonNativeFunction?
 
-    public PythonNativeFunction(PythonState pyState, String funcName) {
-        if (!pyState.mp_func_vaild(funcName)) {
-            throw new RuntimeException("invaild function");
-        }
-        
-        pythonState = pyState;
-        functionName = funcName;
+public class PythonNativeFunction extends PythonNativeObject implements PythonFunction {
+    PythonNativeFunction(PythonState pyState, long mpStateId, long objectId) {
+        super(pyState, mpStateId, objectId);
     }
     
-    public String toString() {
-        // TODO: replace this.
-        String code = "repr(jnupy.pyfuncs[" + functionName + "])";
-        String result = (String)pythonState.mp_code_eval(code);
-        return getClass().getName() + "[" + result + "]";
+    private void checkState(PythonState pyState) {
+        if (pythonState != pyState) {
+            throw new RuntimeException("invaild state (not match)");
+        }
     }
     
     @Override
     public Object invoke(PythonState pyState, Object... args) {
-        if (pythonState != pyState) {
-            throw new RuntimeException("invaild state (not match)");
-        }
-        
+        checkState(pyState);
         return this.invoke(args);
     }
     
     @Override
     public Object invoke(Object... args) {
-        return pythonState.mp_func_call(functionName, args);
+        return pythonState.mp_func_call(true, this, args);
     }
+    
+    @Override
+    public Object rawInvoke(PythonState pyState, Object... args) {
+        checkState(pyState);
+        return this.rawInvoke(args);
+    }
+    
+    @Override
+    public Object rawInvoke(Object... args) {
+        return pythonState.mp_func_call(false, this, args);
+    }
+    
+    
 }
