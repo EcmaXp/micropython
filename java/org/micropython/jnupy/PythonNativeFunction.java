@@ -47,7 +47,7 @@ public class PythonNativeFunction extends PythonNativeObject implements PythonFu
     
     @Override
     public Object invoke(Object... args) {
-        return pythonState.mp_func_call(true, this, args);
+        return pythonState.jnupy_func_call(true, this, args);
     }
     
     @Override
@@ -58,7 +58,7 @@ public class PythonNativeFunction extends PythonNativeObject implements PythonFu
     
     @Override
     public Object rawInvoke(Object... args) {
-        return pythonState.mp_func_call(false, this, args);
+        return pythonState.jnupy_func_call(false, this, args);
     }
     
     

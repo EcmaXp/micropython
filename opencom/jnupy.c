@@ -1250,7 +1250,7 @@ const mp_obj_module_t mp_module_ujnupy = {
 
 // http://cafe.daum.net/oddtip/JxlJ/27?docid=1CBe5|JxlJ|27|20080424210900&q=java%20jni&srchid=CCB1CBe5|JxlJ|27|20080424210900
 
-JNUPY_FUNC_DEF(void, mp_1test_1jni)
+JNUPY_FUNC_DEF(void, jnupy_1test_1jni)
     (JNIEnv *env, jobject self) {
     JNUPY_FUNC_START;
 
@@ -1259,7 +1259,7 @@ JNUPY_FUNC_DEF(void, mp_1test_1jni)
     JNUPY_FUNC_END_VOID;
 }
 
-JNUPY_FUNC_DEF(void, mp_1test_1jni_1fail)
+JNUPY_FUNC_DEF(void, jnupy_1test_1jni_1fail)
     (JNIEnv *env, jobject self) {
     JNUPY_FUNC_START;
 
@@ -1268,14 +1268,14 @@ JNUPY_FUNC_DEF(void, mp_1test_1jni_1fail)
     JNUPY_FUNC_END_VOID;
 }
 
-JNUPY_FUNC_DEF(void, mp_1test_1jni_1state)
+JNUPY_FUNC_DEF(void, jnupy_1test_1jni_1state)
     (JNIEnv *env, jobject self) {
     JNUPY_FUNC_START_WITH_STATE;
 
     JNUPY_FUNC_END_VOID;
 }
 
-JNUPY_FUNC_DEF(jboolean, mp_1state_1new)
+JNUPY_FUNC_DEF(jboolean, jnupy_1state_1new)
     (JNIEnv *env, jobject self, jlong stack_size, jlong heap_size) {
     JNUPY_FUNC_START;
 
@@ -1341,7 +1341,7 @@ JNUPY_FUNC_DEF(jboolean, mp_1state_1new)
 }
 
 
-JNUPY_FUNC_DEF(jboolean, mp_1state_1check)
+JNUPY_FUNC_DEF(jboolean, jnupy_1state_1check)
     (JNIEnv *env, jobject self) {
     JNUPY_FUNC_START;
 
@@ -1356,7 +1356,7 @@ JNUPY_FUNC_DEF(jboolean, mp_1state_1check)
     JNUPY_FUNC_END;
 }
 
-JNUPY_FUNC_DEF(void, mp_1state_1free)
+JNUPY_FUNC_DEF(void, jnupy_1state_1free)
     (JNIEnv *env, jobject self) {
     JNUPY_FUNC_START_WITH_STATE;
 
@@ -1371,7 +1371,7 @@ JNUPY_FUNC_DEF(void, mp_1state_1free)
     JNUPY_FUNC_END_VOID;
 }
 
-JNUPY_FUNC_DEF(jboolean, mp_1code_1exec)
+JNUPY_FUNC_DEF(jboolean, jnupy_1code_1exec)
     (JNIEnv *env, jobject self, jstring code) {
     JNUPY_FUNC_START_WITH_STATE;
 
@@ -1410,7 +1410,7 @@ JNUPY_FUNC_DEF(jboolean, mp_1code_1exec)
     JNUPY_FUNC_END;
 }
 
-JNUPY_FUNC_DEF(jobject, mp_1code_1eval)
+JNUPY_FUNC_DEF(jobject, jnupy_1code_1eval)
     (JNIEnv *env, jobject self, jstring code) {
     JNUPY_FUNC_START_WITH_STATE;
 
@@ -1454,7 +1454,7 @@ JNUPY_FUNC_DEF(jobject, mp_1code_1eval)
     JNUPY_FUNC_END;
 }
 
-JNUPY_FUNC_DEF(jboolean, mp_1jfunc_1set)
+JNUPY_FUNC_DEF(jboolean, jnupy_1jfunc_1set)
     (JNIEnv *env, jobject self, jstring name, jobject jfunc) {
     JNUPY_FUNC_START_WITH_STATE;
 
@@ -1475,7 +1475,7 @@ JNUPY_FUNC_DEF(jboolean, mp_1jfunc_1set)
     JNUPY_FUNC_END_VALUE(JNI_FALSE);
 }
 
-JNUPY_FUNC_DEF(jboolean, mp_1jobj_1set)
+JNUPY_FUNC_DEF(jboolean, jnupy_1jobj_1set)
     (JNIEnv *env, jobject self, jstring name, jobject jobj) {
     JNUPY_FUNC_START_WITH_STATE;
 
@@ -1499,7 +1499,7 @@ JNUPY_FUNC_DEF(jboolean, mp_1jobj_1set)
     JNUPY_FUNC_END_VALUE(JNI_FALSE);
 }
 
-JNUPY_FUNC_DEF(void, mp_1ref_1incr)
+JNUPY_FUNC_DEF(void, jnupy_1ref_1incr)
     (JNIEnv *env, jobject self, jobject jobj) {
     JNUPY_FUNC_START_WITH_STATE;
 
@@ -1524,7 +1524,7 @@ JNUPY_FUNC_DEF(void, mp_1ref_1incr)
     JNUPY_FUNC_END_VOID;
 }
 
-JNUPY_FUNC_DEF(void, mp_1ref_1derc)
+JNUPY_FUNC_DEF(void, jnupy_1ref_1derc)
     (JNIEnv *env, jobject self, jobject jobj) {
     JNUPY_FUNC_START_WITH_STATE;
 
@@ -1550,7 +1550,7 @@ JNUPY_FUNC_DEF(void, mp_1ref_1derc)
     JNUPY_FUNC_END_VOID;
 }
 
-JNUPY_FUNC_DEF(jobject, mp_1func_1call)
+JNUPY_FUNC_DEF(jobject, jnupy_1func_1call)
     (JNIEnv *env, jobject self, jboolean convertResult, jobject pyref, jarray jargs) {
     JNUPY_FUNC_START_WITH_STATE;
 
@@ -1601,7 +1601,7 @@ JNUPY_FUNC_DEF(jobject, mp_1func_1call)
 }
 
 
-JNUPY_FUNC_DEF(jstring, mp_1obj_1repr)
+JNUPY_FUNC_DEF(jstring, jnupy_1obj_1repr)
     (JNIEnv *env, jobject self, jobject pyref) {
     JNUPY_FUNC_START_WITH_STATE;
 

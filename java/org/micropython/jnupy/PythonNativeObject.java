@@ -37,15 +37,15 @@ public class PythonNativeObject implements PythonObject {
         
         pythonState = pyState;
         mpObject = objectId;
-        pythonState.mp_ref_incr(this);
+        pythonState.jnupy_ref_incr(this);
     }
     
     public String toString() {
-        Object result = pythonState.mp_obj_repr(this);
+        Object result = pythonState.jnupy_obj_repr(this);
         return getClass().getName() + "[" + result.toString() + "]";
     }
 
     protected void finalize() throws Throwable {
-        pythonState.mp_ref_derc(this);
+        pythonState.jnupy_ref_derc(this);
     }
 }
