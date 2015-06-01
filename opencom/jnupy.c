@@ -24,7 +24,7 @@
  * THE SOFTWARE.
  */
 
-/** ref: ../java/org/micropython/jnupy/PythonState.java **/
+/** ref: ../java/org/micropython/jnupy/PythonNativeState.java **/
 // TODO: Support JSR 223? (not in jnupy.c)
 
 /** JNLUA-LICENSE
@@ -156,7 +156,7 @@ typedef struct _jnupy_current_state_t {
     jobject java_self;
 
     // JNUPY_PY_STATE
-    // java PythonState (vaild only current thread)
+    // java PythonNativeState (vaild only current thread)
     jobject java_pystate;
 } jnupy_current_state_t;
 
@@ -191,7 +191,7 @@ STATIC JavaVM *jnupy_glob_java_vm;
 JNUPY_CALL usage:
 
 // With getting value
-jobject msg = JNUPY_CALL(GetLongField, JNUPY_SELF, JFIELD(PythonState, mpState));
+jobject msg = JNUPY_CALL(GetLongField, JNUPY_SELF, JFIELD(PythonNativeState, mpState));
 
 // With ignore value
 JNUPY_CALL(NewGlobalRef, jfunc);
@@ -333,14 +333,14 @@ JNUPY_REF_CLASS(CRBZE)
 JNUPY_REF_CLASS(C4K4N)
 // CLASS: org/micropython/jnupy/PythonNativeObject
 JNUPY_REF_CLASS(CXHK4)
-// CLASS: org/micropython/jnupy/PythonState
-JNUPY_REF_CLASS(C4SDY)
+// CLASS: org/micropython/jnupy/PythonNativeState
+JNUPY_REF_CLASS(CEYRH)
 // FIELD: org/micropython/jnupy/PythonNativeObject->mpObject[J]
 JNUPY_REF_FIELD(FJS2C)
 // FIELD: org/micropython/jnupy/PythonNativeObject->pythonState[Lorg/micropython/jnupy/PythonState;]
 JNUPY_REF_FIELD(F2KV6)
-// FIELD: org/micropython/jnupy/PythonState->mpState[J]
-JNUPY_REF_FIELD(F3VA2)
+// FIELD: org/micropython/jnupy/PythonNativeState->mpState[J]
+JNUPY_REF_FIELD(FJ2IH)
 // METHOD: java/io/ByteArrayInputStream-><init>[([B)V]
 JNUPY_REF_METHOD(MUZ6M)
 // METHOD: java/io/ByteArrayOutputStream->toByteArray[()[B]
@@ -408,8 +408,8 @@ JNUPY_AP(EXPORT)
 #define JSTATICFIELD_Boolean_TRUE JNUPY_STATICFIELD("java/lang/Boolean", "TRUE", "Ljava/lang/Boolean;", S3RTH)
 #define JSTATICFIELD_Boolean_FALSE JNUPY_STATICFIELD("java/lang/Boolean", "FALSE", "Ljava/lang/Boolean;", SYCJ2)
 
-#define JCLASS_PythonState JNUPY_CLASS("org/micropython/jnupy/PythonState", C4SDY)
-#define JFIELD_PythonState_mpState JNUPY_FIELD("org/micropython/jnupy/PythonState", "mpState", "J", F3VA2)
+#define JCLASS_PythonNativeState JNUPY_CLASS("org/micropython/jnupy/PythonNativeState", CEYRH)
+#define JFIELD_PythonNativeState_mpState JNUPY_FIELD("org/micropython/jnupy/PythonNativeState", "mpState", "J", FJ2IH)
 
 #define JCLASS_PythonNativeObject JNUPY_CLASS("org/micropython/jnupy/PythonNativeObject", CXHK4)
 #define JMETHOD_PythonNativeObject_INIT JNUPY_METHOD("org/micropython/jnupy/PythonNativeObject", "<init>", "(Lorg/micropython/jnupy/PythonState;JJ)V", MI4DW)
@@ -498,10 +498,10 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNUPY_LOAD_CLASS("org/micropython/jnupy/JavaFunction", CRBZE)
     JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonNativeFunction", C4K4N)
     JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonNativeObject", CXHK4)
-    JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonState", C4SDY)
+    JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonNativeState", CEYRH)
     JNUPY_LOAD_FIELD("org/micropython/jnupy/PythonNativeObject", "mpObject", "J", CXHK4, FJS2C)
     JNUPY_LOAD_FIELD("org/micropython/jnupy/PythonNativeObject", "pythonState", "Lorg/micropython/jnupy/PythonState;", CXHK4, F2KV6)
-    JNUPY_LOAD_FIELD("org/micropython/jnupy/PythonState", "mpState", "J", C4SDY, F3VA2)
+    JNUPY_LOAD_FIELD("org/micropython/jnupy/PythonNativeState", "mpState", "J", CEYRH, FJ2IH)
     JNUPY_LOAD_METHOD("java/io/ByteArrayInputStream", "<init>", "([B)V", CPYWG, MUZ6M)
     JNUPY_LOAD_METHOD("java/io/ByteArrayOutputStream", "toByteArray", "()[B", CPITF, MHUAS)
     JNUPY_LOAD_METHOD("java/lang/Boolean", "booleanValue", "()Z", CDKHI, ME2HS)
@@ -564,10 +564,10 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/JavaFunction", CRBZE)
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/PythonNativeFunction", C4K4N)
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/PythonNativeObject", CXHK4)
-    JNUPY_UNLOAD_CLASS("org/micropython/jnupy/PythonState", C4SDY)
+    JNUPY_UNLOAD_CLASS("org/micropython/jnupy/PythonNativeState", CEYRH)
     JNUPY_UNLOAD_FIELD("org/micropython/jnupy/PythonNativeObject", "mpObject", "J", CXHK4, FJS2C)
     JNUPY_UNLOAD_FIELD("org/micropython/jnupy/PythonNativeObject", "pythonState", "Lorg/micropython/jnupy/PythonState;", CXHK4, F2KV6)
-    JNUPY_UNLOAD_FIELD("org/micropython/jnupy/PythonState", "mpState", "J", C4SDY, F3VA2)
+    JNUPY_UNLOAD_FIELD("org/micropython/jnupy/PythonNativeState", "mpState", "J", CEYRH, FJ2IH)
     JNUPY_UNLOAD_METHOD("java/io/ByteArrayInputStream", "<init>", "([B)V", CPYWG, MUZ6M)
     JNUPY_UNLOAD_METHOD("java/io/ByteArrayOutputStream", "toByteArray", "()[B", CPITF, MHUAS)
     JNUPY_UNLOAD_METHOD("java/lang/Boolean", "booleanValue", "()Z", CDKHI, ME2HS)
@@ -619,21 +619,21 @@ bool jnupy_load_state(mp_state_ctx_t *state) {
     return true;
 }
 
-mp_state_ctx_t *jnupy_get_state_from_pythonstate(jobject pythonState) {
-    jlong pythonStateId = JNUPY_CALL(GetLongField, pythonState, JFIELD(PythonState, mpState));
-    return (mp_state_ctx_t *)pythonStateId;
+mp_state_ctx_t *jnupy_get_state_from_pythonnativestate(jobject pythonNativeState) {
+    jlong pythonNativeStateId = JNUPY_CALL(GetLongField, pythonNativeState, JFIELD(PythonNativeState, mpState));
+    return (mp_state_ctx_t *)pythonNativeStateId;
 }
 
-bool jnupy_load_state_from_pythonstate() {
+bool jnupy_load_state_from_pythonnativestate() {
     JNUPY_PY_JSTATE = JNUPY_SELF;
-    mp_state_ctx_t *state = jnupy_get_state_from_pythonstate(JNUPY_SELF);
+    mp_state_ctx_t *state = jnupy_get_state_from_pythonnativestate(JNUPY_SELF);
     return jnupy_load_state(state);
 }
 
 bool jnupy_load_state_from_pythonnativeobject() {
-    jobject pythonState = JNUPY_CALL(GetObjectField, JNUPY_SELF, JFIELD(PythonNativeObject, pythonState));
-    JNUPY_PY_JSTATE = pythonState;
-    mp_state_ctx_t *state = jnupy_get_state_from_pythonstate(pythonState);
+    jobject pythonNativeState = JNUPY_CALL(GetObjectField, JNUPY_SELF, JFIELD(PythonNativeObject, pythonState));
+    JNUPY_PY_JSTATE = pythonNativeState;
+    mp_state_ctx_t *state = jnupy_get_state_from_pythonnativestate(pythonNativeState);
     return jnupy_load_state(state);
 }
 
@@ -720,7 +720,7 @@ mp_obj_t jnupy_jobj_new(jobject jobj);
 jobject jnupy_jobj_get(mp_obj_t self_in);
 
 const mp_obj_type_t mp_type_jfunc;
-mp_obj_t mp_obj_jfunc_new(jobject jstate, mp_obj_t name, jobject jfunc);
+mp_obj_t mp_obj_jfunc_new(jobject jstate, jobject jfunc);
 jobject mp_obj_jfunc_get(mp_obj_t self_in);
 
 const mp_obj_type_t mp_type_pyref;
@@ -757,15 +757,15 @@ TODO: support convert it (jnupy_obj_j2py, jnupy_obj_py2j)
 */
 
 // TODO: jnupy_pyobj_new and jnupy_pyobj_func_new -> give old value if already exists.
-jobject jnupy_pyobj_new(jobject pythonState, mp_obj_t pyobj) {
-    jobject pyState = JNUPY_CALL(NewGlobalRef, pythonState);
+jobject jnupy_pyobj_new(jobject pythonNativeState, mp_obj_t pyobj) {
+    jobject pyState = JNUPY_CALL(NewGlobalRef, pythonNativeState);
     jobject jobj = JNUPY_CALL(NewObject, JCLASS(PythonNativeObject), JMETHOD(PythonNativeObject, INIT), pyState, (jlong)(void *)JNUPY_MP_STATE, (jlong)(void *)pyobj);
 
     return jobj;
 }
 
-jobject jnupy_pyobj_func_new(jobject pythonState, mp_obj_t pyobj) {
-    jobject pyState = JNUPY_CALL(NewGlobalRef, pythonState);
+jobject jnupy_pyobj_func_new(jobject pythonNativeState, mp_obj_t pyobj) {
+    jobject pyState = JNUPY_CALL(NewGlobalRef, pythonNativeState);
     jobject jobj = JNUPY_CALL(NewObject, JCLASS(PythonNativeFunction), JMETHOD(PythonNativeFunction, INIT), pyState, (jlong)(void *)JNUPY_MP_STATE, (jlong)(void *)pyobj);
 
     return jobj;
@@ -850,6 +850,8 @@ mp_obj_t jnupy_obj_j2py(jobject obj) {
         // TODO: handle dictionary
     } else if (0) {
         // TODO: handle set?
+    } else if (IsInstanceOf(obj, JCLASS(JavaFunction))) {
+        return mp_obj_jfunc_new(JNUPY_PY_JSTATE, obj);
     } else if (IsInstanceOf(obj, JCLASS(PythonNativeObject))) {
         return jnupy_pyobj_get(obj);
     } else {
@@ -949,6 +951,16 @@ jobject jnupy_obj_py2j(mp_obj_t obj) {
     return NULL;
 }
 
+jobject jnupy_obj_py2j_raw(mp_obj_t obj) {
+    MP_STACK_CHECK();
+
+    if (MP_OBJ_IS_TYPE(obj, &mp_type_jobject)) {
+        return jnupy_jobj_get(obj);
+    } else {
+        return jnupy_pyobj_new(JNUPY_PY_JSTATE, obj);
+    }
+}
+
 typedef struct _jnupy_jobj_t {
     mp_obj_base_t base;
     jobject jobj;
@@ -1010,15 +1022,13 @@ const mp_obj_type_t mp_type_jobject = {
 
 typedef struct _mp_obj_jfunc_t {
     mp_obj_base_t base;
-    mp_obj_t name;
     jobject jstate;
     jobject jfunc;
 } mp_obj_jfunc_t;
 
-mp_obj_t mp_obj_jfunc_new(jobject jstate, mp_obj_t name, jobject jfunc) {
+mp_obj_t mp_obj_jfunc_new(jobject jstate, jobject jfunc) {
     mp_obj_jfunc_t *o = m_new_obj_with_finaliser(mp_obj_jfunc_t);
     o->base.type = &mp_type_jfunc;
-    o->name = name;
     o->jstate = JNUPY_CALL(NewGlobalRef, jstate);
     o->jfunc = JNUPY_CALL(NewGlobalRef, jfunc);
 
@@ -1059,28 +1069,6 @@ STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, c
 	return pyresult;
 }
 
-STATIC void jfunc_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
-    mp_obj_jfunc_t *self = self_in;
-
-    if (dest[0] != MP_OBJ_NULL) {
-        // not load attribute
-        return;
-    }
-    if (attr == MP_QSTR___name__) {
-        dest[0] = self->name;
-    }
-}
-
-#if MICROPY_CPYTHON_COMPAT
-STATIC void jfunc_print(const mp_print_t *print, mp_obj_t o_in, mp_print_kind_t kind) {
-    mp_obj_jfunc_t *o = o_in;
-
-    mp_print_str(print, "<JFunction ");
-    mp_obj_print_helper(print, o->name, kind);
-    mp_print_str(print, ">");
-}
-#endif
-
 STATIC mp_obj_t jfunc_del(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
     mp_obj_jfunc_t *o = self_in;
     JNUPY_CALL(DeleteGlobalRef, o->jstate);
@@ -1101,10 +1089,6 @@ const mp_obj_type_t mp_type_jfunc = {
     { &mp_type_type },
     .name = MP_QSTR_JFunction,
     .call = jfunc_call,
-    .attr = jfunc_attr,
-    #if MICROPY_CPYTHON_COMPAT
-    .print = jfunc_print,
-    #endif
     .locals_dict = (mp_obj_t)&jfunc_locals_dict,
 };
 
@@ -1244,9 +1228,9 @@ const mp_obj_module_t mp_module_ujnupy = {
 
 #undef JNUPY_FUNC
 #undef JNUPY_FUNC_STATE_LOADER
-// org.micropython.jnupy.PythonState
-#define JNUPY_FUNC(name) Java_org_micropython_jnupy_PythonState_##name
-#define JNUPY_FUNC_STATE_LOADER jnupy_load_state_from_pythonstate
+// org.micropython.jnupy.PythonNativeState
+#define JNUPY_FUNC(name) Java_org_micropython_jnupy_PythonNativeState_##name
+#define JNUPY_FUNC_STATE_LOADER jnupy_load_state_from_pythonnativestate
 
 // http://cafe.daum.net/oddtip/JxlJ/27?docid=1CBe5|JxlJ|27|20080424210900&q=java%20jni&srchid=CCB1CBe5|JxlJ|27|20080424210900
 
@@ -1314,13 +1298,11 @@ JNUPY_FUNC_DEF(jboolean, jnupy_1state_1new)
 
         mp_obj_module_t *module_jnupy = mp_obj_new_module(MP_QSTR_jnupy);
         mp_obj_dict_t *module_jnupy_dict = mp_call_function_0(mp_load_attr(mp_module_ujnupy.globals, MP_QSTR_copy));
-        mp_obj_dict_store(module_jnupy_dict, MP_OBJ_NEW_QSTR(MP_QSTR_jfuncs), mp_obj_new_dict(0));
-        mp_obj_dict_store(module_jnupy_dict, MP_OBJ_NEW_QSTR(MP_QSTR_jrefs), mp_obj_new_dict(0));
         mp_obj_dict_store(module_jnupy_dict, MP_OBJ_NEW_QSTR(MP_QSTR_pyrefs), mp_obj_new_dict(0));
         module_jnupy->globals = module_jnupy_dict;
 
         mp_state_store(state);
-        JNUPY_CALL(SetLongField, JNUPY_SELF, JFIELD(PythonState, mpState), (mp_uint_t)state);
+        JNUPY_CALL(SetLongField, JNUPY_SELF, JFIELD(PythonNativeState, mpState), (mp_uint_t)state);
         JNUPY_MP_STATE = state;
 
         nlr_gk_pop(&nlr_gk);
@@ -1345,7 +1327,7 @@ JNUPY_FUNC_DEF(jboolean, jnupy_1state_1check)
     (JNIEnv *env, jobject self) {
     JNUPY_FUNC_START;
 
-    mp_state_ctx_t *state = jnupy_get_state_from_pythonstate(JNUPY_SELF);
+    mp_state_ctx_t *state = jnupy_get_state_from_pythonnativestate(JNUPY_SELF);
 
 	if (state != NULL) {
 	    return JNI_TRUE;
@@ -1411,7 +1393,7 @@ JNUPY_FUNC_DEF(jboolean, jnupy_1code_1exec)
 }
 
 JNUPY_FUNC_DEF(jobject, jnupy_1code_1eval)
-    (JNIEnv *env, jobject self, jstring code) {
+    (JNIEnv *env, jobject self, jboolean convertResult, jstring code) {
     JNUPY_FUNC_START_WITH_STATE;
 
     nlr_gk_buf_t nlr_gk;
@@ -1437,7 +1419,13 @@ JNUPY_FUNC_DEF(jobject, jnupy_1code_1eval)
         }
 
         mp_obj_t result = mp_call_function_0(module_fun);
-        jobject jresult = jnupy_obj_py2j(result);
+        jobject jresult = NULL;
+
+        if (convertResult) {
+            jresult = jnupy_obj_py2j(result);
+        } else {
+            jresult = jnupy_obj_py2j_raw(result);
+        }
 
         nlr_gk_pop(&nlr_gk);
         return jresult;
@@ -1454,50 +1442,6 @@ JNUPY_FUNC_DEF(jobject, jnupy_1code_1eval)
     JNUPY_FUNC_END;
 }
 
-JNUPY_FUNC_DEF(jboolean, jnupy_1jfunc_1set)
-    (JNIEnv *env, jobject self, jstring name, jobject jfunc) {
-    JNUPY_FUNC_START_WITH_STATE;
-
-    nlr_buf_t nlr;
-    if (nlr_push(&nlr) == 0) {
-        mp_obj_t nameobj = jnupy_obj_str_new(name);
-        mp_obj_t funcobj = mp_obj_jfunc_new(JNUPY_PY_JSTATE, nameobj, jfunc);
-        mp_obj_dict_store(jnupy_getattr(MP_QSTR_jfuncs), nameobj, funcobj);
-
-        nlr_pop();
-        return JNI_TRUE;
-    } else {
-        // TODO: how to handle exception on java side?
-        mp_obj_print_exception(&mp_plat_print, nlr.ret_val);
-        return JNI_FALSE;
-    }
-
-    JNUPY_FUNC_END_VALUE(JNI_FALSE);
-}
-
-JNUPY_FUNC_DEF(jboolean, jnupy_1jobj_1set)
-    (JNIEnv *env, jobject self, jstring name, jobject jobj) {
-    JNUPY_FUNC_START_WITH_STATE;
-
-    nlr_buf_t nlr;
-    if (nlr_push(&nlr) == 0) {
-        mp_obj_t nameobj = jnupy_obj_str_new(name);
-        mp_obj_t pyobj = jnupy_jobj_new(jobj);
-
-        mp_obj_t module_jnupy = mp_module_get(MP_QSTR_jnupy);
-        mp_obj_t jrefs_dict = mp_load_attr(module_jnupy, MP_QSTR_jrefs);
-        mp_obj_dict_store(jrefs_dict, nameobj, pyobj);
-
-        nlr_pop();
-        return JNI_TRUE;
-    } else {
-        // TODO: how to handle exception on java side?
-        mp_obj_print_exception(&mp_plat_print, nlr.ret_val);
-        return JNI_FALSE;
-    }
-
-    JNUPY_FUNC_END_VALUE(JNI_FALSE);
-}
 
 JNUPY_FUNC_DEF(void, jnupy_1ref_1incr)
     (JNIEnv *env, jobject self, jobject jobj) {
@@ -1573,14 +1517,10 @@ JNUPY_FUNC_DEF(jobject, jnupy_1func_1call)
 
         mp_obj_t result = mp_call_function_n_kw(func, jargs_length, 0, args);
 
-        if (convertResult == JNI_TRUE) {
+        if (convertResult) {
             jresult = jnupy_obj_py2j(result);
-        } else if (convertResult == JNI_FALSE) {
-            // JNUPY_SELF?
-            jresult = jnupy_pyobj_new(self, result);
         } else {
-            // ?
-            jresult = NULL;
+            jresult = jnupy_obj_py2j_raw(result);
         }
 
         nlr_pop();

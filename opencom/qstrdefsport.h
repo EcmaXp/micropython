@@ -153,7 +153,6 @@ Q(jnupy)
 Q(ujnupy)
 Q(JFunction)
 Q(JObject)
-Q(jfuncs) // TODO: remove this.
 Q(jrefs)
 Q(pyrefs)
 Q(PyRef)
