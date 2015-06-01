@@ -31,28 +31,19 @@ import java.util.Map;
 import java.util.HashMap;
 
 public class PythonState extends PythonNativeState {
-	public static final int MEMORY_SCALE;
-	static {
-		String model = System.getProperty("sun.arch.data.model");
-		switch (model) {
-			case "32":
-				MEMORY_SCALE = 1;
-				break;
-			case "64":
-				MEMORY_SCALE = 2;
-				break;
-			default:
-				MEMORY_SCALE = 1;
-		}
-	}
+	public static final long DEFAULT_STACK_SIZE = 1024 * 32 * MEMORY_SCALE; // 32 KB
+	public static final long DEFAULT_HEAP_SIZE = 1024 * 256 * MEMORY_SCALE; // 256 KB
+	
+	// TODO: private?
+	HashMap<String, PythonFunction> builtin_functions;
 	
 	public static void main(String args[]) {
 		System.gc(); // Remove incorrect reference.
 		
 		PythonState py = new PythonState();
 
-		PythonNativeObject global = (PythonNativeObject)py.jnupy_code_eval(false, "globals()");
-		PythonNativeFunction set = (PythonNativeFunction)py.jnupy_code_eval(true, "lambda x, y, z: x.__setitem__(y, z)");
+		PythonObject global = py.pyEval("globals()");
+		PythonFunction set = (PythonNativeFunction)py.jnupy_code_eval(true, "lambda x, y, z: x.__setitem__(y, z)");
 		System.out.println(global);
 		set.invoke(global, "hello", new JavaFunction() {
 			@Override
@@ -79,9 +70,6 @@ public class PythonState extends PythonNativeState {
 		py.jnupy_code_eval(false, "hello(1, 2, 3)");
 	}
 	
-	public static final long DEFAULT_STACK_SIZE = 1024 * 32 * MEMORY_SCALE; // 32 KB
-	public static final long DEFAULT_HEAP_SIZE = 1024 * 256 * MEMORY_SCALE; // 256 KB
-	
 	public PythonState() {
 		this(DEFAULT_STACK_SIZE, DEFAULT_HEAP_SIZE);
 	}
@@ -94,6 +82,44 @@ public class PythonState extends PythonNativeState {
 		super(stack_size, heap_size);
 		
 		// jnupy is python-side module
-		jnupy_code_exec("import jnupy");
+		execute("import jnupy");
+		
+		builtin_functions = new HashMap<String, PythonFunction>();
+	
+		PythonFunction loader = (PythonFunction)eval("lambda x: setattr(jnupy, 'loader', x)");
+		loader.invoke(new JavaFunction() {
+			@Override
+			public Object invoke(PythonState pythonState, Object... args) {
+				if (args[1] instanceof PythonFunction && args[0] instanceof String) {
+					pythonState.builtin_functions.put((String)args[0], (PythonFunction)args[1]);
+				}
+				
+				return null;
+			}
+		});
+		execute("import builtins");
+		execute("for name in dir(builtins): x=getattr(builtins, name); (jnupy.loader(name, x) if (callable(x) and type(x) != type) else None)"); // ...
+	}
+	
+	public void execute(String code) {
+		jnupy_code_exec(code);
+	}
+	
+	public Object eval(String code) {
+		return jnupy_code_eval(true, code);
+	}
+	
+	public Object rawEval(String code) {
+		return jnupy_code_eval(false, code);
+	}
+	
+	public PythonObject pyEval(String code) {
+		Object result = rawEval(code);
+		if (result instanceof PythonObject) {
+			return (PythonObject)result;
+		}
+		
+		// TODO: change excpetion
+		throw new RuntimeException("invaild python raw object return: " + result.toString());
 	}
 }

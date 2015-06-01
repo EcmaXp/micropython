@@ -527,8 +527,8 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 	JNUPY_AP(LOAD, END)
 
 	// section for load jany
-	JNUPY_LOAD_ANY(RUTF8, JNUPY_RAW_CALL(NewStringUTF, "utf-8"))
-	// Question: NewStringUTF require NewGlobalRef?
+	JNUPY_LOAD_ANY(RUTF8, JNUPY_RAW_CALL(NewGlobalRef, JNUPY_RAW_CALL(NewStringUTF, "utf-8")))
+	// Question: NewStringUTF require NewGlobalRef? [YES]
 
 	initialized = 1;
 	} while (false);
@@ -593,7 +593,8 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
 	JNUPY_AP(UNLOAD, END)
 
 	// section for unload jany
-	JNUPY_UNLOAD_ANY(RUTF8, JNUPY_RAW_CALL(ReleaseStringUTFChars, JANY(RUTF8), NULL), 0)
+    // TODO: handle RUTF8 correctly
+	// JNUPY_UNLOAD_ANY(RUTF8, JNUPY_RAW_CALL(ReleaseStringUTFChars, JANY(RUTF8), NULL), 0)
 
 	} while (false);
 
@@ -1357,8 +1358,8 @@ JNUPY_FUNC_DEF(jboolean, jnupy_1code_1exec)
     (JNIEnv *env, jobject self, jstring code) {
     JNUPY_FUNC_START_WITH_STATE;
 
-    nlr_gk_buf_t nlr_gk;
-    if (nlr_gk_push(&nlr_gk) == 0) {
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) == 0) {
         qstr name = qstr_from_str("<CODE from JAVA>");
         const char *codebuf = JNUPY_CALL(GetStringUTFChars, code, 0);
 
@@ -1381,11 +1382,11 @@ JNUPY_FUNC_DEF(jboolean, jnupy_1code_1exec)
 
         mp_call_function_0(module_fun);
 
-        nlr_gk_pop(&nlr_gk);
+        nlr_pop();
         return JNI_TRUE;
     } else {
         // TODO: how to handle exception on java side?
-        mp_obj_print_exception(&mp_plat_print, nlr_gk.buf.ret_val);
+        mp_obj_print_exception(&mp_plat_print, nlr.ret_val);
         return JNI_FALSE;
     }
 

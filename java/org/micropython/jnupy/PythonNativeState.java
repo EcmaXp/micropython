@@ -33,6 +33,21 @@ public class PythonNativeState {
 		// MICROPYTHON_VERSION = jnupy_version();
 	}
 	
+	public static final int MEMORY_SCALE;
+	static {
+		String model = System.getProperty("sun.arch.data.model");
+		switch (model) {
+			case "32":
+				MEMORY_SCALE = 1;
+				break;
+			case "64":
+				MEMORY_SCALE = 2;
+				break;
+			default:
+				MEMORY_SCALE = 1;
+		}
+	}
+	
 	private static final int APIVERSION = 1;
 	
 	// store pointer, never access on java side!

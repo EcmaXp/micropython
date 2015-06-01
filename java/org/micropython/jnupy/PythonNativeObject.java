@@ -32,6 +32,7 @@ public class PythonNativeObject implements PythonObject {
 
     PythonNativeObject(PythonState pyState, long mpStateId, long objectId) {
         if (!pyState.checkState(mpStateId)) {
+            // TODO: change exception
             throw new RuntimeException("invaild state");
         }
         

@@ -26,9 +26,9 @@
 
 package org.micropython.jnupy;
 
-// TODO: remove PythonNativeFunction?
-
 public class PythonNativeFunction extends PythonNativeObject implements PythonFunction {
+    // TODO: just import PythonNativeObject?
+    
     PythonNativeFunction(PythonState pyState, long mpStateId, long objectId) {
         super(pyState, mpStateId, objectId);
     }
@@ -60,6 +60,4 @@ public class PythonNativeFunction extends PythonNativeObject implements PythonFu
     public Object rawInvoke(Object... args) {
         return pythonState.jnupy_func_call(false, this, args);
     }
-    
-    
 }
