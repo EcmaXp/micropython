@@ -276,11 +276,20 @@ void gc_collect_start(void) {
     // correctly in the mp_state_ctx structure.  We scan nlr_top, dict_locals,
     // dict_globals, then the root pointer section of mp_state_vm.
     #if MICROPY_MULTI_STATE_CONTEXT
+    // mp_state_ctx is pointer
     void **ptrs = (void**)(void*)mp_state_ctx;
-    gc_collect_root((void**)(void*)mp_nlr_top, 1);
     #else
+    // mp_state_ctx is value
     void **ptrs = (void**)(void*)&mp_state_ctx;
     #endif
+    
+    #if MICROPY_MULTI_STATE_CONTEXT
+    // Yes: mp_nlr_top is external value when MICROPY_MULTI_STATE_CONTEXT is enabled.
+    if (mp_nlr_top != NULL) {
+        gc_collect_root((void**)(void*)mp_nlr_top, 1);
+    }
+    #endif
+    
     gc_collect_root(ptrs, offsetof(mp_state_ctx_t, vm.stack_top) / sizeof(mp_uint_t));
 }
 
