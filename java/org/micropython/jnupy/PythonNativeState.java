@@ -27,6 +27,8 @@
 package org.micropython.jnupy;
 
 public class PythonNativeState {
+	// TODO: PythonNativeState is correct name?
+	
     static {
     	System.load(System.getenv("MICROPYTHON_LIB"));
 		// NativeSupport.getInstance().getLoader().load();
@@ -90,9 +92,9 @@ public class PythonNativeState {
 	native synchronized boolean jnupy_state_check();
 	native synchronized boolean jnupy_code_exec(String code);
 	native synchronized Object jnupy_code_eval(boolean convertResult, String code);
-    native synchronized String jnupy_obj_repr(PythonNativeObject pyobj);
-    native synchronized long jnupy_ref_incr(PythonNativeObject pyobj);
-    native synchronized void jnupy_ref_derc(PythonNativeObject pyobj);
+    native synchronized String jnupy_obj_repr(PythonObject pyobj);
+    native synchronized long jnupy_ref_incr(PythonObject pyobj);
+    native synchronized void jnupy_ref_derc(PythonObject pyobj);
     native synchronized boolean jnupy_func_vaild(String name);
-    native synchronized Object jnupy_func_call(boolean convertResult, PythonNativeObject func, Object ...args);
+    native synchronized Object jnupy_func_call(boolean convertResult, PythonObject func, Object ...args);
 }

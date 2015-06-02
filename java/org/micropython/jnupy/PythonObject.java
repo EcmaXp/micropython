@@ -26,6 +26,52 @@
 
 package org.micropython.jnupy;
 
-public interface PythonObject {
+public class PythonObject {
+    PythonState pythonState;
+    private long mpObject;
+
+    PythonObject(PythonState pyState, long mpStateId, long objectId) {
+        if (!pyState.checkState(mpStateId)) {
+            // TODO: change exception
+            throw new RuntimeException("invaild state");
+        }
+        
+        pythonState = pyState;
+        mpObject = objectId;
+        pythonState.jnupy_ref_incr(this);
+    }
     
+    public String toString() {
+        PythonObject repr = pythonState.builtins.get("repr");
+        Object result = repr.invoke(this);
+        return "PythonObject[" + result.toString() + "]";
+    }
+
+    protected void finalize() throws Throwable {
+        pythonState.jnupy_ref_derc(this);
+    }
+    
+    private void checkState(PythonState pyState) {
+        if (pythonState != pyState) {
+            throw new RuntimeException("invaild state (not match)");
+        }
+    }
+    
+    public Object invoke(PythonState pyState, Object... args) {
+        checkState(pyState);
+        return this.invoke(args);
+    }
+    
+    public Object invoke(Object... args) {
+        return pythonState.jnupy_func_call(true, this, args);
+    }
+    
+    public Object rawInvoke(PythonState pyState, Object... args) {
+        checkState(pyState);
+        return this.rawInvoke(args);
+    }
+    
+    public Object rawInvoke(Object... args) {
+        return pythonState.jnupy_func_call(false, this, args);
+    }
 }

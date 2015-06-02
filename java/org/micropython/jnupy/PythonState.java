@@ -35,7 +35,7 @@ public class PythonState extends PythonNativeState {
 	public static final long DEFAULT_HEAP_SIZE = 1024 * 256 * MEMORY_SCALE; // 256 KB
 	
 	// TODO: private?
-	HashMap<String, PythonFunction> builtin_functions;
+	HashMap<String, PythonObject> builtins;
 	
 	public static void main(String args[]) {
 		System.gc(); // Remove incorrect reference.
@@ -43,7 +43,8 @@ public class PythonState extends PythonNativeState {
 		PythonState py = new PythonState();
 
 		PythonObject global = py.pyEval("globals()");
-		PythonFunction set = (PythonNativeFunction)py.jnupy_code_eval(true, "lambda x, y, z: x.__setitem__(y, z)");
+		PythonObject set = py.pyEval("lambda x, y, z: x.__setitem__(y, z)");
+
 		System.out.println(global);
 		set.invoke(global, "hello", new JavaFunction() {
 			@Override
@@ -63,11 +64,11 @@ public class PythonState extends PythonNativeState {
 			}
 		});
 		
-		PythonNativeFunction print = (PythonNativeFunction)py.jnupy_code_eval(true, "print");
+		PythonObject print = py.pyEval("print");
 		print.invoke(1, 2, 3);
 		System.out.println(print.toString());
 		
-		py.jnupy_code_eval(false, "hello(1, 2, 3)");
+		py.pyEval("hello(1, 2, 3)");
 	}
 	
 	public PythonState() {
@@ -84,14 +85,14 @@ public class PythonState extends PythonNativeState {
 		// jnupy is python-side module
 		execute("import jnupy");
 		
-		builtin_functions = new HashMap<String, PythonFunction>();
+		builtins = new HashMap<String, PythonObject>();
 	
-		PythonFunction loader = (PythonFunction)eval("lambda x: setattr(jnupy, 'loader', x)");
+		PythonObject loader = pyEval("lambda x: setattr(jnupy, 'loader', x)");
 		loader.invoke(new JavaFunction() {
 			@Override
 			public Object invoke(PythonState pythonState, Object... args) {
-				if (args[1] instanceof PythonFunction && args[0] instanceof String) {
-					pythonState.builtin_functions.put((String)args[0], (PythonFunction)args[1]);
+				if (args[1] instanceof PythonObject && args[0] instanceof String) {
+					pythonState.builtins.put((String)args[0], (PythonObject)args[1]);
 				}
 				
 				return null;
