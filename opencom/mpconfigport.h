@@ -114,25 +114,12 @@ multiful state require:
 #define MICROPY_EMERGENCY_EXCEPTION_BUF_SIZE  (256)
 
 // Porting Program's internal modules.
-extern const struct _mp_obj_module_t mp_module_os;
-extern const struct _mp_obj_module_t mp_module_time;
-extern const struct _mp_obj_module_t mp_module_socket;
 extern const struct _mp_obj_module_t mp_module_msgpack;
 extern const struct _mp_obj_module_t mp_module_microthread;
 extern const struct _mp_obj_module_t mp_module_persist;
 extern const struct _mp_obj_module_t mp_module_mpoc;
 extern const struct _mp_obj_module_t mp_module_jnupy;
 
-#if MICROPY_PY_TIME
-#define MICROPY_PY_TIME_DEF { MP_OBJ_NEW_QSTR(MP_QSTR_utime), (mp_obj_t)&mp_module_time },
-#else
-#define MICROPY_PY_TIME_DEF
-#endif
-#if MICROPY_PY_SOCKET
-#define MICROPY_PY_SOCKET_DEF { MP_OBJ_NEW_QSTR(MP_QSTR_usocket), (mp_obj_t)&mp_module_socket },
-#else
-#define MICROPY_PY_SOCKET_DEF
-#endif
 #if MICROPY_PY_MSGPACK
 #define MICROPY_PY_MSGPACK_DEF { MP_OBJ_NEW_QSTR(MP_QSTR_umsgpack), (mp_obj_t)&mp_module_msgpack },
 #else
@@ -155,14 +142,11 @@ extern const struct _mp_obj_module_t mp_module_jnupy;
 #endif
 
 #define MICROPY_PORT_BUILTIN_MODULES \
-    MICROPY_PY_TIME_DEF \
-    MICROPY_PY_SOCKET_DEF \
     MICROPY_PY_MSGPACK_DEF \
     MICROPY_PY_MICROTHREAD_DEF \
     MICROPY_PY_PERSIST_DEF \
     MICROPY_PY_JNUPY_DEF \
     { MP_OBJ_NEW_QSTR(MP_QSTR_mpoc), (mp_obj_t)&mp_module_mpoc }, \
-    { MP_OBJ_NEW_QSTR(MP_QSTR__os), (mp_obj_t)&mp_module_os }, \
     {}
 
 
