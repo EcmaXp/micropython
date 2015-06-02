@@ -317,6 +317,8 @@ JNUPY_REF_CLASS(CDKHI)
 JNUPY_REF_CLASS(CMCKJ)
 // CLASS: java/lang/Float
 JNUPY_REF_CLASS(CLJBD)
+// CLASS: java/lang/IllegalArgumentException
+JNUPY_REF_CLASS(C5K3P)
 // CLASS: java/lang/IllegalStateException
 JNUPY_REF_CLASS(CQIAK)
 // CLASS: java/lang/Integer
@@ -487,6 +489,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNUPY_LOAD_CLASS("java/lang/Boolean", CDKHI)
     JNUPY_LOAD_CLASS("java/lang/Double", CMCKJ)
     JNUPY_LOAD_CLASS("java/lang/Float", CLJBD)
+    JNUPY_LOAD_CLASS("java/lang/IllegalArgumentException", C5K3P)
     JNUPY_LOAD_CLASS("java/lang/IllegalStateException", CQIAK)
     JNUPY_LOAD_CLASS("java/lang/Integer", CTOBT)
     JNUPY_LOAD_CLASS("java/lang/Long", CJACF)
@@ -551,6 +554,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     JNUPY_UNLOAD_CLASS("java/lang/Boolean", CDKHI)
     JNUPY_UNLOAD_CLASS("java/lang/Double", CMCKJ)
     JNUPY_UNLOAD_CLASS("java/lang/Float", CLJBD)
+    JNUPY_UNLOAD_CLASS("java/lang/IllegalArgumentException", C5K3P)
     JNUPY_UNLOAD_CLASS("java/lang/IllegalStateException", CQIAK)
     JNUPY_UNLOAD_CLASS("java/lang/Integer", CTOBT)
     JNUPY_UNLOAD_CLASS("java/lang/Long", CJACF)
@@ -662,7 +666,7 @@ uint mp_import_stat(const char *path) {
         }
     }
     */
-    
+
     return MP_IMPORT_STAT_NO_EXIST;
 }
 
@@ -679,7 +683,7 @@ bool _jnupy_attach_env() {
     if (JNUPY_ENV == NULL && JNUPY_G_ENV != NULL) {
         JNUPY_RAW_CALL_WITH(JNUPY_G_VM, AttachCurrentThread, (void **) &JNUPY_G_ENV, NULL);
     }
-    
+
     return true;
 }
 
@@ -702,7 +706,7 @@ NORETURN void mp_assert_fail(const char *assertion, const char *file,
     } else {
         printf("%s\n", buf);
     }
-    
+
     abort();
 }
 
@@ -715,7 +719,7 @@ void nlr_jump_fail(void *val) {
     } else {
         printf("%s\n", buf);
     }
-    
+
     abort();
 }
 
@@ -1269,7 +1273,7 @@ JNUPY_FUNC_DEF(jboolean, jnupy_1state_1new)
 
     mp_state_ctx_t *state = NULL;
 
-    jlong pythonNativeStateId = JNUPY_CALL(GetLongField, pythonNativeState, JFIELD(PythonNativeState, mpState));
+    jlong pythonNativeStateId = JNUPY_CALL(GetLongField, self, JFIELD(PythonNativeState, mpState));
     state = (mp_state_ctx_t *)pythonNativeStateId;
 	if (state != NULL) {
 	    // Already state are exists.
@@ -1357,9 +1361,8 @@ JNUPY_FUNC_DEF(void, jnupy_1state_1free)
     JNUPY_FUNC_END_VOID;
 }
 
-// TODO: merge jnupy_code_exec and jnupy_code_eval
-JNUPY_FUNC_DEF(jboolean, jnupy_1code_1exec)
-    (JNIEnv *env, jobject self, jstring code) {
+JNUPY_FUNC_DEF(jobject, jnupy_1execute)
+    (JNIEnv *env, jobject self, jboolean convertResult, jint jflag, jstring code) {
     JNUPY_FUNC_START_WITH_STATE;
 
     nlr_buf_t nlr;
@@ -1374,53 +1377,31 @@ JNUPY_FUNC_DEF(jboolean, jnupy_1code_1exec)
             return JNI_FALSE;
         }
 
+        // TODO: use enum?
+        mp_parse_input_kind_t flag;
+        switch (jflag) {
+            case 1:
+                flag = MP_PARSE_SINGLE_INPUT;
+                break;
+            case 2:
+                flag = MP_PARSE_FILE_INPUT;
+                break;
+            case 3:
+                flag = MP_PARSE_EVAL_INPUT;
+                break;
+            default:
+                JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/IllegalArgumentException", C5K3P), "<execute> flag is invaild");
+                return NULL;
+        }
+
         qstr source_name = lex->source_name;
-        mp_parse_node_t pn = mp_parse(lex, MP_PARSE_FILE_INPUT);
+        mp_parse_node_t pn = mp_parse(lex, flag);
 
         JNUPY_CALL(ReleaseStringUTFChars, code, codebuf);
 
         mp_obj_t module_fun = mp_compile(pn, source_name, MP_EMIT_OPT_NONE, false);
         if (module_fun == NULL) {
             return JNI_FALSE;
-        }
-
-        mp_call_function_0(module_fun);
-
-        nlr_pop();
-        return JNI_TRUE;
-    } else {
-        // TODO: how to handle exception on java side?
-        mp_obj_print_exception(&mp_plat_print, nlr.ret_val);
-        return JNI_FALSE;
-    }
-
-    JNUPY_FUNC_END;
-}
-
-JNUPY_FUNC_DEF(jobject, jnupy_1code_1eval)
-    (JNIEnv *env, jobject self, jboolean convertResult, jstring code) {
-    JNUPY_FUNC_START_WITH_STATE;
-
-    nlr_gk_buf_t nlr_gk;
-    if (nlr_gk_push(&nlr_gk) == 0) {
-        qstr name = qstr_from_str("<CODE from JAVA>");
-        const char *codebuf = JNUPY_CALL(GetStringUTFChars, code, 0);
-
-        mp_lexer_t *lex = mp_lexer_new_from_str_len(name, codebuf, strlen(codebuf), 0);
-
-        if (lex == NULL) {
-            JNUPY_CALL(ReleaseStringUTFChars, code, codebuf);
-            return NULL;
-        }
-
-        qstr source_name = lex->source_name;
-        mp_parse_node_t pn = mp_parse(lex, MP_PARSE_EVAL_INPUT);
-
-        JNUPY_CALL(ReleaseStringUTFChars, code, codebuf);
-
-        mp_obj_t module_fun = mp_compile(pn, source_name, MP_EMIT_OPT_NONE, false);
-        if (module_fun == NULL) {
-            return NULL;
         }
 
         mp_obj_t result = mp_call_function_0(module_fun);
@@ -1432,19 +1413,15 @@ JNUPY_FUNC_DEF(jobject, jnupy_1code_1eval)
             jresult = jnupy_obj_py2j_raw(result);
         }
 
-        nlr_gk_pop(&nlr_gk);
+        nlr_pop();
         return jresult;
     } else {
         // TODO: how to handle exception on java side?
-        if (nlr_gk.buf.ret_val == NULL) {
-            nlr_gk_jump(NULL);
-        }
-
-        mp_obj_print_exception(&mp_plat_print, nlr_gk.buf.ret_val);
+        mp_obj_print_exception(&mp_plat_print, nlr.ret_val);
         return NULL;
     }
 
-    JNUPY_FUNC_END;
+    JNUPY_FUNC_END_VALUE(NULL);
 }
 
 JNUPY_FUNC_DEF(void, jnupy_1ref_1incr)

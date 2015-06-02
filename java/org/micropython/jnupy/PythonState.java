@@ -34,6 +34,11 @@ public class PythonState extends PythonNativeState {
 	public static final long DEFAULT_STACK_SIZE = 1024 * 32 * MEMORY_SCALE; // 32 KB
 	public static final long DEFAULT_HEAP_SIZE = 1024 * 256 * MEMORY_SCALE; // 256 KB
 	
+	// TODO: replace to enum?
+	public static final int JNUPY_EXECUTE_SINGAL = 1;
+	public static final int JNUPY_EXECUTE_EXEC = 2;
+	public static final int JNUPY_EXECUTE_EVAL = 3;
+	
 	// TODO: private?
 	HashMap<String, PythonObject> builtins;
 	
@@ -103,15 +108,15 @@ public class PythonState extends PythonNativeState {
 	}
 	
 	public void execute(String code) {
-		jnupy_code_exec(code);
+		jnupy_execute(true, JNUPY_EXECUTE_EXEC, code);
 	}
 	
 	public Object eval(String code) {
-		return jnupy_code_eval(true, code);
+		return jnupy_execute(true, JNUPY_EXECUTE_EVAL, code);
 	}
 	
 	public Object rawEval(String code) {
-		return jnupy_code_eval(false, code);
+		return jnupy_execute(false, JNUPY_EXECUTE_EVAL, code);
 	}
 	
 	public PythonObject pyEval(String code) {
