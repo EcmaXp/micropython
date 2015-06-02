@@ -1236,33 +1236,6 @@ const mp_obj_module_t mp_module_ujnupy = {
 #define JNUPY_FUNC(name) Java_org_micropython_jnupy_PythonNativeState_##name
 #define JNUPY_FUNC_STATE_LOADER jnupy_load_state_from_pythonnativestate
 
-// http://cafe.daum.net/oddtip/JxlJ/27?docid=1CBe5|JxlJ|27|20080424210900&q=java%20jni&srchid=CCB1CBe5|JxlJ|27|20080424210900
-
-JNUPY_FUNC_DEF(void, jnupy_1test_1jni)
-    (JNIEnv *env, jobject self) {
-    JNUPY_FUNC_START;
-
-    printf("Welcome to java native micropython! (env=%p; obj=%p;)\n", JNUPY_ENV, JNUPY_SELF);
-
-    JNUPY_FUNC_END_VOID;
-}
-
-JNUPY_FUNC_DEF(void, jnupy_1test_1jni_1fail)
-    (JNIEnv *env, jobject self) {
-    JNUPY_FUNC_START;
-
-	assert(! "just checking assert work?");
-
-    JNUPY_FUNC_END_VOID;
-}
-
-JNUPY_FUNC_DEF(void, jnupy_1test_1jni_1state)
-    (JNIEnv *env, jobject self) {
-    JNUPY_FUNC_START_WITH_STATE;
-
-    JNUPY_FUNC_END_VOID;
-}
-
 JNUPY_FUNC_DEF(jboolean, jnupy_1state_1new)
     (JNIEnv *env, jobject self, jlong stack_size, jlong heap_size) {
     JNUPY_FUNC_START;
@@ -1273,8 +1246,7 @@ JNUPY_FUNC_DEF(jboolean, jnupy_1state_1new)
 
     mp_state_ctx_t *state = NULL;
 
-    jlong pythonNativeStateId = JNUPY_CALL(GetLongField, self, JFIELD(PythonNativeState, mpState));
-    state = (mp_state_ctx_t *)pythonNativeStateId;
+    state = jnupy_get_state_from_pythonnativestate(JNUPY_SELF);
 	if (state != NULL) {
 	    // Already state are exists.
 	    return JNI_FALSE;
@@ -1351,6 +1323,7 @@ JNUPY_FUNC_DEF(void, jnupy_1state_1free)
     JNUPY_FUNC_START_WITH_STATE;
 
     assert(mp_state_is_loaded(JNUPY_MP_STATE));
+    JNUPY_CALL(SetLongField, JNUPY_SELF, JFIELD(PythonNativeState, mpState), 0);
 
     mp_deinit();
     free(MP_STATE_MEM(gc_alloc_table_start));

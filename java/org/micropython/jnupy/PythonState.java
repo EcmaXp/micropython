@@ -90,6 +90,17 @@ public class PythonState extends PythonNativeState {
 		// jnupy is python-side module
 		execute("import jnupy");
 		
+		/* TODO: push jnupy setting helper
+		A. init internal usage function; access jnupy module only for
+		    - getattr(..., name, None)
+		    - setattr(..., name, value)
+		B. get raw builtin module and function, class, etc.
+		C. set custom __import__ function.
+		*/
+		
+		// TODO: load stream and do load
+		// execute("");
+		
 		builtins = new HashMap<String, PythonObject>();
 	
 		PythonObject loader = pyEval("lambda x: setattr(jnupy, 'loader', x)");

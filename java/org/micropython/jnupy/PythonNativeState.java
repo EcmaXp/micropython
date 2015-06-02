@@ -83,16 +83,11 @@ public class PythonNativeState {
 	}
 	
 	// native function list: jnupy.c
-	native synchronized void jnupy_test_jni();
-	native synchronized void jnupy_test_jni_state();
-	native synchronized void jnupy_test_jni_fail();
 	native synchronized boolean jnupy_state_new(long stack_size, long heap_size);
-	native synchronized void jnupy_state_free();
-	native synchronized boolean jnupy_state_exist();
 	native synchronized boolean jnupy_state_check();
-	native synchronized Object jnupy_execute(boolean convertResult, int flag, String code);
+	native synchronized void jnupy_state_free();
     native synchronized long jnupy_ref_incr(PythonObject pyobj);
     native synchronized void jnupy_ref_derc(PythonObject pyobj);
-    native synchronized boolean jnupy_func_vaild(String name);
+	native synchronized Object jnupy_execute(boolean convertResult, int flag, String code);
     native synchronized Object jnupy_func_call(boolean convertResult, PythonObject func, Object ...args);
 }
