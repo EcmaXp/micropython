@@ -462,6 +462,10 @@ extern const mp_obj_type_t mp_type_SystemSoftLimit;
 extern const mp_obj_type_t mp_type_SystemHardLimit;
 #endif
 
+#if MICROPY_BUILD_JNI_LIBRARY
+extern const mp_obj_type_t mp_type_JavaError;
+#endif
+
 // Constant objects, globally accessible
 // The macros are for convenience only
 #define mp_const_none ((mp_obj_t)&mp_const_none_obj)

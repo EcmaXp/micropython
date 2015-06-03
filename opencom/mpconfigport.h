@@ -25,17 +25,11 @@
  */
 
 // for OpenComptuers
-/*
-multiful state require:
-    - nlr_*** function handle __thread value. -> just use MICROPY_NLR_SETJMP?
-    - mp_module___main__ should have multi state.
-    - well. assert handler required... (and vm.c never handle it.)
-    - nlr_jump_fail...?
-*/
-
+#define MICROPY_ALLOW_PAUSE_VM      (1)
+#define MICROPY_LIMIT_CPU           (1)
+#define MICROPY_BUILD_JNI_LIBRARY   (1)
 
 // options to control how Micro Python is built
-
 #define MICROPY_EMIT_X64            (0)
 #define MICROPY_EMIT_X86            (0)
 #define MICROPY_EMIT_THUMB          (0)
@@ -118,7 +112,7 @@ extern const struct _mp_obj_module_t mp_module_msgpack;
 extern const struct _mp_obj_module_t mp_module_microthread;
 extern const struct _mp_obj_module_t mp_module_persist;
 extern const struct _mp_obj_module_t mp_module_mpoc;
-extern const struct _mp_obj_module_t mp_module_jnupy;
+extern const struct _mp_obj_module_t mp_module_ujnupy;
 
 #if MICROPY_PY_MSGPACK
 #define MICROPY_PY_MSGPACK_DEF { MP_OBJ_NEW_QSTR(MP_QSTR_umsgpack), (mp_obj_t)&mp_module_msgpack },
@@ -148,7 +142,6 @@ extern const struct _mp_obj_module_t mp_module_jnupy;
     MICROPY_PY_JNUPY_DEF \
     { MP_OBJ_NEW_QSTR(MP_QSTR_mpoc), (mp_obj_t)&mp_module_mpoc }, \
     {}
-
 
 // type definitions for the specific machine
 

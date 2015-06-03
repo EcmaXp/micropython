@@ -61,22 +61,23 @@ THE SOFTWARE.
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "py/bc.h"
+#include "py/builtin.h"
+#include "py/compile.h"
+#include "py/cpuctrl.h"
+#include "py/gc.h"
 #include "py/mpconfig.h"
 #include "py/mpstate.h"
 #include "py/nlr.h"
-#include "py/compile.h"
+#include "py/obj.h"
+#include "py/objint.h"
+#include "py/objmodule.h"
+#include "py/objstr.h"
+#include "py/repl.h"
 #include "py/runtime.h"
 #include "py/runtime0.h"
-#include "py/objstr.h"
-#include "py/builtin.h"
-#include "py/repl.h"
-#include "py/gc.h"
-#include "py/bc.h"
-#include "py/cpuctrl.h"
 #include "py/stackctrl.h"
 #include "py/statectrl.h"
-#include "py/objmodule.h"
-#include "py/objint.h"
 #include "genhdr/mpversion.h"
 
 /** BUILD LIMITER **/
@@ -84,16 +85,8 @@ THE SOFTWARE.
 #error jnupy require MICROPY_MULTI_STATE_CONTEXT
 #endif
 
-#if !MICROPY_ALLOW_PAUSE_VM
-#error jnupy require MICROPY_ALLOW_PAUSE_VM
-#endif
-
 #if !MICROPY_OVERRIDE_ASSERT_FAIL
 #error jnupy require MICROPY_OVERRIDE_ASSERT_FAIL
-#endif
-
-#if !MICROPY_LIMIT_CPU
-#error jnupy require MICROPY_LIMIT_CPU
 #endif
 
 #if !MICROPY_ENABLE_GC
@@ -109,20 +102,18 @@ THE SOFTWARE.
 // TODO: support MICROPY_LONGINT_IMPL_MPZ...
 #endif
 
-/** Legacy Code **/ // TODO: remove this block
-/*
-TODO: should i programming
-    - make / control state [OK]
-    - convert value [OK]
-    - execute source from file or buffer [OK, but without building module.]
-    - handle assert failure or nlr_raise [OK?]
-    - use coffeecatch library or other signal capture handler? [IGNORE]
-    - safe warpper or sandbox for something. [OK?]
-    - support PythonFunction...?
-*/
+/** BUILD SOFT LIMITER **/
+#if !MICROPY_ALLOW_PAUSE_VM
+#error jnupy require MICROPY_ALLOW_PAUSE_VM
+#endif
+
+#if !MICROPY_LIMIT_CPU
+#error jnupy require MICROPY_LIMIT_CPU
+#endif
 
 /** JNUPY INFO **/
 #define JNUPY_JNIVERSION JNI_VERSION_1_6
+// TODO: fill this.
 
 /** JNUPY INTERNAL VALUE **/
 STATIC int initialized = 0;
@@ -170,11 +161,11 @@ STATIC JavaVM *jnupy_glob_java_vm;
 STATIC JNIEnv *jnupy_glob_java_env;
 
 /** JNUPY MECRO **/
-//#if DEBUG
+#if DEBUG
 #define _D(x) printf(#x "\n")
-//#else
-//#define _D(x) (void)0
-//#endif
+#else
+#define _D(x) (void)0
+#endif
 
 #define _JNUPY_CUR_STATE(x) (jnupy_cur_state.x)
 #define JNUPY_G_VM jnupy_glob_java_vm
@@ -592,8 +583,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
 	JNUPY_AP(UNLOAD, END)
 
 	// section for unload jany
-    // TODO: handle RUTF8 correctly
-	// JNUPY_UNLOAD_ANY(RUTF8, JNUPY_RAW_CALL(ReleaseStringUTFChars, JANY(RUTF8), NULL), 0)
+	JNUPY_UNLOAD_ANY(RUTF8, JNUPY_RAW_CALL(ReleaseStringUTFChars, JANY(RUTF8), NULL), 0)
 
 	} while (false);
 
@@ -1060,17 +1050,23 @@ STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, c
     }
 
 	jobject jresult = JNUPY_RAW_CALL(CallObjectMethod, o->jfunc, JMETHOD(JavaFunction, invoke), JNUPY_SELF, jargs);
-    jthrowable error = JNUPY_IS_RAW_CALL_HAS_ERROR();
-	if (error) {
-	    // just throw java error, export to jnupy.
-	    // and if error are not captured by python, raise it to java...?
-	    // TODO: how to handle JavaError? ...
-		nlr_raise(mp_obj_new_exception_msg(&mp_type_RuntimeError, "error raised from java"));
+    jthrowable jerror = JNUPY_IS_RAW_CALL_HAS_ERROR();
+	if (jerror) {
+	    nlr_buf_t nlr;
+	    if (nlr_push(&nlr) == 0) {
+    	    mp_obj_t rawexc = jnupy_obj_j2py(jerror);
+
+    	    nlr_pop();
+    	    nlr_raise(mp_obj_new_exception_arg1(&mp_type_JavaError, rawexc));
+	    } else {
+    	    nlr_raise(mp_obj_new_exception_msg(&mp_type_JavaError, "Unknwon java error"));
+	    }
+
+        abort();
 	}
 
-    mp_obj_t pyresult = jnupy_obj_j2py(jresult);
-
-	return pyresult;
+    mp_obj_t result = jnupy_obj_j2py(jresult);
+	return result;
 }
 
 STATIC mp_obj_t jfunc_del(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
@@ -1334,8 +1330,8 @@ JNUPY_FUNC_DEF(void, jnupy_1state_1free)
     JNUPY_FUNC_END_VOID;
 }
 
-JNUPY_FUNC_DEF(jobject, jnupy_1execute)
-    (JNIEnv *env, jobject self, jboolean convertResult, jint jflag, jstring code) {
+JNUPY_FUNC_DEF(jobject, jnupy_1code_1compile)
+    (JNIEnv *env, jobject self, jstring code, jint jflag) {
     JNUPY_FUNC_START_WITH_STATE;
 
     nlr_buf_t nlr;
@@ -1347,7 +1343,7 @@ JNUPY_FUNC_DEF(jobject, jnupy_1execute)
 
         if (lex == NULL) {
             JNUPY_CALL(ReleaseStringUTFChars, code, codebuf);
-            return JNI_FALSE;
+            return NULL;
         }
 
         // TODO: use enum?
@@ -1363,7 +1359,7 @@ JNUPY_FUNC_DEF(jobject, jnupy_1execute)
                 flag = MP_PARSE_EVAL_INPUT;
                 break;
             default:
-                JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/IllegalArgumentException", C5K3P), "<execute> flag is invaild");
+                JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/IllegalArgumentException", C5K3P), "compile flag is invaild");
                 return NULL;
         }
 
@@ -1374,17 +1370,10 @@ JNUPY_FUNC_DEF(jobject, jnupy_1execute)
 
         mp_obj_t module_fun = mp_compile(pn, source_name, MP_EMIT_OPT_NONE, false);
         if (module_fun == NULL) {
-            return JNI_FALSE;
+            return NULL;
         }
 
-        mp_obj_t result = mp_call_function_0(module_fun);
-        jobject jresult = NULL;
-
-        if (convertResult) {
-            jresult = jnupy_obj_py2j(result);
-        } else {
-            jresult = jnupy_obj_py2j_raw(result);
-        }
+        jobject jresult = jnupy_obj_py2j_raw(module_fun);
 
         nlr_pop();
         return jresult;

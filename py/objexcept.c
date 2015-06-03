@@ -243,6 +243,9 @@ MP_DEFINE_EXCEPTION(Exception, BaseException)
   MP_DEFINE_EXCEPTION(RuntimeError, Exception)
     MP_DEFINE_EXCEPTION_BASE(RuntimeError)
     MP_DEFINE_EXCEPTION(NotImplementedError, RuntimeError)
+#if MICROPY_BUILD_JNI_LIBRARY
+    MP_DEFINE_EXCEPTION(JavaError, RuntimeError)
+#endif
   MP_DEFINE_EXCEPTION(SyntaxError, Exception)
     MP_DEFINE_EXCEPTION_BASE(SyntaxError)
     MP_DEFINE_EXCEPTION(IndentationError, SyntaxError)

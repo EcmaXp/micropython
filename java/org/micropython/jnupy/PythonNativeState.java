@@ -88,6 +88,6 @@ public class PythonNativeState {
 	native synchronized void jnupy_state_free();
     native synchronized long jnupy_ref_incr(PythonObject pyobj);
     native synchronized void jnupy_ref_derc(PythonObject pyobj);
-	native synchronized Object jnupy_execute(boolean convertResult, int flag, String code);
+	native synchronized PythonObject jnupy_code_compile(String code, int flag);
     native synchronized Object jnupy_func_call(boolean convertResult, PythonObject func, Object ...args);
 }

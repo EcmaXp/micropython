@@ -57,18 +57,8 @@ public class PythonObject {
         }
     }
     
-    public Object invoke(PythonState pyState, Object... args) {
-        checkState(pyState);
-        return this.invoke(args);
-    }
-    
     public Object invoke(Object... args) {
         return pythonState.jnupy_func_call(true, this, args);
-    }
-    
-    public Object rawInvoke(PythonState pyState, Object... args) {
-        checkState(pyState);
-        return this.rawInvoke(args);
     }
     
     public Object rawInvoke(Object... args) {

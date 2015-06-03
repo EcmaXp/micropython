@@ -119,15 +119,18 @@ public class PythonState extends PythonNativeState {
 	}
 	
 	public void execute(String code) {
-		jnupy_execute(true, JNUPY_EXECUTE_EXEC, code);
+		PythonObject func = jnupy_code_compile(code, JNUPY_EXECUTE_EXEC);
+		func.invoke();
 	}
 	
 	public Object eval(String code) {
-		return jnupy_execute(true, JNUPY_EXECUTE_EVAL, code);
+		PythonObject func = jnupy_code_compile(code, JNUPY_EXECUTE_EVAL);
+		return func.invoke();
 	}
 	
 	public Object rawEval(String code) {
-		return jnupy_execute(false, JNUPY_EXECUTE_EVAL, code);
+		PythonObject func = jnupy_code_compile(code, JNUPY_EXECUTE_EVAL);
+		return func.rawInvoke();
 	}
 	
 	public PythonObject pyEval(String code) {

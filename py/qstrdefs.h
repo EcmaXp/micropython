@@ -160,6 +160,9 @@ Q(SystemLimit)
 Q(SystemSoftLimit)
 Q(SystemHardLimit)
 #endif
+#if MICROPY_BUILD_JNI_LIBRARY
+Q(JavaError)
+#endif
 
 Q(None)
 Q(False)
