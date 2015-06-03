@@ -318,6 +318,8 @@ JNUPY_REF_CLASS(CTOBT)
 JNUPY_REF_CLASS(CJACF)
 // CLASS: java/lang/Object
 JNUPY_REF_CLASS(CVNFN)
+// CLASS: java/lang/RuntimeException
+JNUPY_REF_CLASS(CBQSF)
 // CLASS: java/lang/Short
 JNUPY_REF_CLASS(CMUMS)
 // CLASS: java/lang/String
@@ -485,6 +487,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNUPY_LOAD_CLASS("java/lang/Integer", CTOBT)
     JNUPY_LOAD_CLASS("java/lang/Long", CJACF)
     JNUPY_LOAD_CLASS("java/lang/Object", CVNFN)
+    JNUPY_LOAD_CLASS("java/lang/RuntimeException", CBQSF)
     JNUPY_LOAD_CLASS("java/lang/Short", CMUMS)
     JNUPY_LOAD_CLASS("java/lang/String", CCHCW)
     JNUPY_LOAD_CLASS("java/util/HashMap", CEKJY)
@@ -550,6 +553,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     JNUPY_UNLOAD_CLASS("java/lang/Integer", CTOBT)
     JNUPY_UNLOAD_CLASS("java/lang/Long", CJACF)
     JNUPY_UNLOAD_CLASS("java/lang/Object", CVNFN)
+    JNUPY_UNLOAD_CLASS("java/lang/RuntimeException", CBQSF)
     JNUPY_UNLOAD_CLASS("java/lang/Short", CMUMS)
     JNUPY_UNLOAD_CLASS("java/lang/String", CCHCW)
     JNUPY_UNLOAD_CLASS("java/util/HashMap", CEKJY)
@@ -726,6 +730,10 @@ jobject mp_obj_jfunc_get(mp_obj_t self_in);
 const mp_obj_type_t mp_type_pyref;
 mp_obj_t jnupy_pyref_new(mp_obj_t obj);
 
+jobject jnupy_obj_py2j_raw(mp_obj_t obj);
+jobject jnupy_obj_py2j(mp_obj_t obj);
+mp_obj_t jnupy_obj_j2py(jobject obj);
+
 mp_obj_t jnupy_obj_str_new(jstring jstr) {
     const char *strbuf = JNUPY_CALL(GetStringUTFChars, jstr, 0);
     mp_obj_t str_obj = mp_obj_new_str(strbuf, strlen(strbuf), true);
@@ -737,6 +745,34 @@ mp_obj_t jnupy_obj_str_new(jstring jstr) {
 mp_obj_t jnupy_getattr(qstr attr) {
     mp_obj_t module_jnupy = mp_module_get(MP_QSTR_jnupy);
     return mp_load_attr(module_jnupy, attr);
+}
+
+void jnupy_obj_do_exception(mp_obj_t exception) {
+    printf("exception raised\n");
+    nlr_gk_buf_t nlr_gk;
+    if (nlr_gk_push(&nlr_gk) == 0) {
+        do {
+            if (exception == NULL) {
+                // already exception are thowed (java)
+                break;
+            }
+
+            if (mp_obj_exception_match(exception, &mp_type_JavaError)) {
+                mp_obj_t value = mp_obj_exception_get_value(exception);
+                if (MP_OBJ_IS_TYPE(value, &mp_type_jobject)) {
+                    jthrowable exc = jnupy_obj_py2j_raw(value);
+                    JNUPY_RAW_CALL(Throw, exc);
+                    break;
+                }
+            }
+
+            JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/RuntimeException", CBQSF), "unknown exception (python exception)");
+            break;
+        } while (0);
+        nlr_pop();
+    } else {
+        JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/RuntimeException", CBQSF), "invaild exception");
+    }
 }
 
 /* in li.cil.oc.server.machine.Machine.scala ...
@@ -776,6 +812,7 @@ mp_obj_t jnupy_pyobj_get(jobject jobj) {
 // TODO: how to java convert argument?
 
 #define IsInstanceOf(obj, class_) (JNUPY_RAW_CALL(IsInstanceOf, obj, class_) == JNI_TRUE)
+
 mp_obj_t jnupy_obj_j2py(jobject obj) {
     MP_STACK_CHECK();
 
@@ -1049,17 +1086,26 @@ STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, c
         JNUPY_CALL(SetObjectArrayElement, jargs, i, jnupy_obj_py2j(args[i]));
     }
 
+    // TODO: how to handle exception?
 	jobject jresult = JNUPY_RAW_CALL(CallObjectMethod, o->jfunc, JMETHOD(JavaFunction, invoke), JNUPY_SELF, jargs);
     jthrowable jerror = JNUPY_IS_RAW_CALL_HAS_ERROR();
-	if (jerror) {
+
+	if (jerror != NULL) {
+	    (*JNUPY_ENV)->ExceptionClear(JNUPY_ENV);
+	    printf("result: %p %p\n", jresult, jerror);
 	    nlr_buf_t nlr;
 	    if (nlr_push(&nlr) == 0) {
+	        printf("a\n");
     	    mp_obj_t rawexc = jnupy_obj_j2py(jerror);
-
+	        printf("b\n");
     	    nlr_pop();
+	        printf("c\n");
     	    nlr_raise(mp_obj_new_exception_arg1(&mp_type_JavaError, rawexc));
+	        printf("d\n");
 	    } else {
+	        printf("e\n");
     	    nlr_raise(mp_obj_new_exception_msg(&mp_type_JavaError, "Unknwon java error"));
+	        printf("f\n");
 	    }
 
         abort();
@@ -1192,6 +1238,7 @@ const mp_obj_module_t mp_module_ujnupy = {
     void *stack_top = NULL; \
     nlr_buf_t *nlr_ptr = mp_nlr_top; \
     nlr_gk_buf_t _nlr_gk = nlr_gk_new(); \
+    bool has_exception = false; \
     if (init_expr) { \
         if (with_state) { \
             stack_top = MP_STATE_VM(stack_top); \
@@ -1199,6 +1246,9 @@ const mp_obj_module_t mp_module_ujnupy = {
         } \
         do { \
             if (nlr_gk_push(&_nlr_gk) != 0) { \
+                printf("has exception\n"); \
+                jnupy_obj_do_exception(_nlr_gk.buf.ret_val); \
+                has_exception = true; \
                 break; \
             } \
 
@@ -1212,6 +1262,9 @@ const mp_obj_module_t mp_module_ujnupy = {
 #define return \
     if (with_state) { \
         MP_STATE_VM(stack_top) = stack_top; \
+    } \
+    if (!has_exception) { \
+        (*JNUPY_ENV)->ExceptionClear(JNUPY_ENV); \
     } \
     nlr_gk_pop(&_nlr_gk); \
     mp_nlr_top = nlr_ptr; \
@@ -1473,6 +1526,7 @@ JNUPY_FUNC_DEF(jobject, jnupy_1func_1call)
 
         // TODO: fill exception? or throw?
         jresult = NULL;
+        nlr_gk_jump(nlr.ret_val); // YES! THIS IS...
     }
 
     if (args != MP_OBJ_NULL) {

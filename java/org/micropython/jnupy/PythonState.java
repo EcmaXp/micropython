@@ -103,8 +103,8 @@ public class PythonState extends PythonNativeState {
 		
 		builtins = new HashMap<String, PythonObject>();
 	
-		PythonObject loader = pyEval("lambda x: setattr(jnupy, 'loader', x)");
-		loader.invoke(new JavaFunction() {
+		PythonObject loader = pyEval("lambda x, y: setattr(jnupy, x, y)");
+		loader.invoke("loader", new JavaFunction() {
 			@Override
 			public Object invoke(PythonState pythonState, Object... args) {
 				if (args[1] instanceof PythonObject && args[0] instanceof String) {
@@ -114,8 +114,18 @@ public class PythonState extends PythonNativeState {
 				return null;
 			}
 		});
+		loader.invoke("do_exc", new JavaFunction() {
+			@Override
+			public Object invoke(PythonState pythonState, Object... args) {
+				throw new RuntimeException("hello exception");
+			}
+		});
+		
 		execute("import builtins");
 		execute("for name in dir(builtins): x=getattr(builtins, name); (jnupy.loader(name, x) if (callable(x) and type(x) != type) else None)"); // ...
+		
+		execute("try:\n\tjnupy.do_exc()\nexcept:\n\timport sys; print(sys.exc_info())");
+		execute("jnupy.do_exc()");
 	}
 	
 	public void execute(String code) {
