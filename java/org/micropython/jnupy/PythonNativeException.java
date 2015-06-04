@@ -25,37 +25,41 @@
  */
 
 package org.micropython.jnupy;
+import java.util.regex.Pattern;
 
-public class PythonException extends Exception {
-	// TODO: name and detail is correct value name?
-	// TODO: add stacktrace for debugging?
-	
+public class PythonNativeException extends PythonException {
+    // only jnupy.c can throw this exception.
+    // TODO: have PythonObject?
+    
+    private String name;
     private String detail;
     
-	public PythonException() {
-		super();
-		detail = "";
+	private PythonNativeException(String msg) {
+	    super(msg);
+	    parseMessage(msg);
 	}
 
-	public PythonException(String msg) {
-		super(msg);
-		detail = msg;
-	}
-
-	public PythonException(String msg, Throwable cause) {
+	private PythonNativeException(String msg, Throwable cause) {
 		super(msg, cause);
-		detail = msg;
+	    parseMessage(msg);
+	}
+	
+	private void parseMessage(String msg) {
+	    String[] splited = msg.split(Pattern.quote(": "), 2);
+	    if (splited.length == 1) {
+	        detail = splited[0];
+	    } else if (splited.length == 2) {
+	        name = splited[0];
+	        detail = splited[1];
+	    }
 	}
 
-	public PythonException(Throwable cause) {
-		super(cause);
-		detail = "";
-	}
-	
+	@Override	
 	public String getName() {
-	    return "Exception";
+	    return name;
 	}
 	
+	@Override
 	public String getDetail() {
 	    return detail;
 	}

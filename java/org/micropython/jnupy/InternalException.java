@@ -26,37 +26,20 @@
 
 package org.micropython.jnupy;
 
-public class PythonException extends Exception {
-	// TODO: name and detail is correct value name?
-	// TODO: add stacktrace for debugging?
-	
-    private String detail;
-    
-	public PythonException() {
+public class InternalException extends Exception {
+	public InternalException() {
 		super();
-		detail = "";
 	}
 
-	public PythonException(String msg) {
+	public InternalException(String msg) {
 		super(msg);
-		detail = msg;
 	}
 
-	public PythonException(String msg, Throwable cause) {
+	public InternalException(String msg, Throwable cause) {
 		super(msg, cause);
-		detail = msg;
 	}
 
-	public PythonException(Throwable cause) {
+	public InternalException(Throwable cause) {
 		super(cause);
-		detail = "";
-	}
-	
-	public String getName() {
-	    return "Exception";
-	}
-	
-	public String getDetail() {
-	    return detail;
 	}
 }

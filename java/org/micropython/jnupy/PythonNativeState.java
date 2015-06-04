@@ -82,6 +82,8 @@ public class PythonNativeState {
 		}
 	}
 	
+	// TODO: add new exception method? (name and detail and PythonObject exc?)
+	
 	// native function list: jnupy.c
 	native synchronized boolean jnupy_state_new(long stack_size, long heap_size);
 	native synchronized boolean jnupy_state_check();

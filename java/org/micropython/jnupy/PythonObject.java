@@ -41,6 +41,17 @@ public class PythonObject {
         pythonState.jnupy_ref_incr(this);
     }
     
+    // TODO: move to PythonState?
+    private PythonObject getHelper(String name) {
+        return pythonState.builtins.get(name);
+    }
+    
+    private PythonObject helper(String name, Object... args) {
+        PythonObject func = getHelper(name);
+        return func.call(args);
+    }
+    // END TODO
+    
     public String toString() {
         PythonObject repr = pythonState.builtins.get("repr");
         Object result = repr.invoke(this);
@@ -64,4 +75,40 @@ public class PythonObject {
     public Object rawInvoke(Object... args) {
         return pythonState.jnupy_func_call(false, this, args);
     }
+    
+    public PythonObject call(Object... args) {
+        Object result = pythonState.jnupy_func_call(false, this, args);
+		if (result instanceof PythonObject) {
+			return (PythonObject)result;
+		}
+		
+		// TODO: change excpetion
+		throw new RuntimeException("invaild python raw object return: " + result.toString());
+    }
+    
+    // TODO: getitem, getattr, etc impl in here? (by builtin)
+
+    public PythonObject getattr(String name) {
+        return helper("getattr", this, name);
+    }
+
+    public PythonObject setattr(String name, Object value) {
+        return helper("setattr", this, name, value);
+    }
+    
+    public PythonObject hasattr(String name) {
+        return helper("hasattr", this, name);
+    }
+    
+    public PythonObject delattr(String name) {
+        return helper("delattr", this, name);
+    }
+    
+    /*
+    public Object unbox() {
+        return pythonState.unboxValue(x);
+    }
+    */
+    
+    // getitem or setitem require helper function... (not builtin function.)
 }

@@ -40,40 +40,28 @@ public class PythonState extends PythonNativeState {
 	public static final int JNUPY_EXECUTE_EVAL = 3;
 	
 	// TODO: private?
-	HashMap<String, PythonObject> builtins;
+	public HashMap<String, PythonObject> builtins;
 	
 	public static void main(String args[]) {
 		System.gc(); // Remove incorrect reference.
 		
 		PythonState py = new PythonState();
-
-		PythonObject global = py.pyEval("globals()");
-		PythonObject set = py.pyEval("lambda x, y, z: x.__setitem__(y, z)");
-
-		System.out.println(global);
-		set.invoke(global, "hello", new JavaFunction() {
-			@Override
-			public Object invoke(PythonState pythonState, Object ... args) {
-			    for (Object o : args) {
-			    	if (o instanceof Object[]) {
-			    		Object[] array = (Object[])o;
-			    		System.out.println("start");
-			    		for (int i=0; i < array.length; i++) {
-						    System.out.println(array[i]);
-						}
-			    		System.out.println("end");
-			    	}
-			        System.out.println(o);
-			    }
-				return args[0];
-			}
-		});
-		
-		PythonObject print = py.pyEval("print");
+		PythonObject print = py.builtins.get("print");
+		PythonObject globals = py.builtins.get("globals");
+		PythonObject getitem = py.pyEval("lambda x, y: x[y]");
 		print.invoke(1, 2, 3);
-		System.out.println(print.toString());
-		
-		py.pyEval("hello(1, 2, 3)");
+		PythonObject importer = py.builtins.get("__import__");
+		PythonObject microthread = importer.call("umicrothread");
+		PythonObject MicroThread = microthread.getattr("MicroThread");
+		// https://github.com/benelog/multiline ?
+		String hello = "" +
+			"import umicrothread\n" +
+			"def hello():\n" +
+			"	umicrothread.pause()";
+		py.execute(hello);
+		PythonObject func = MicroThread.call("hello", getitem.call(globals.call(), "hello"));
+		System.out.println(func.getattr("resume").call());
+		System.out.println(func.getattr("resume").call());
 	}
 	
 	public PythonState() {
@@ -86,6 +74,8 @@ public class PythonState extends PythonNativeState {
 	
 	public PythonState(long stack_size, long heap_size) {
 		super(stack_size, heap_size);
+		
+		builtins = new HashMap<String, PythonObject>();
 		
 		// jnupy is python-side module
 		execute("import jnupy");
@@ -101,31 +91,20 @@ public class PythonState extends PythonNativeState {
 		// TODO: load stream and do load
 		// execute("");
 		
-		builtins = new HashMap<String, PythonObject>();
-	
 		PythonObject loader = pyEval("lambda x, y: setattr(jnupy, x, y)");
-		loader.invoke("loader", new JavaFunction() {
+		loader.invoke("load_builtin", new JavaFunction() {
 			@Override
 			public Object invoke(PythonState pythonState, Object... args) {
-				if (args[1] instanceof PythonObject && args[0] instanceof String) {
+				if (args.length == 2 && args[1] instanceof PythonObject && args[0] instanceof String) {
 					pythonState.builtins.put((String)args[0], (PythonObject)args[1]);
 				}
 				
 				return null;
 			}
 		});
-		loader.invoke("do_exc", new JavaFunction() {
-			@Override
-			public Object invoke(PythonState pythonState, Object... args) {
-				throw new RuntimeException("hello exception");
-			}
-		});
 		
 		execute("import builtins");
-		execute("for name in dir(builtins): x=getattr(builtins, name); (jnupy.loader(name, x) if (callable(x) and type(x) != type) else None)"); // ...
-		
-		execute("try:\n\tjnupy.do_exc()\nexcept:\n\timport sys; print(sys.exc_info())");
-		execute("jnupy.do_exc()");
+		execute("for name in dir(builtins): jnupy.load_builtin(name, getattr(builtins, name))"); // ...
 	}
 	
 	public void execute(String code) {
