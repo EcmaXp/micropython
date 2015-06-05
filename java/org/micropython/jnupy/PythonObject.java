@@ -92,6 +92,10 @@ public class PythonObject {
         return helper("getattr", this, name);
     }
 
+    public PythonObject getattr(String name, Object defvalue) {
+        return helper("getattr", this, name, defvalue);
+    }
+
     public PythonObject setattr(String name, Object value) {
         return helper("setattr", this, name, value);
     }

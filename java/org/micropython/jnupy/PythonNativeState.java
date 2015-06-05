@@ -93,6 +93,16 @@ public class PythonNativeState {
 		}
 	}
 	
+	public int readStat(String path) {
+		// just access native?
+		return 0; // not exists? (TODO: enum?)
+	}
+	
+	public String readFile(String filename) {
+		// just access native?
+		return "code";
+	}
+	
 	// TODO: add new exception method? (name and detail and PythonObject exc?)
 	
 	// native function list: jnupy.c

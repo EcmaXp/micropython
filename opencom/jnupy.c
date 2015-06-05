@@ -651,24 +651,6 @@ void jnupy_setup_env(JNIEnv *env, jobject self) {
 /** PORT IMPL VALUE/FUNCTIONS **/
 MP_THREAD mp_uint_t mp_verbose_flag = 0;
 
-uint mp_import_stat(const char *path) {
-    // TODO: limit path to internal only?
-    // (but custom importer maybe don't this this?)
-
-    /*
-    struct stat st;
-    if (stat(path, &st) == 0) {
-        if (S_ISDIR(st.st_mode)) {
-            return MP_IMPORT_STAT_DIR;
-        } else if (S_ISREG(st.st_mode)) {
-            return MP_IMPORT_STAT_FILE;
-        }
-    }
-    */
-
-    return MP_IMPORT_STAT_NO_EXIST;
-}
-
 int DEBUG_printf(const char *fmt, ...) {
     // TODO: use java output?
     va_list ap;
@@ -678,7 +660,7 @@ int DEBUG_printf(const char *fmt, ...) {
     return ret;
 }
 
-bool _jnupy_attach_env() {
+STATIC bool _jnupy_attach_env() {
     if (JNUPY_ENV == NULL && JNUPY_G_ENV != NULL) {
         JNUPY_RAW_CALL_WITH(JNUPY_G_VM, AttachCurrentThread, (void **) &JNUPY_G_ENV, NULL);
     }
@@ -735,6 +717,38 @@ void jnupy_print_strn(const char *str, mp_uint_t len) {
 
         JNUPY_CALL(ReleaseByteArrayElements, bytearr, NULL, JNI_ABORT);
     }
+}
+
+uint mp_import_stat(const char *path) {
+    jstring jpath = JNUPY_CALL(NewStringUTF, path);
+    jint result = JNUPY_CALL(CallObjectMethod, JNUPY_PY_JSTATE, JMETHOD(PythonNativeState, readStat), jpath);
+    
+    JNUPY_CALL(ReleaseStringUTFChars, jpath, NULL);
+
+    switch (result) {
+        case MP_IMPORT_STAT_DIR:
+        case MP_IMPORT_STAT_FILE:
+        case MP_IMPORT_STAT_NO_EXIST:
+            return result;
+        default:
+            return MP_IMPORT_STAT_NO_EXIST;
+    }
+}
+
+// STATIC void jcodestr_buf_free(mp_lexer_str_buf_t *sb) {
+//     JNUPY_CALL(ReleaseStringUTFChars, jcodestr, NULL);
+// }
+
+mp_lexer_t *mp_lexer_new_from_file(const char *filename) {
+    jstring jfilename = JNUPY_CALL(NewStringUTF, filename);
+    jstring jcodestr = JNUPY_CALL(CallObjectMethod, JNUPY_PY_JSTATE, JMETHOD(PythonNativeState, readFile), jfilename);
+    
+    const char* codestr = GetStringUTFChars(jcodestr, JNI_TRUE);
+    
+    // codestr is maybe unfree... must release function are required. (custom mp_lexer_new?)
+    JNUPY_CALL(ReleaseStringUTFChars, jfilename, NULL);
+    
+    return mp_lexer_new_from_str_len(qstr_from_str(filename), str, len, 0);
 }
 
 /** JNUPY INTERNAL MODULE **/

@@ -95,6 +95,21 @@ public class PythonState extends PythonNativeState {
 		builtins = new HashMap<String, PythonObject>();
 		String loader = "lambda x, m: [x(s, getattr(m,s)) for s in dir(m)]";
 		pyEval(loader).call(load, modbuiltins);
+		
+		JavaFunction open = new JavaFunction() {
+			@Override
+			public Object invoke(PythonState pythonState, Object... args) {
+				// ?
+				return null;
+			}
+		};
+		
+		// modbuiltins.setattr("__import__", open);
+		// override import module
+		
+		modbuiltins.setattr("open", open);
+		
+		// other thing should override also, example: map.
 	}
 	
 	public void execute(String code) {
