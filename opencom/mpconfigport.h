@@ -67,16 +67,17 @@
 #define MICROPY_PY_ALL_SPECIAL_METHODS (1)
 #define MICROPY_PY_ARRAY_SLICE_ASSIGN (1)
 #define MICROPY_PY_SYS_EXIT         (1)
-#define MICROPY_PY_SYS_PLATFORM     "linux"
+#define MICROPY_PY_SYS_PLATFORM     "jnupy"
 #define MICROPY_PY_SYS_MAXSIZE      (1)
-#define MICROPY_PY_SYS_STDFILES     (1)
+#define MICROPY_PY_SYS_STDFILES     (0) // Default: 1
 #define MICROPY_PY_SYS_EXC_INFO     (1)
 #define MICROPY_PY_COLLECTIONS_ORDEREDDICT (1)
 #define MICROPY_PY_MATH_SPECIAL_FUNCTIONS (1)
 #define MICROPY_PY_CMATH            (1)
-#define MICROPY_PY_IO_FILEIO        (1)
+#define MICROPY_PY_IO               (0) // Default: 1
+#define MICROPY_PY_IO_FILEIO        (0) // Default: 1
 #define MICROPY_PY_GC_COLLECT_RETVAL (1)
-#define MICROPY_MODULE_FROZEN       (1)
+#define MICROPY_MODULE_FROZEN       (0) // Default: 1
 
 #define MICROPY_STACKLESS           (1) // Default: 0
 #define MICROPY_STACKLESS_STRICT    (0) // Default: 0
