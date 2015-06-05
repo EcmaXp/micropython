@@ -103,6 +103,13 @@ SRC_C = \
 	coverage.c \
 	$(SRC_MOD)
 
+# Include builtin package manager in the standard build (and coverage)
+ifeq ($(PROG),micropython)
+SRC_C += $(BUILD)/_frozen_upip.c
+else ifeq ($(PROG),micropython_coverage)
+SRC_C += $(BUILD)/_frozen_upip.c
+endif
+
 LIB_SRC_C = $(addprefix lib/,\
 	$(LIB_SRC_C_EXTRA) \
 	)
@@ -153,3 +160,17 @@ coverage_test: coverage
 	cd ../tests && MICROPY_MICROPYTHON=../$(DIRNAME)/micropython_coverage ./run-tests --emit native
 	gcov -o build-coverage/py ../py/*.c
 	gcov -o build-coverage/extmod ../extmod/*.c
+
+$(BUILD)/_frozen_upip.c: $(BUILD)/frozen_upip/upip.py
+	../tools/make-frozen.py $(dir $^) > $@
+
+# Select latest upip version available
+UPIP_TARBALL := $(shell ls -1 -v ../tools/micropython-upip-*.tar.gz | tail -n1)
+
+$(BUILD)/frozen_upip/upip.py: $(UPIP_TARBALL)
+	$(ECHO) "MISC Preparing upip as frozen module"
+	$(Q)rm -rf $(BUILD)/micropython-upip-*
+	$(Q)tar -C $(BUILD) -xz -f $^
+	$(Q)rm -rf $(dir $@)
+	$(Q)mkdir -p $(dir $@)
+	$(Q)cp $(BUILD)/micropython-upip-*/upip*.py $(dir $@)

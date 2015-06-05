@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2013, 2014 Damien P. George
+ * Copyright (c) 2015 Damien P. George
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,17 +24,9 @@
  * THE SOFTWARE.
  */
 
-// This config file is intended to configure artificially fast uPy build for
-// synthetic benchmarking, at the expense of features supported and memory
-// usage. This config is not intended to be used in production.
+#include "unix/unix_mphal.h"
 
-#include <mpconfigport.h>
-#define MICROPY_PY___FILE__ (0)
-// 91 is a magic number proposed by @dpgeorge, which make pystone run ~ at tie
-// with CPython 3.4.
-#define MICROPY_MODULE_DICT_SIZE (91)
+#define MICROPY_HAL_HAS_VT100 (0)
 
-// Don't include builtin upip, as this build is again intended just for
-// synthetic benchmarking
-#undef MICROPY_MODULE_FROZEN
-#define MICROPY_MODULE_FROZEN    (0)
+void mp_hal_move_cursor_back(unsigned int pos);
+void mp_hal_erase_line_from_cursor();
