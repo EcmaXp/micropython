@@ -186,11 +186,13 @@ extern THREAD mp_state_ctx_t *mp_state_ctx;
 #define MP_STATE_CTX(x) (mp_state_ctx->x)
 #define MP_STATE_VM(x) (mp_state_ctx->vm.x)
 #define MP_STATE_MEM(x) (mp_state_ctx->mem.x)
+#define MP_STATE_CTX_PTR mp_state_ctx
 #else
 extern mp_state_ctx_t mp_state_ctx;
 #define MP_STATE_CTX(x) (mp_state_ctx.x)
 #define MP_STATE_VM(x) (mp_state_ctx.vm.x)
 #define MP_STATE_MEM(x) (mp_state_ctx.mem.x)
+#define MP_STATE_CTX_PTR &mp_state_ctx
 #endif // MICROPY_MULTI_STATE_CONTEXT
 
 #endif // __MICROPY_INCLUDED_PY_MPSTATE_H__

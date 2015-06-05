@@ -275,14 +275,8 @@ void gc_collect_start(void) {
     // Trace root pointers.  This relies on the root pointers being organised
     // correctly in the mp_state_ctx structure.  We scan nlr_top, dict_locals,
     // dict_globals, then the root pointer section of mp_state_vm.
-    #if MICROPY_MULTI_STATE_CONTEXT
-    // mp_state_ctx is pointer
-    void **ptrs = (void**)(void*)mp_state_ctx;
-    #else
-    // mp_state_ctx is value
-    void **ptrs = (void**)(void*)&mp_state_ctx;
-    #endif
-    
+    void **ptrs = (void**)(void*)MP_STATE_CTX_PTR;
+
     #if MICROPY_MULTI_STATE_CONTEXT
     // Yes: mp_nlr_top is external value when MICROPY_MULTI_STATE_CONTEXT is enabled.
     if (mp_nlr_top != NULL) {

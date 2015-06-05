@@ -615,10 +615,6 @@ bool jnupy_load_state(mp_state_ctx_t *state) {
     }
 
     mp_state_force_load(state);
-    if (state != mp_state_ctx) {
-        JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/IllegalStateException", CQIAK), "Python state is Invaild.");
-        return false;
-    }
 
     JNUPY_MP_STATE = state;
     return true;
@@ -632,13 +628,6 @@ mp_state_ctx_t *jnupy_get_state_from_pythonnativestate(jobject pythonNativeState
 bool jnupy_load_state_from_pythonnativestate() {
     JNUPY_PY_JSTATE = JNUPY_SELF;
     mp_state_ctx_t *state = jnupy_get_state_from_pythonnativestate(JNUPY_SELF);
-    return jnupy_load_state(state);
-}
-
-bool jnupy_load_state_from_pythonobject() {
-    jobject pythonNativeState = JNUPY_CALL(GetObjectField, JNUPY_SELF, JFIELD(PythonObject, pythonState));
-    JNUPY_PY_JSTATE = pythonNativeState;
-    mp_state_ctx_t *state = jnupy_get_state_from_pythonnativestate(pythonNativeState);
     return jnupy_load_state(state);
 }
 
@@ -717,7 +706,7 @@ NORETURN void mp_assert_fail(const char *assertion, const char *file,
 
 void nlr_jump_fail(void *val) {
     char buf[128];
-    snprintf(buf, sizeof(buf), "<JNUPY>: FATAL: uncaught NLR %p (mp_state_ctx=%p)", val, mp_state_ctx);
+    snprintf(buf, sizeof(buf), "<JNUPY>: FATAL: uncaught NLR %p (mp_state_ctx=%p)", val, MP_STATE_CTX_PTR);
 
     if (_jnupy_attach_env()) {
         JNUPY_RAW_CALL(FatalError, buf);
