@@ -25,9 +25,10 @@
  */
 
 // for OpenComptuers
+#define MICROPY_BUILD_JNI_LIBRARY   (1)
 #define MICROPY_ALLOW_PAUSE_VM      (1)
 #define MICROPY_LIMIT_CPU           (1)
-#define MICROPY_BUILD_JNI_LIBRARY   (1)
+#define MICROPY_GCREGS_SETJMP       (1)
 
 // options to control how Micro Python is built
 #define MICROPY_EMIT_X64            (0)
@@ -61,7 +62,7 @@
 #define MICROPY_PY_BUILTINS_MEMORYVIEW (1)
 #define MICROPY_PY_BUILTINS_FROZENSET (1)
 #define MICROPY_PY_BUILTINS_COMPILE (1)
-#define MICROPY_PY_BUILTINS_NOTIMPLEMENTED (0)
+#define MICROPY_PY_BUILTINS_NOTIMPLEMENTED (1)
 #define MICROPY_PY_MICROPYTHON_MEM_INFO (1)
 #define MICROPY_PY_ALL_SPECIAL_METHODS (1)
 #define MICROPY_PY_ARRAY_SLICE_ASSIGN (1)
@@ -75,6 +76,7 @@
 #define MICROPY_PY_CMATH            (1)
 #define MICROPY_PY_IO_FILEIO        (1)
 #define MICROPY_PY_GC_COLLECT_RETVAL (1)
+#define MICROPY_MODULE_FROZEN       (1)
 
 #define MICROPY_STACKLESS           (1) // Default: 0
 #define MICROPY_STACKLESS_STRICT    (0) // Default: 0
@@ -94,16 +96,6 @@
 #define MICROPY_ERROR_REPORTING     (MICROPY_ERROR_REPORTING_DETAILED)
 #define MICROPY_WARNINGS            (1)
 
-// Define to 1 to use undertested inefficient GC helper implementation
-// (if more efficient arch-specific one is not available).
-#ifndef MICROPY_GCREGS_SETJMP
-    #ifdef __mips__
-        #define MICROPY_GCREGS_SETJMP (1)
-    #else
-        #define MICROPY_GCREGS_SETJMP (0)
-    #endif
-#endif
-
 #define MICROPY_ENABLE_EMERGENCY_EXCEPTION_BUF   (1)
 #define MICROPY_EMERGENCY_EXCEPTION_BUF_SIZE  (256)
 
@@ -114,6 +106,11 @@ extern const struct _mp_obj_module_t mp_module_persist;
 extern const struct _mp_obj_module_t mp_module_mpoc;
 extern const struct _mp_obj_module_t mp_module_ujnupy;
 
+#if MICROPY_BUILD_JNI_LIBRARY
+#define MICROPY_PY_JNUPY_DEF { MP_OBJ_NEW_QSTR(MP_QSTR_ujnupy), (mp_obj_t)&mp_module_ujnupy },
+#else
+#define MICROPY_PY_JNUPY_DEF
+#endif
 #if MICROPY_PY_MSGPACK
 #define MICROPY_PY_MSGPACK_DEF { MP_OBJ_NEW_QSTR(MP_QSTR_umsgpack), (mp_obj_t)&mp_module_msgpack },
 #else
@@ -129,17 +126,12 @@ extern const struct _mp_obj_module_t mp_module_ujnupy;
 #else
 #define MICROPY_PY_MICROTHREAD_DEF
 #endif
-#if MICROPY_BUILD_JNI_LIBRARY
-#define MICROPY_PY_JNUPY_DEF { MP_OBJ_NEW_QSTR(MP_QSTR_ujnupy), (mp_obj_t)&mp_module_ujnupy },
-#else
-#define MICROPY_PY_JNUPY_DEF
-#endif
 
 #define MICROPY_PORT_BUILTIN_MODULES \
+    MICROPY_PY_JNUPY_DEF \
     MICROPY_PY_MSGPACK_DEF \
     MICROPY_PY_MICROTHREAD_DEF \
     MICROPY_PY_PERSIST_DEF \
-    MICROPY_PY_JNUPY_DEF \
     { MP_OBJ_NEW_QSTR(MP_QSTR_mpoc), (mp_obj_t)&mp_module_mpoc }, \
     {}
 
@@ -167,9 +159,8 @@ typedef long mp_off_t;
 typedef void *machine_ptr_t; // must be of pointer size
 typedef const void *machine_const_ptr_t; // must be of pointer size
 
-extern const struct _mp_obj_fun_builtin_t mp_builtin_open_obj;
-#define MICROPY_PORT_BUILTINS \
-    { MP_OBJ_NEW_QSTR(MP_QSTR_open), (mp_obj_t)&mp_builtin_open_obj },
+#define MICROPY_PORT_BUILTINS
+//    { MP_OBJ_NEW_QSTR(MP_QSTR_open), (mp_obj_t)&mp_builtin_open_obj },
 
 // We need to provide a declaration/definition of alloca()
 #ifdef __FreeBSD__

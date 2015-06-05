@@ -98,7 +98,6 @@ endif
 # source files
 SRC_C = \
 	jnupy.c \
-	file.c \
 	gccollect.c \
 	modmpoc.c \
 	$(SRC_MOD)
