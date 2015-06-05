@@ -28,11 +28,11 @@ package org.micropython.jnupy;
 
 public class PythonNativeState {
 	// TODO: PythonNativeState is correct name?
+	public static final String MICROPYTHON_VERSION; // 1.4.1?
 	
     static {
-    	System.load(System.getenv("MICROPYTHON_LIB"));
-		// NativeSupport.getInstance().getLoader().load();
-		// MICROPYTHON_VERSION = jnupy_version();
+    	NativeSupport.getInstance().getLoader().load();
+		MICROPYTHON_VERSION = jnupy_mp_version();
 	}
 	
 	public static final int MEMORY_SCALE;
@@ -85,6 +85,7 @@ public class PythonNativeState {
 	// TODO: add new exception method? (name and detail and PythonObject exc?)
 	
 	// native function list: jnupy.c
+	native static String jnupy_mp_version();
 	native synchronized boolean jnupy_state_new(long stack_size, long heap_size);
 	native synchronized boolean jnupy_state_check();
 	native synchronized void jnupy_state_free();

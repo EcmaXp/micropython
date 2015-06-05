@@ -1290,6 +1290,17 @@ const mp_obj_module_t mp_module_ujnupy = {
 #define JNUPY_FUNC(name) Java_org_micropython_jnupy_PythonNativeState_##name
 #define JNUPY_FUNC_STATE_LOADER jnupy_load_state_from_pythonnativestate
 
+JNUPY_FUNC_DEF(jstring, jnupy_1mp_1version)
+    (JNIEnv *env, jobject self) {
+    JNUPY_FUNC_START;
+
+    jstring result = JNUPY_CALL(NewStringUTF, MICROPY_VERSION_STRING);
+    return result;
+
+    JNUPY_FUNC_END;
+}
+
+
 JNUPY_FUNC_DEF(jboolean, jnupy_1state_1new)
     (JNIEnv *env, jobject self, jlong stack_size, jlong heap_size) {
     JNUPY_FUNC_START;
