@@ -25,6 +25,7 @@
  */
 
 package org.micropython.jnupy;
+import java.io.IOException;
 
 public class PythonNativeState {
 	// TODO: PythonNativeState is correct name?
@@ -79,6 +80,16 @@ public class PythonNativeState {
 	void check() {
 		if (!isOpen()) {
 			throw new IllegalStateException("Python state is closed.");
+		}
+	}
+	
+	public void print(byte[] buf) {
+		try {
+			System.out.write(buf);	
+		} catch (IOException e) {
+			// what the...
+			// TODO: change exception type, message.
+			throw new RuntimeException("unexcepted error", e);
 		}
 	}
 	

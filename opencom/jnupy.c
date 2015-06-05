@@ -378,6 +378,8 @@ JNUPY_REF_METHOD(MSG5B)
 JNUPY_REF_METHOD(MEFVT)
 // METHOD: org/micropython/jnupy/PythonNativeException-><init>[(Ljava/lang/String;)V]
 JNUPY_REF_METHOD(MOBLI)
+// METHOD: org/micropython/jnupy/PythonNativeState->print[([B)V]
+JNUPY_REF_METHOD(MOUBH)
 // METHOD: org/micropython/jnupy/PythonObject-><init>[(Lorg/micropython/jnupy/PythonState;JJ)V]
 JNUPY_REF_METHOD(MHTAY)
 // STATICFIELD: java/lang/Boolean->FALSE[Ljava/lang/Boolean;]
@@ -408,6 +410,7 @@ JNUPY_AP(EXPORT)
 #define JSTATICFIELD_Boolean_FALSE JNUPY_STATICFIELD("java/lang/Boolean", "FALSE", "Ljava/lang/Boolean;", SYCJ2)
 
 #define JCLASS_PythonNativeState JNUPY_CLASS("org/micropython/jnupy/PythonNativeState", CEYRH)
+#define JMETHOD_PythonNativeState_print JNUPY_METHOD("org/micropython/jnupy/PythonNativeState", "print", "([B)V", MOUBH)
 #define JFIELD_PythonNativeState_mpState JNUPY_FIELD("org/micropython/jnupy/PythonNativeState", "mpState", "J", FJ2IH)
 
 #define JCLASS_PythonObject JNUPY_CLASS("org/micropython/jnupy/PythonObject", CKZG7)
@@ -524,6 +527,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNUPY_LOAD_METHOD("java/util/HashMap", "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;", CEKJY, MSG5B)
     JNUPY_LOAD_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", CRBZE, MEFVT)
     JNUPY_LOAD_METHOD("org/micropython/jnupy/PythonNativeException", "<init>", "(Ljava/lang/String;)V", CLGS4, MOBLI)
+    JNUPY_LOAD_METHOD("org/micropython/jnupy/PythonNativeState", "print", "([B)V", CEYRH, MOUBH)
     JNUPY_LOAD_METHOD("org/micropython/jnupy/PythonObject", "<init>", "(Lorg/micropython/jnupy/PythonState;JJ)V", CKZG7, MHTAY)
     JNUPY_LOAD_STATICFIELD("java/lang/Boolean", "FALSE", "Ljava/lang/Boolean;", CDKHI, SYCJ2)
     JNUPY_LOAD_STATICFIELD("java/lang/Boolean", "TRUE", "Ljava/lang/Boolean;", CDKHI, S3RTH)
@@ -592,6 +596,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     JNUPY_UNLOAD_METHOD("java/util/HashMap", "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;", CEKJY, MSG5B)
     JNUPY_UNLOAD_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", CRBZE, MEFVT)
     JNUPY_UNLOAD_METHOD("org/micropython/jnupy/PythonNativeException", "<init>", "(Ljava/lang/String;)V", CLGS4, MOBLI)
+    JNUPY_UNLOAD_METHOD("org/micropython/jnupy/PythonNativeState", "print", "([B)V", CEYRH, MOUBH)
     JNUPY_UNLOAD_METHOD("org/micropython/jnupy/PythonObject", "<init>", "(Lorg/micropython/jnupy/PythonState;JJ)V", CKZG7, MHTAY)
     JNUPY_UNLOAD_STATICFIELD("java/lang/Boolean", "FALSE", "Ljava/lang/Boolean;", CDKHI, SYCJ2)
     JNUPY_UNLOAD_STATICFIELD("java/lang/Boolean", "TRUE", "Ljava/lang/Boolean;", CDKHI, S3RTH)
@@ -715,6 +720,21 @@ void nlr_jump_fail(void *val) {
     }
 
     abort();
+}
+
+// mp_plat_print_strn call it for print to stdout.
+void jnupy_print_strn(const char *str, mp_uint_t len) {
+    if (MP_STATE_CTX_PTR == NULL || !MP_STATE_VM(is_state_loaded) || (JNUPY_PY_JSTATE == NULL)) {
+        // state is unloaded.
+        printf("%.*s", (int)len, str);
+    } else {
+        jbyteArray bytearr = JNUPY_CALL(NewByteArray, len);
+        JNUPY_CALL(SetByteArrayRegion, bytearr, 0, len, (const jbyte *)str);
+
+        JNUPY_CALL(CallVoidMethod, JNUPY_PY_JSTATE, JMETHOD(PythonNativeState, print), bytearr);
+
+        JNUPY_CALL(ReleaseByteArrayElements, bytearr, NULL, JNI_ABORT);
+    }
 }
 
 /** JNUPY INTERNAL MODULE **/
@@ -1215,11 +1235,42 @@ const mp_obj_type_t mp_type_pyref = {
 };
 
 
+STATIC mp_obj_t mod_jnupy_test(mp_obj_t asdf) {
+    return mp_const_none;
+}
+
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_jnupy_test_obj, mod_jnupy_test);
+
+STATIC mp_obj_t mod_jnupy_get_state_ident() {
+    #if MICROPY_MULTI_STATE_CONTEXT
+    return mp_obj_new_int((mp_uint_t)mp_state_ctx);
+    #else
+    return mp_const_none;
+    #endif
+}
+
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_jnupy_get_state_ident_obj, mod_jnupy_get_state_ident);
+
+STATIC mp_obj_t mod_jnupy_get_loaded_modules(void) {
+    mp_obj_dict_t *self = m_new_obj(mp_obj_dict_t);
+    self->base.type = &mp_type_dict;
+    self->map = MP_STATE_VM(mp_loaded_modules_map);
+
+    mp_obj_t copy_fun = mp_load_attr(self, MP_QSTR_copy);
+    return mp_call_function_0(copy_fun);
+}
+
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_jnupy_get_loaded_modules_obj, mod_jnupy_get_loaded_modules);
+
 STATIC const mp_map_elem_t mp_module_ujnupy_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_micropython) },
     { MP_OBJ_NEW_QSTR(MP_QSTR_JObject), (mp_obj_t)&mp_type_jobject },
     { MP_OBJ_NEW_QSTR(MP_QSTR_JFunction), (mp_obj_t)&mp_type_jfunc },
     { MP_OBJ_NEW_QSTR(MP_QSTR_PyRef), (mp_obj_t)&mp_type_pyref },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&mod_jnupy_test_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_get_state_ident), (mp_obj_t)&mod_jnupy_get_state_ident_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_builtin_modules), (mp_obj_t)&mp_builtin_module_dict },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_get_loaded_modules), (mp_obj_t)&mod_jnupy_get_loaded_modules_obj },
 };
 
 STATIC MP_DEFINE_CONST_DICT(mp_module_ujnupy_globals, mp_module_ujnupy_globals_table);
@@ -1230,11 +1281,18 @@ const mp_obj_module_t mp_module_ujnupy = {
     .globals = (mp_obj_dict_t*)&mp_module_ujnupy_globals,
 };
 
-/** JNI EXPORT FUNCTION MECRO **/
-#define JNUPY_FUNC(name) // Java_org_micropython_jnupy_xxx_##name
+/** JNI EXPORT FUNCTION HEADER MECRO **/
+#define JNUPY_FUNC(name) Java_org_micropython_jnupy_PythonNativeState_##name
 #define JNUPY_FUNC_DEF(ret, name) \
     JNIEXPORT ret JNICALL JNUPY_FUNC(name)
 
+/** JNI STATIC EXPORT FUNCTIONS (org.micropython.jnupy.PythonNativeState) **/
+JNUPY_FUNC_DEF(jstring, jnupy_1mp_1version)
+    (JNIEnv *env, jobject self) {
+    return (*env)->NewStringUTF(env, MICROPY_VERSION_STRING);
+}
+
+/** JNI EXPORT FUNCTION BODY MECRO **/
 // TODO: cleanup body... (nlr_gk, nlr_top, stack_top, etc...)
 // TODO: re-compute stack_limit for setuped stack_top...
 
@@ -1275,32 +1333,14 @@ const mp_obj_module_t mp_module_ujnupy = {
     mp_nlr_top = nlr_ptr; \
     return
 
-#define JNUPY_FUNC_STATE_LOADER
+#define JNUPY_FUNC_STATE_LOADER jnupy_load_state_from_pythonnativestate
 #define JNUPY_FUNC_START_WITH_STATE _JNUPY_FUNC_BODY_START(true, JNUPY_FUNC_STATE_LOADER())
 #define JNUPY_FUNC_START _JNUPY_FUNC_BODY_START(false, true)
 #define JNUPY_FUNC_END_VOID _JNUPY_FUNC_BODY_END(return)
 #define JNUPY_FUNC_END_VALUE(value) _JNUPY_FUNC_BODY_END(return (value))
 #define JNUPY_FUNC_END _JNUPY_FUNC_BODY_END(return 0)
 
-/** JNI EXPORT FUNCTIONS **/
-
-#undef JNUPY_FUNC
-#undef JNUPY_FUNC_STATE_LOADER
-// org.micropython.jnupy.PythonNativeState
-#define JNUPY_FUNC(name) Java_org_micropython_jnupy_PythonNativeState_##name
-#define JNUPY_FUNC_STATE_LOADER jnupy_load_state_from_pythonnativestate
-
-JNUPY_FUNC_DEF(jstring, jnupy_1mp_1version)
-    (JNIEnv *env, jobject self) {
-    JNUPY_FUNC_START;
-
-    jstring result = JNUPY_CALL(NewStringUTF, MICROPY_VERSION_STRING);
-    return result;
-
-    JNUPY_FUNC_END;
-}
-
-
+/** JNI EXPORT FUNCTIONS (org.micropython.jnupy.PythonNativeState) **/
 JNUPY_FUNC_DEF(jboolean, jnupy_1state_1new)
     (JNIEnv *env, jobject self, jlong stack_size, jlong heap_size) {
     JNUPY_FUNC_START;

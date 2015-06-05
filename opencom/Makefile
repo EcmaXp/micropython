@@ -99,7 +99,6 @@ endif
 SRC_C = \
 	jnupy.c \
 	gccollect.c \
-	modmpoc.c \
 	$(SRC_MOD)
 
 OBJ = $(PY_O) $(addprefix $(BUILD)/, $(SRC_C:.c=.o))

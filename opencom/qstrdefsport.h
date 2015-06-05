@@ -26,17 +26,6 @@
 
 // qstrs specific to this port
 
-// mpoc
-Q(mpoc)
-Q(test)
-Q(test1)
-Q(test2)
-Q(test3)
-Q(test4)
-Q(get_state_ident)
-Q(get_loaded_modules)
-Q(builtin_modules)
-
 // microthread
 Q(microthread)
 Q(umicrothread)
@@ -105,3 +94,11 @@ Q(JObject)
 Q(jrefs)
 Q(pyrefs)
 Q(PyRef)
+Q(test)
+Q(test1)
+Q(test2)
+Q(test3)
+Q(test4)
+Q(get_state_ident)
+Q(get_loaded_modules)
+Q(builtin_modules)

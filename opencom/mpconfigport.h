@@ -133,7 +133,6 @@ extern const struct _mp_obj_module_t mp_module_ujnupy;
     MICROPY_PY_MSGPACK_DEF \
     MICROPY_PY_MICROTHREAD_DEF \
     MICROPY_PY_PERSIST_DEF \
-    { MP_OBJ_NEW_QSTR(MP_QSTR_mpoc), (mp_obj_t)&mp_module_mpoc }, \
     {}
 
 // type definitions for the specific machine
@@ -169,3 +168,6 @@ typedef const void *machine_const_ptr_t; // must be of pointer size
 #else
 #include <alloca.h>
 #endif
+
+#define MP_PLAT_PRINT_STRN(str, len) jnupy_print_strn(str, len)
+void jnupy_print_strn(const char *str, mp_uint_t len);

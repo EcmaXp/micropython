@@ -41,6 +41,8 @@ public class PythonState extends PythonNativeState {
 	
 	// TODO: private?
 	public HashMap<String, PythonObject> builtins;
+	public PythonObject modjnupy;
+	public PythonObject modbuiltins;
 	
 	public static void main(String args[]) {
 		System.gc(); // Remove incorrect reference.
@@ -74,37 +76,25 @@ public class PythonState extends PythonNativeState {
 	
 	public PythonState(long stack_size, long heap_size) {
 		super(stack_size, heap_size);
-		
-		builtins = new HashMap<String, PythonObject>();
-		
-		// jnupy is python-side module
-		execute("import jnupy");
-		
-		/* TODO: push jnupy setting helper
-		A. init internal usage function; access jnupy module only for
-		    - getattr(..., name, None)
-		    - setattr(..., name, value)
-		B. get raw builtin module and function, class, etc.
-		C. set custom __import__ function.
-		*/
-		
-		// TODO: load stream and do load
-		// execute("");
-		
-		PythonObject loader = pyEval("lambda x, y: setattr(jnupy, x, y)");
-		loader.invoke("load_builtin", new JavaFunction() {
+
+		PythonObject importer = pyEval("__import__");	
+		modjnupy = importer.call("jnupy");
+		modbuiltins = importer.call("builtins");
+
+		JavaFunction load = new JavaFunction() {
 			@Override
 			public Object invoke(PythonState pythonState, Object... args) {
-				if (args.length == 2 && args[1] instanceof PythonObject && args[0] instanceof String) {
+				if (args[1] != null && args[1] instanceof PythonObject) {
 					pythonState.builtins.put((String)args[0], (PythonObject)args[1]);
 				}
 				
 				return null;
 			}
-		});
-		
-		execute("import builtins");
-		execute("for name in dir(builtins): jnupy.load_builtin(name, getattr(builtins, name))"); // ...
+		};
+
+		builtins = new HashMap<String, PythonObject>();
+		String loader = "lambda x, m: [x(s, getattr(m,s)) for s in dir(m)]";
+		pyEval(loader).call(load, modbuiltins);
 	}
 	
 	public void execute(String code) {
