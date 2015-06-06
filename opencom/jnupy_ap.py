@@ -13,6 +13,31 @@ if __name__ != "__main__" or len(sys.argv) != 2:
 
 # TODO: this file are not documented and lazy.
 
+config = {}
+ref = {}
+href = set()
+
+# AP TAG
+REF = "REF"
+LOAD = "LOAD"
+UNLOAD = "UNLOAD"
+EXPORT = "EXPORT"
+
+# AP BLOCK
+START = "START"
+END = "END"
+
+# AP VIRTUAL CONFIG
+TAB = "TAB" # with START
+
+# AP TYPE
+CLASS = "CLASS"
+ENUM = "ENUM"
+METHOD = "METHOD"
+FIELD = "FIELD"
+STATICMETHOD = "STATICMETHOD"
+STATICFIELD = "STATICFIELD"
+
 def build_parse_call(func):
     func_pc = func + "("
     def parse(line):
@@ -51,11 +76,12 @@ def build_parse_call(func):
 def build_call(func, *args):
     return "{}({})".format(func, ", ".join(args))
 
-
+# preprocessor
 JNUPY_AP = "JNUPY_AP"
 JNUPY_AP_DEFINE = "#define {}(...)".format(JNUPY_AP)
 
 JNUPY_CLASS = "JNUPY_CLASS"
+JNUPY_ENUM = "JNUPY_ENUM"
 JNUPY_METHOD = "JNUPY_METHOD"
 JNUPY_FIELD = "JNUPY_FIELD"
 JNUPY_STATICMETHOD = "JNUPY_STATICMETHOD"
@@ -63,6 +89,7 @@ JNUPY_STATICFIELD = "JNUPY_STATICFIELD"
 
 JNUPY_AP_CALL = build_parse_call(JNUPY_AP)
 JNUPY_CLASS_CALL = build_parse_call(JNUPY_CLASS)
+JNUPY_ENUM_CALL = build_parse_call(JNUPY_ENUM)
 JNUPY_METHOD_CALL = build_parse_call(JNUPY_METHOD)
 JNUPY_FIELD_CALL = build_parse_call(JNUPY_FIELD)
 JNUPY_STATICMETHOD_CALL = build_parse_call(JNUPY_STATICMETHOD)
@@ -154,30 +181,6 @@ class FileControl():
 
         return "\n".join(result)
 
-config = {}
-ref = {}
-href = set()
-
-# AP TAG
-REF = "REF"
-LOAD = "LOAD"
-UNLOAD = "UNLOAD"
-EXPORT = "EXPORT"
-
-# AP BLOCK
-START = "START"
-END = "END"
-
-# AP VIRTUAL CONFIG
-TAB = "TAB" # with START
-
-# AP TYPE
-CLASS = "CLASS"
-METHOD = "METHOD"
-FIELD = "FIELD"
-STATICMETHOD = "STATICMETHOD"
-STATICFIELD = "STATICFIELD"
-
 def block_assign(fc, tag, data):
     try:
         start = config[tag, START]
@@ -243,6 +246,7 @@ for lineno, rawline in enumerate(lines):
     
     for ref_type, parse_call, argnum in (
             (CLASS, JNUPY_CLASS_CALL, 1),
+            (ENUM, JNUPY_ENUM_CALL, 2),
             (METHOD, JNUPY_METHOD_CALL, 3),
             (FIELD, JNUPY_FIELD_CALL, 3),
             (STATICMETHOD, JNUPY_STATICMETHOD_CALL, 3),
@@ -264,13 +268,13 @@ for lineno, rawline in enumerate(lines):
                 vname, = args[:1]
                 tag = ref_type, (vname,)
                 args = map(str, args[:argnum] + (get_hash(tag),))
-            elif ref_type in (METHOD, FIELD, STATICMETHOD, STATICFIELD):
-                class_, vname, vtype, = args[:3]
+            elif ref_type in (ENUM, METHOD, FIELD, STATICMETHOD, STATICFIELD):
+                class_ = args[0]
                 class_hash = ref.get((CLASS, (class_,)))
                 if class_hash is None:
                     raise ValueError("class {} are not used".format(class_))
 
-                tag = ref_type, (class_, vname, vtype,)
+                tag = ref_type, args[:argnum]
                 args = map(str, args[:argnum] + (get_hash(tag),))
             else:
                 assert False
@@ -317,6 +321,8 @@ for (ref_type, info), hash_value in sorted(ref.items(), key=(lambda x: (x[0], x)
     name = None
     if ref_type == CLASS:
         desc = unescape(info[0])
+    elif ref_type == ENUM:
+        desc = unescape(info[0]) + "->" + unescape(info[1])
     else:
         desc = unescape(info[0]) + "->" + unescape(info[1]) + "[" + unescape(info[2]) + "]"
 
@@ -335,6 +341,8 @@ out = load_block.append
 for (ref_type, info), hash_value in sorted(ref.items(), key=(lambda x: (x[0], x))):
     if ref_type == CLASS:
         args = info[0], hash_value
+    elif ref_type == ENUM:
+        args = info[0], info[1], ref[CLASS, (info[0],)], hash_value
     else:
         args = info[0], info[1], info[2], ref[CLASS, (info[0],)], hash_value
     
@@ -351,6 +359,8 @@ out = unload_block.append
 for (ref_type, info), hash_value in sorted(ref.items(), key=(lambda x: (x[0], x))):
     if ref_type == CLASS:
         args = info[0], hash_value
+    elif ref_type == ENUM:
+        args = info[0], info[1], ref[CLASS, (info[0],)], hash_value
     else:
         args = info[0], info[1], info[2], ref[CLASS, (info[0],)], hash_value
     
