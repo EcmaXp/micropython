@@ -199,7 +199,7 @@ mp_vm_return_kind_t mp_execute_bytecode(mp_code_state *code_state, volatile mp_o
         first_code_state = first_code_state->prev;
     }
     
-    mp_vm_return_kind_t kind = _mp_execute_bytecode(false, first_code_state, code_state, inject_exc);
+    mp_vm_return_kind_t kind = mp_execute_bytecode_body(false, first_code_state, code_state, inject_exc);
     mp_obj_t exc = NULL;
     
     switch (kind){
@@ -220,10 +220,10 @@ mp_vm_return_kind_t mp_execute_bytecode(mp_code_state *code_state, volatile mp_o
 }
 
 mp_vm_return_kind_t mp_resume_bytecode(mp_code_state *first_code_state, mp_code_state *code_state, volatile mp_obj_t inject_exc) {
-    return _mp_execute_bytecode(true, first_code_state, code_state, inject_exc);
+    return mp_execute_bytecode_body(true, first_code_state, code_state, inject_exc);
 }
 
-mp_vm_return_kind_t _mp_execute_bytecode(bool is_pauseable, mp_code_state *first_code_state, mp_code_state *code_state, volatile mp_obj_t inject_exc) {
+mp_vm_return_kind_t mp_execute_bytecode_body(bool is_pauseable, mp_code_state *first_code_state, mp_code_state *code_state, volatile mp_obj_t inject_exc) {
 #endif
 #define SELECTIVE_EXC_IP (0)
 #if SELECTIVE_EXC_IP
