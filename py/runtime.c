@@ -1285,7 +1285,11 @@ mp_obj_t mp_parse_compile_execute(mp_lexer_t *lex, mp_parse_input_kind_t parse_i
     if (nlr_push(&nlr) == 0) {
         qstr source_name = lex->source_name;
         mp_parse_node_t pn = mp_parse(lex, parse_input_kind);
+        #if MICROPY_PY_COMPILE_SINGLE_WITH_REPL
+        mp_obj_t module_fun = mp_compile(pn, source_name, MP_EMIT_OPT_NONE, (parse_input_kind == MP_PARSE_SINGLE_INPUT));
+        #else
         mp_obj_t module_fun = mp_compile(pn, source_name, MP_EMIT_OPT_NONE, false);
+        #endif
 
         mp_obj_t ret;
         if (MICROPY_PY_BUILTINS_COMPILE && globals == NULL) {

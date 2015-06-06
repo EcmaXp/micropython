@@ -452,6 +452,11 @@ endif
 */
 #endif
 
+// Whether to given parse_input_kind with single must set repl
+#ifndef MICROPY_PY_COMPILE_SINGLE_WITH_REPL
+#define MICROPY_PY_COMPILE_SINGLE_WITH_REPL (0)
+#endif
+
 /*****************************************************************************/
 /* Fine control over Python builtins, classes, modules, etc                  */
 
