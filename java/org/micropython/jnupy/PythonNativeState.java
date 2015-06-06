@@ -62,16 +62,16 @@ public class PythonNativeState {
 		}
 	}
 
-	// Internal usage only in java-side
-	public boolean checkState(long mpStateId) {
-		return (mpState == mpStateId) && isOpen();
-	}
-	
 	public final synchronized boolean isOpen() {
 		return jnupy_state_check();
 	}
+
+	// Internal usage only in java-side
+	boolean checkState(long mpStateId) {
+		return (mpState == mpStateId) && isOpen();
+	}
 	
-	public synchronized void close() {
+	synchronized void close() {
 		if (isOpen()) {
 			jnupy_state_free();
 		}
@@ -83,6 +83,7 @@ public class PythonNativeState {
 		}
 	}
 	
+	// Override on subclass.
 	public void print(byte[] buf) {
 		try {
 			System.out.write(buf);	

@@ -26,6 +26,8 @@
 
 package org.micropython.jnupy;
 
-public interface JavaFunction {
-    public Object invoke(PythonState pythonState, Object... args) throws PythonException;
+public enum PythonParseInputKind {
+    MP_PARSE_SINGLE_INPUT,
+    MP_PARSE_FILE_INPUT,
+    MP_PARSE_EVAL_INPUT,
 }

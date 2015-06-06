@@ -26,6 +26,28 @@
 
 package org.micropython.jnupy;
 
-public interface JavaFunction {
-    public Object invoke(PythonState pythonState, Object... args) throws PythonException;
+public class PythonModule extends PythonObject {
+    PythonModule(PythonState pyState, long mpStateId, long objectId) {
+        super(pyState, mpStateId, objectId);
+    }
+    
+    public PythonModule(PythonObject pyobj) {
+        super(pyobj.pythonState, pyobj.mpObject);
+    }
+
+    public PythonObject get(String name) throws PythonException {
+        return getattr(name);
+    }
+    
+    public void set(String name, JavaFunction func) throws PythonException {
+        setattr(name, func);
+    }
+    
+    public void set(String name, PythonObject pyobj) throws PythonException {
+        setattr(name, pyobj);
+    }
+    
+    public void set(String name, Object obj) throws PythonException {
+        setattr(name, obj);
+    }
 }

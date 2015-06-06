@@ -80,6 +80,11 @@ public class PythonObject {
         PythonObject func = getHelper(name);
         return func.rawCall(args);
     }
+    
+    private Object rawhelper(String name, Object... args) throws PythonException {
+        PythonObject func = getHelper(name);
+        return func.rawInvoke(args);
+    }
     // END TODO
     
     public String toString() {
@@ -99,14 +104,18 @@ public class PythonObject {
     }
     
     public Object invoke(Object... args) throws PythonException {
+        // TODO: given flag to convert to anything?
         return pythonState.jnupy_func_call(true, this, args);
     }
     
     public Object rawInvoke(Object... args) throws PythonException {
+        // TODO: remove it?? (is possible?)
+        // TODO: given flag to never convert it... (when it is JavaObject...?)
         return pythonState.jnupy_func_call(false, this, args);
     }
     
     public PythonObject call(Object... args) throws PythonException {
+        // TODO: remove rawCall and given flag to only convert to PythonXXX object...
         Object result = pythonState.jnupy_func_call(true, this, args);
         if (result == null) {
             return null;
@@ -125,8 +134,8 @@ public class PythonObject {
         return getattr(name);
     }
 
-    public PythonObject attr(String name, Object value) throws PythonException {
-        return setattr(name, value);
+    public void attr(String name, Object value) throws PythonException {
+        setattr(name, value);
     }
 
     public PythonObject getattr(String name) throws PythonException {
@@ -137,16 +146,16 @@ public class PythonObject {
         return helper("getattr", this, name, defvalue);
     }
 
-    public PythonObject setattr(String name, Object value) throws PythonException {
-        return helper("setattr", this, name, value);
+    public void setattr(String name, Object value) throws PythonException {
+        rawhelper("setattr", this, name, value);
     }
     
     public PythonObject hasattr(String name) throws PythonException {
         return helper("hasattr", this, name);
     }
     
-    public PythonObject delattr(String name) throws PythonException {
-        return helper("delattr", this, name);
+    public void delattr(String name) throws PythonException {
+        rawhelper("delattr", this, name);
     }
     
     public Object unbox() throws PythonException {

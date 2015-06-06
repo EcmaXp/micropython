@@ -26,6 +26,6 @@
 
 package org.micropython.jnupy;
 
-public interface JavaFunction {
-    public Object invoke(PythonState pythonState, Object... args) throws PythonException;
+public interface NamedJavaFunction extends JavaFunction {
+    public String getName();
 }

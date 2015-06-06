@@ -4,6 +4,7 @@
  * The MIT License (MIT)
  *
  * Copyright (c) 2015 EcmaXp
+ * Copyright (C) 2008,2012 Andre Naef
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +27,38 @@
 
 package org.micropython.jnupy;
 
-public interface JavaFunction {
-    public Object invoke(PythonState pythonState, Object... args) throws PythonException;
+// jnlua NativeSupport
+public final class NativeSupport {
+	private static final NativeSupport INSTANCE = new NativeSupport();
+	private Loader loader = new DefaultLoader();
+
+	public static NativeSupport getInstance() {
+		return INSTANCE;
+	}
+
+	private NativeSupport() {
+	}
+
+	public Loader getLoader() {
+		return loader;
+	}
+
+	public void setLoader(Loader loader) {
+		if (loader == null) {
+			throw new NullPointerException("loader must not be null");
+		}
+		this.loader = loader;
+	}
+
+	public interface Loader {
+		public void load();
+	}
+
+	private class DefaultLoader implements Loader {
+		@Override
+		public void load() {
+		    // TODO: change this later.
+			System.load(System.getenv("MICROPYTHON_LIB"));
+		}
+	}
 }

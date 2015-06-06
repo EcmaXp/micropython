@@ -1249,7 +1249,7 @@ STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, c
     }
 
     // TODO: how to handle exception?
-	jobject jresult = JNUPY_RAW_CALL(CallObjectMethod, o->jfunc, JMETHOD(JavaFunction, invoke), JNUPY_SELF, jargs);
+    jobject jresult = JNUPY_RAW_CALL(CallObjectMethod, o->jfunc, JMETHOD(JavaFunction, invoke), JNUPY_SELF, jargs);
     jthrowable jerror = JNUPY_IS_RAW_CALL_HAS_ERROR();
 
 	if (jerror != NULL) {
@@ -1453,7 +1453,7 @@ JNUPY_FUNC_DEF(jstring, jnupy_1mp_1version)
     } \
     ret_stmt;
 
-#define return \
+#define _JNUPY_FUNC_BEFORE_RETURN \
     if (with_state) { \
         MP_STATE_VM(stack_top) = stack_top; \
     } \
@@ -1461,7 +1461,10 @@ JNUPY_FUNC_DEF(jstring, jnupy_1mp_1version)
         (*JNUPY_ENV)->ExceptionClear(JNUPY_ENV); \
     } \
     nlr_gk_pop(&_nlr_gk); \
-    mp_nlr_top = nlr_ptr; \
+    mp_nlr_top = nlr_ptr;
+
+#define return \
+    _JNUPY_FUNC_BEFORE_RETURN \
     return
 
 #define JNUPY_FUNC_STATE_LOADER jnupy_load_state_from_pythonnativestate

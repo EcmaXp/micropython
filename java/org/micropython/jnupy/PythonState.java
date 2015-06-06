@@ -30,6 +30,8 @@ import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Scanner;
+import java.util.NoSuchElementException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.io.File;
@@ -64,7 +66,14 @@ public class PythonState extends PythonNativeState {
 	
 			modsys.get("path").attr("append").call(rompath);
 			modsys.get("path").attr("append").call(libpath);
-
+			
+			PythonObject argv = py.builtins.get("list").rawCall();
+			for (String arg : args) {
+				argv.attr("append").call(arg);
+			}
+			
+			modsys.set("argv", py.builtins.get("tuple").rawCall(argv));
+			
 			PythonObject modbios = importer.call("bios");
 			PythonObject result = modbios.attr("main").rawCall();
 		} catch (PythonException e) {
@@ -96,8 +105,8 @@ public class PythonState extends PythonNativeState {
 	
 	public void setup() throws PythonException {
 		PythonObject importer = pyEval("__import__");	
-		PythonObject modjnupy = importer.call("jnupy");
-		PythonObject modbuiltins = importer.call("builtins");
+		PythonModule modjnupy = (PythonModule)importer.call("jnupy");
+		PythonModule modbuiltins = (PythonModule)importer.call("builtins");
 
 		JavaFunction load = new JavaFunction() {
 			@Override
@@ -113,23 +122,24 @@ public class PythonState extends PythonNativeState {
 		String loader = "lambda x, m: [x(s, getattr(m,s)) for s in dir(m)]";
 		pyEval(loader).rawCall(load, modbuiltins);
 		
-		JavaFunction open = new JavaFunction() {
-			@Override
-			public Object invoke(PythonState pythonState, Object... args) {
-				// ?
-				return null;
-			}
-		};
-		
-		// modbuiltins.setattr("__import__", open);
-		// override import module
-		
-		modbuiltins.attr("open", open);
-		
 		helpers.put("unbox", pyEval("lambda x: x"));
 		
+		modjnupy.set("input", new JavaFunction() {
+			@Override
+			public Object invoke(PythonState pythonState, Object... args) throws PythonException {
+				Scanner scan = new Scanner(System.in);
+				try {
+					return scan.nextLine();
+				} catch (NoSuchElementException e) {
+					return null;
+				}
+			}
+		});
+		
+		// TODO: move to module.xxx
 		PythonModule modutime = newModule("utime");
-		modutime.put("time", new JavaFunction() {
+		
+		modutime.set("time", new JavaFunction() {
 			@Override
 			public Object invoke(PythonState pythonState, Object... args) {
 				if (args.length != 0) {
@@ -140,7 +150,7 @@ public class PythonState extends PythonNativeState {
 			}
 		});
 		
-		modutime.put("sleep", new JavaFunction() {
+		modutime.set("sleep", new JavaFunction() {
 			@Override
 			public Object invoke(PythonState pythonState, Object... args) {
 				if (args.length != 1) {

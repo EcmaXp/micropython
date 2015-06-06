@@ -26,6 +26,8 @@
 
 package org.micropython.jnupy;
 
-public interface JavaFunction {
-    public Object invoke(PythonState pythonState, Object... args) throws PythonException;
+public enum PythonImportStat {
+    MP_IMPORT_STAT_NO_EXIST,
+    MP_IMPORT_STAT_DIR,
+    MP_IMPORT_STAT_FILE,
 }
