@@ -64,7 +64,7 @@ public class PythonNativeState {
 
 	// Internal usage only in java-side
 	public boolean checkState(long mpStateId) {
-		return (mpState == mpStateId);
+		return (mpState == mpStateId) && isOpen();
 	}
 	
 	public final synchronized boolean isOpen() {
@@ -93,14 +93,12 @@ public class PythonNativeState {
 		}
 	}
 	
-	public int readStat(String path) {
-		// just access native?
-		return 0; // not exists? (TODO: enum?)
+	public PythonImportStat readStat(String path) {
+		return PythonImportStat.MP_IMPORT_STAT_NO_EXIST;
 	}
 	
 	public String readFile(String filename) {
-		// just access native?
-		return "code";
+		return "";
 	}
 	
 	// TODO: add new exception method? (name and detail and PythonObject exc?)
@@ -112,6 +110,7 @@ public class PythonNativeState {
 	native synchronized void jnupy_state_free();
     native synchronized long jnupy_ref_incr(PythonObject pyobj);
     native synchronized void jnupy_ref_derc(PythonObject pyobj);
-	native synchronized PythonObject jnupy_code_compile(String code, int flag);
-    native synchronized Object jnupy_func_call(boolean convertResult, PythonObject func, Object ...args);
+	native synchronized PythonObject jnupy_code_compile(String code, PythonParseInputKind kind) throws PythonException;
+    native synchronized Object jnupy_func_call(boolean convertResult, PythonObject func, Object ...args) throws PythonException;
+    native synchronized PythonObject jnupy_module_new(String name) throws PythonException;
 }

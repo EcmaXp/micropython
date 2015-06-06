@@ -25,61 +25,79 @@
  */
 
 package org.micropython.jnupy;
+
 import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.FileSystems;
 
 public class PythonState extends PythonNativeState {
 	public static final long DEFAULT_STACK_SIZE = 1024 * 32 * MEMORY_SCALE; // 32 KB
 	public static final long DEFAULT_HEAP_SIZE = 1024 * 256 * MEMORY_SCALE; // 256 KB
 	
-	// TODO: replace to enum?
-	public static final int JNUPY_EXECUTE_SINGAL = 1;
-	public static final int JNUPY_EXECUTE_EXEC = 2;
-	public static final int JNUPY_EXECUTE_EVAL = 3;
-	
 	// TODO: private?
-	public HashMap<String, PythonObject> builtins;
-	public PythonObject modjnupy;
-	public PythonObject modbuiltins;
+	HashMap<String, PythonObject> builtins;
+	HashMap<String, PythonObject> helpers;
 	
 	public static void main(String args[]) {
 		System.gc(); // Remove incorrect reference.
+		PythonState py;
 		
-		PythonState py = new PythonState();
-		PythonObject print = py.builtins.get("print");
-		PythonObject globals = py.builtins.get("globals");
-		PythonObject getitem = py.pyEval("lambda x, y: x[y]");
-		print.invoke(1, 2, 3);
-		PythonObject importer = py.builtins.get("__import__");
-		PythonObject microthread = importer.call("umicrothread");
-		PythonObject MicroThread = microthread.getattr("MicroThread");
-		// https://github.com/benelog/multiline ?
-		String hello = "" +
-			"import umicrothread\n" +
-			"def hello():\n" +
-			"	umicrothread.pause()";
-		py.execute(hello);
-		PythonObject func = MicroThread.call("hello", getitem.call(globals.call(), "hello"));
-		System.out.println(func.getattr("resume").call());
-		System.out.println(func.getattr("resume").call());
+		try {
+			py = new PythonState();
+		} catch (PythonException e) {
+			throw new RuntimeException("createing state are failed", e);
+		}
+		
+		try {
+			PythonObject importer = py.builtins.get("__import__");
+			PythonModule modsys = (PythonModule)importer.call("sys");
+			String rompath = System.getenv("MPOC_ROM");
+			String libpath = System.getenv("MICROPYTHON_BATTERY");
+	
+			modsys.get("path").attr("append").call(rompath);
+			modsys.get("path").attr("append").call(libpath);
+
+			PythonObject modbios = importer.call("bios");
+			PythonObject result = modbios.attr("main").rawCall();
+		} catch (PythonException e) {
+			String name = e.getName();
+			if (name.equals("SystemExit")) {
+				System.exit(0);
+			}
+			
+			e.printStackTrace();
+		}
 	}
 	
-	public PythonState() {
+	public PythonState() throws PythonException {
 		this(DEFAULT_STACK_SIZE, DEFAULT_HEAP_SIZE);
 	}
 
-	public PythonState(long heap_size) {
+	public PythonState(long heap_size) throws PythonException {
 		this(DEFAULT_STACK_SIZE, heap_size);
 	}
 	
-	public PythonState(long stack_size, long heap_size) {
+	public PythonState(long stack_size, long heap_size) throws PythonException {
 		super(stack_size, heap_size);
 
+		builtins = new HashMap<String, PythonObject>();
+		helpers = new HashMap<String, PythonObject>();
+		
+		setup();
+	}
+	
+	public void setup() throws PythonException {
 		PythonObject importer = pyEval("__import__");	
-		modjnupy = importer.call("jnupy");
-		modbuiltins = importer.call("builtins");
+		PythonObject modjnupy = importer.call("jnupy");
+		PythonObject modbuiltins = importer.call("builtins");
 
 		JavaFunction load = new JavaFunction() {
 			@Override
@@ -92,9 +110,8 @@ public class PythonState extends PythonNativeState {
 			}
 		};
 
-		builtins = new HashMap<String, PythonObject>();
 		String loader = "lambda x, m: [x(s, getattr(m,s)) for s in dir(m)]";
-		pyEval(loader).call(load, modbuiltins);
+		pyEval(loader).rawCall(load, modbuiltins);
 		
 		JavaFunction open = new JavaFunction() {
 			@Override
@@ -107,33 +124,114 @@ public class PythonState extends PythonNativeState {
 		// modbuiltins.setattr("__import__", open);
 		// override import module
 		
-		modbuiltins.setattr("open", open);
+		modbuiltins.attr("open", open);
+		
+		helpers.put("unbox", pyEval("lambda x: x"));
+		
+		PythonModule modutime = newModule("utime");
+		modutime.put("time", new JavaFunction() {
+			@Override
+			public Object invoke(PythonState pythonState, Object... args) {
+				if (args.length != 0) {
+					throw new RuntimeException("invaild argument... ?");
+				}
+				
+				return new Double(System.currentTimeMillis() / 1000);
+			}
+		});
+		
+		modutime.put("sleep", new JavaFunction() {
+			@Override
+			public Object invoke(PythonState pythonState, Object... args) {
+				if (args.length != 1) {
+					throw new RuntimeException("invaild argument... ?");
+				}
+				
+				try {
+					if (args[0] instanceof Float) {
+						Float val = (Float)args[0];
+						Thread.sleep(new Float(val * 1000).longValue());
+					} else if (args[0] instanceof Double) {
+						Double val = (Double)args[0];
+						Thread.sleep(new Double(val * 1000).longValue());
+					} else {
+						throw new RuntimeException("invaild argument... ?");
+					}
+				} catch (InterruptedException e) {
+					// TODO: exception
+					throw new RuntimeException("?", e);
+				}
+				
+				return null;
+			}
+		});
 		
 		// other thing should override also, example: map.
 	}
 	
-	public void execute(String code) {
-		PythonObject func = jnupy_code_compile(code, JNUPY_EXECUTE_EXEC);
+	public void execute(String code) throws PythonException {
+		PythonObject func = jnupy_code_compile(code, PythonParseInputKind.MP_PARSE_FILE_INPUT);
 		func.invoke();
 	}
 	
-	public Object eval(String code) {
-		PythonObject func = jnupy_code_compile(code, JNUPY_EXECUTE_EVAL);
+	public Object eval(String code) throws PythonException {
+		PythonObject func = jnupy_code_compile(code, PythonParseInputKind.MP_PARSE_EVAL_INPUT);
 		return func.invoke();
 	}
 	
-	public Object rawEval(String code) {
-		PythonObject func = jnupy_code_compile(code, JNUPY_EXECUTE_EVAL);
+	public Object rawEval(String code) throws PythonException {
+		PythonObject func = jnupy_code_compile(code, PythonParseInputKind.MP_PARSE_EVAL_INPUT);
 		return func.rawInvoke();
 	}
 	
-	public PythonObject pyEval(String code) {
-		Object result = rawEval(code);
-		if (result instanceof PythonObject) {
-			return (PythonObject)result;
+	public PythonObject pyEval(String code) throws PythonException {
+		return PythonObject.fromObject(rawEval(code));
+	}
+	
+	public PythonModule newModule(String name) throws PythonException {
+		return new PythonModule(newRawModule(name));
+	}
+	
+	public PythonObject newRawModule(String name) throws PythonException {
+		return jnupy_module_new(name);
+	}
+	
+	private File resolvePath(String path) {
+		return FileSystems.getDefault().getPath(path).toFile();
+	}
+	
+	public PythonImportStat readStat(String path) {
+		File file = resolvePath(path);
+		
+		try {
+			if (!file.exists()) {
+				// ...
+			} else if (file.isFile() && file.canRead()) {
+				return PythonImportStat.MP_IMPORT_STAT_FILE;
+			} else if (file.isDirectory()) {
+				return PythonImportStat.MP_IMPORT_STAT_DIR;
+			}
+ 		} catch (SecurityException e) {
+			// ...
 		}
 		
-		// TODO: change excpetion
-		throw new RuntimeException("invaild python raw object return: " + result.toString());
+		return PythonImportStat.MP_IMPORT_STAT_NO_EXIST; // not exists? (TODO: enum?)
+	}
+	
+	public String readFile(String filename) {
+		File file = resolvePath(filename);
+		byte[] encoded;
+		
+		try {
+			encoded = Files.readAllBytes(file.toPath());
+		} catch (IOException e) {
+			// TODO: exception...
+			throw new RuntimeException("?", e);			
+		} catch (SecurityException e) {
+			// TODO: exception...
+			throw new RuntimeException("?", e);
+		}
+		
+		return new String(encoded, StandardCharsets.UTF_8);
 	}
 }

@@ -28,38 +28,68 @@ package org.micropython.jnupy;
 
 public class PythonObject {
     PythonState pythonState;
-    private long mpObject;
+    long mpObject;
 
     PythonObject(PythonState pyState, long mpStateId, long objectId) {
-        if (!pyState.checkState(mpStateId)) {
-            // TODO: change exception
-            throw new RuntimeException("invaild state");
+        if (pyState == null || !pyState.checkState(mpStateId)) {
+            throw new IllegalStateException("Python state is invaild.");
         }
         
         pythonState = pyState;
         mpObject = objectId;
+        refIncr();
+    }
+    
+    PythonObject(PythonState pyState, long objectId) {
+        pyState.check();
+        
+        pythonState = pyState;
+        mpObject = objectId;
+        refIncr();
+    }
+    
+    protected void finalize() throws Throwable {
+        refDerc();
+    }
+    
+    void refIncr() {
         pythonState.jnupy_ref_incr(this);
     }
+    
+    void refDerc() {
+        pythonState.jnupy_ref_derc(this);        
+    }
+    
+    public static PythonObject fromObject(Object obj) {
+        if (obj == null) {
+            throw new NullPointerException();
+        } else if (obj instanceof PythonObject) {
+			return (PythonObject)obj;
+		}
+		
+		// TODO: change excpetion
+		throw new RuntimeException("invaild python raw object: " + obj.toString());
+	}
     
     // TODO: move to PythonState?
     private PythonObject getHelper(String name) {
         return pythonState.builtins.get(name);
     }
     
-    private PythonObject helper(String name, Object... args) {
+    private PythonObject helper(String name, Object... args) throws PythonException {
         PythonObject func = getHelper(name);
-        return func.call(args);
+        return func.rawCall(args);
     }
     // END TODO
     
     public String toString() {
-        PythonObject repr = pythonState.builtins.get("repr");
-        Object result = repr.invoke(this);
-        return "PythonObject[" + result.toString() + "]";
-    }
-
-    protected void finalize() throws Throwable {
-        pythonState.jnupy_ref_derc(this);
+        try {
+            PythonObject repr = pythonState.builtins.get("repr");
+            Object result = repr.invoke(this);
+            return this.getClass().getName() + "[" + result.toString() + "]";
+        } catch (Exception e) {
+            return super.toString();
+        }
     }
     
     private void checkState(PythonState pyState) {
@@ -68,51 +98,60 @@ public class PythonObject {
         }
     }
     
-    public Object invoke(Object... args) {
+    public Object invoke(Object... args) throws PythonException {
         return pythonState.jnupy_func_call(true, this, args);
     }
     
-    public Object rawInvoke(Object... args) {
+    public Object rawInvoke(Object... args) throws PythonException {
         return pythonState.jnupy_func_call(false, this, args);
     }
     
-    public PythonObject call(Object... args) {
-        Object result = pythonState.jnupy_func_call(false, this, args);
-		if (result instanceof PythonObject) {
-			return (PythonObject)result;
-		}
-		
-		// TODO: change excpetion
-		throw new RuntimeException("invaild python raw object return: " + result.toString());
+    public PythonObject call(Object... args) throws PythonException {
+        Object result = pythonState.jnupy_func_call(true, this, args);
+        if (result == null) {
+            return null;
+        }
+        
+        return PythonObject.fromObject(result);
+    }
+    
+    public PythonObject rawCall(Object... args) throws PythonException {
+        return PythonObject.fromObject(pythonState.jnupy_func_call(false, this, args));
     }
     
     // TODO: getitem, getattr, etc impl in here? (by builtin)
 
-    public PythonObject getattr(String name) {
+    public PythonObject attr(String name) throws PythonException {
+        return getattr(name);
+    }
+
+    public PythonObject attr(String name, Object value) throws PythonException {
+        return setattr(name, value);
+    }
+
+    public PythonObject getattr(String name) throws PythonException {
         return helper("getattr", this, name);
     }
 
-    public PythonObject getattr(String name, Object defvalue) {
+    public PythonObject getattr(String name, Object defvalue) throws PythonException {
         return helper("getattr", this, name, defvalue);
     }
 
-    public PythonObject setattr(String name, Object value) {
+    public PythonObject setattr(String name, Object value) throws PythonException {
         return helper("setattr", this, name, value);
     }
     
-    public PythonObject hasattr(String name) {
+    public PythonObject hasattr(String name) throws PythonException {
         return helper("hasattr", this, name);
     }
     
-    public PythonObject delattr(String name) {
+    public PythonObject delattr(String name) throws PythonException {
         return helper("delattr", this, name);
     }
     
-    /*
-    public Object unbox() {
-        return pythonState.unboxValue(x);
+    public Object unbox() throws PythonException {
+        return pythonState.helpers.get("unbox").invoke(this);
     }
-    */
     
     // getitem or setitem require helper function... (not builtin function.)
 }

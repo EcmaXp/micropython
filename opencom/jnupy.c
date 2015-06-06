@@ -338,6 +338,8 @@ JNUPY_REF_CLASS(CXMH3)
 JNUPY_REF_CLASS(CRBZE)
 // CLASS: org/micropython/jnupy/PythonImportStat
 JNUPY_REF_CLASS(CEIHH)
+// CLASS: org/micropython/jnupy/PythonModule
+JNUPY_REF_CLASS(CL6LM)
 // CLASS: org/micropython/jnupy/PythonNativeException
 JNUPY_REF_CLASS(CLGS4)
 // CLASS: org/micropython/jnupy/PythonNativeState
@@ -402,14 +404,16 @@ JNUPY_REF_METHOD(MSG5B)
 JNUPY_REF_METHOD(MEFVT)
 // METHOD: org/micropython/jnupy/PythonImportStat->ordinal[()I]
 JNUPY_REF_METHOD(M6CJ5)
+// METHOD: org/micropython/jnupy/PythonModule-><init>[(Lorg/micropython/jnupy/PythonState;JJ)V]
+JNUPY_REF_METHOD(MTE4H)
 // METHOD: org/micropython/jnupy/PythonNativeException-><init>[(Ljava/lang/String;)V]
 JNUPY_REF_METHOD(MOBLI)
 // METHOD: org/micropython/jnupy/PythonNativeState->print[([B)V]
 JNUPY_REF_METHOD(MOUBH)
 // METHOD: org/micropython/jnupy/PythonNativeState->readFile[(Ljava/lang/String;)Ljava/lang/String;]
 JNUPY_REF_METHOD(M3LT6)
-// METHOD: org/micropython/jnupy/PythonNativeState->readStat[(Ljava/lang/String;)I]
-JNUPY_REF_METHOD(MKHXY)
+// METHOD: org/micropython/jnupy/PythonNativeState->readStat[(Ljava/lang/String;)Lorg/micropython/jnupy/PythonImportStat;]
+JNUPY_REF_METHOD(MEUPZ)
 // METHOD: org/micropython/jnupy/PythonObject-><init>[(Lorg/micropython/jnupy/PythonState;JJ)V]
 JNUPY_REF_METHOD(MHTAY)
 // METHOD: org/micropython/jnupy/PythonParseInputKind->ordinal[()I]
@@ -422,6 +426,7 @@ JNUPY_AP(REF, END)
 
 /** JNI CLASS/VALUE NON-AUTO ANY REFERENCE **/
 JNUPY_REF_ANY(jstring, RUTF8, NULL)
+// TODO: use StandardCharsets.UTF_8
 
 JNUPY_AP(EXPORT)
 
@@ -444,7 +449,7 @@ JNUPY_AP(EXPORT)
 
 #define JCLASS_PythonNativeState JNUPY_CLASS("org/micropython/jnupy/PythonNativeState", CEYRH)
 #define JMETHOD_PythonNativeState_print JNUPY_METHOD("org/micropython/jnupy/PythonNativeState", "print", "([B)V", MOUBH)
-#define JMETHOD_PythonNativeState_readStat JNUPY_METHOD("org/micropython/jnupy/PythonNativeState", "readStat", "(Ljava/lang/String;)I", MKHXY)
+#define JMETHOD_PythonNativeState_readStat JNUPY_METHOD("org/micropython/jnupy/PythonNativeState", "readStat", "(Ljava/lang/String;)Lorg/micropython/jnupy/PythonImportStat;", MEUPZ)
 #define JMETHOD_PythonNativeState_readFile JNUPY_METHOD("org/micropython/jnupy/PythonNativeState", "readFile", "(Ljava/lang/String;)Ljava/lang/String;", M3LT6)
 #define JFIELD_PythonNativeState_mpState JNUPY_FIELD("org/micropython/jnupy/PythonNativeState", "mpState", "J", FJ2IH)
 
@@ -452,6 +457,11 @@ JNUPY_AP(EXPORT)
 #define JMETHOD_PythonObject_INIT JNUPY_METHOD("org/micropython/jnupy/PythonObject", "<init>", "(Lorg/micropython/jnupy/PythonState;JJ)V", MHTAY)
 #define JFIELD_PythonObject_mpObject JNUPY_FIELD("org/micropython/jnupy/PythonObject", "mpObject", "J", FG57O)
 #define JFIELD_PythonObject_pythonState JNUPY_FIELD("org/micropython/jnupy/PythonObject", "pythonState", "Lorg/micropython/jnupy/PythonState;", F4HBX)
+
+#define JCLASS_PythonModule JNUPY_CLASS("org/micropython/jnupy/PythonModule", CL6LM)
+#define JMETHOD_PythonModule_INIT JNUPY_METHOD("org/micropython/jnupy/PythonModule", "<init>", "(Lorg/micropython/jnupy/PythonState;JJ)V", MTE4H)
+
+// TODO: adding Tuple, List, etc...?
 
 #define JCLASS_PythonNativeException JNUPY_CLASS("org/micropython/jnupy/PythonNativeException", CLGS4)
 #define JMETHOD_PythonNativeException_INIT JNUPY_METHOD("org/micropython/jnupy/PythonNativeException", "<init>", "(Ljava/lang/String;)V", MOBLI)
@@ -568,6 +578,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNUPY_LOAD_CLASS("org/micropython/jnupy/InternalException", CXMH3)
     JNUPY_LOAD_CLASS("org/micropython/jnupy/JavaFunction", CRBZE)
     JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonImportStat", CEIHH)
+    JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonModule", CL6LM)
     JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonNativeException", CLGS4)
     JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonNativeState", CEYRH)
     JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonObject", CKZG7)
@@ -600,10 +611,11 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNUPY_LOAD_METHOD("java/util/HashMap", "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;", CEKJY, MSG5B)
     JNUPY_LOAD_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", CRBZE, MEFVT)
     JNUPY_LOAD_METHOD("org/micropython/jnupy/PythonImportStat", "ordinal", "()I", CEIHH, M6CJ5)
+    JNUPY_LOAD_METHOD("org/micropython/jnupy/PythonModule", "<init>", "(Lorg/micropython/jnupy/PythonState;JJ)V", CL6LM, MTE4H)
     JNUPY_LOAD_METHOD("org/micropython/jnupy/PythonNativeException", "<init>", "(Ljava/lang/String;)V", CLGS4, MOBLI)
     JNUPY_LOAD_METHOD("org/micropython/jnupy/PythonNativeState", "print", "([B)V", CEYRH, MOUBH)
     JNUPY_LOAD_METHOD("org/micropython/jnupy/PythonNativeState", "readFile", "(Ljava/lang/String;)Ljava/lang/String;", CEYRH, M3LT6)
-    JNUPY_LOAD_METHOD("org/micropython/jnupy/PythonNativeState", "readStat", "(Ljava/lang/String;)I", CEYRH, MKHXY)
+    JNUPY_LOAD_METHOD("org/micropython/jnupy/PythonNativeState", "readStat", "(Ljava/lang/String;)Lorg/micropython/jnupy/PythonImportStat;", CEYRH, MEUPZ)
     JNUPY_LOAD_METHOD("org/micropython/jnupy/PythonObject", "<init>", "(Lorg/micropython/jnupy/PythonState;JJ)V", CKZG7, MHTAY)
     JNUPY_LOAD_METHOD("org/micropython/jnupy/PythonParseInputKind", "ordinal", "()I", C6GOM, MAUVV)
     JNUPY_LOAD_STATICFIELD("java/lang/Boolean", "FALSE", "Ljava/lang/Boolean;", CDKHI, SYCJ2)
@@ -649,6 +661,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/InternalException", CXMH3)
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/JavaFunction", CRBZE)
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/PythonImportStat", CEIHH)
+    JNUPY_UNLOAD_CLASS("org/micropython/jnupy/PythonModule", CL6LM)
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/PythonNativeException", CLGS4)
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/PythonNativeState", CEYRH)
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/PythonObject", CKZG7)
@@ -681,10 +694,11 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     JNUPY_UNLOAD_METHOD("java/util/HashMap", "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;", CEKJY, MSG5B)
     JNUPY_UNLOAD_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", CRBZE, MEFVT)
     JNUPY_UNLOAD_METHOD("org/micropython/jnupy/PythonImportStat", "ordinal", "()I", CEIHH, M6CJ5)
+    JNUPY_UNLOAD_METHOD("org/micropython/jnupy/PythonModule", "<init>", "(Lorg/micropython/jnupy/PythonState;JJ)V", CL6LM, MTE4H)
     JNUPY_UNLOAD_METHOD("org/micropython/jnupy/PythonNativeException", "<init>", "(Ljava/lang/String;)V", CLGS4, MOBLI)
     JNUPY_UNLOAD_METHOD("org/micropython/jnupy/PythonNativeState", "print", "([B)V", CEYRH, MOUBH)
     JNUPY_UNLOAD_METHOD("org/micropython/jnupy/PythonNativeState", "readFile", "(Ljava/lang/String;)Ljava/lang/String;", CEYRH, M3LT6)
-    JNUPY_UNLOAD_METHOD("org/micropython/jnupy/PythonNativeState", "readStat", "(Ljava/lang/String;)I", CEYRH, MKHXY)
+    JNUPY_UNLOAD_METHOD("org/micropython/jnupy/PythonNativeState", "readStat", "(Ljava/lang/String;)Lorg/micropython/jnupy/PythonImportStat;", CEYRH, MEUPZ)
     JNUPY_UNLOAD_METHOD("org/micropython/jnupy/PythonObject", "<init>", "(Lorg/micropython/jnupy/PythonState;JJ)V", CKZG7, MHTAY)
     JNUPY_UNLOAD_METHOD("org/micropython/jnupy/PythonParseInputKind", "ordinal", "()I", C6GOM, MAUVV)
     JNUPY_UNLOAD_STATICFIELD("java/lang/Boolean", "FALSE", "Ljava/lang/Boolean;", CDKHI, SYCJ2)
@@ -810,7 +824,7 @@ void jnupy_print_strn(const char *str, mp_uint_t len) {
 
 uint mp_import_stat(const char *path) {
     jstring jpath = JNUPY_CALL(NewStringUTF, path);
-    jobject jresult = JNUPY_CALL(CallIntMethod, JNUPY_PY_JSTATE, JMETHOD(PythonNativeState, readStat), jpath);
+    jobject jresult = JNUPY_CALL(CallObjectMethod, JNUPY_PY_JSTATE, JMETHOD(PythonNativeState, readStat), jpath);
 
     JNUPY_CALL(ReleaseStringUTFChars, jpath, NULL);
 
@@ -929,8 +943,18 @@ TODO: support convert it (jnupy_obj_j2py, jnupy_obj_py2j)
 
 // TODO: jnupy_pyobj_new -> give old value if already exists.
 jobject jnupy_pyobj_new(jobject pythonNativeState, mp_obj_t pyobj) {
-    jobject pyState = JNUPY_CALL(NewGlobalRef, pythonNativeState);
+    jobject pyState = JNUPY_CALL(NewGlobalRef, pythonNativeState); // is correct?
     jobject jobj = JNUPY_CALL(NewObject, JCLASS(PythonObject), JMETHOD(PythonObject, INIT), pyState, (jlong)(void *)JNUPY_MP_STATE, (jlong)(void *)pyobj);
+
+    return jobj;
+}
+
+jobject jnupy_pyobj_new_from_class(jobject pythonNativeState, mp_obj_t pyobj, jclass class_, jmethodID mid) {
+    // class_ must be from PythonObject (should check them...?)
+    // JCLASS(PythonObject)
+
+    jobject pyState = JNUPY_CALL(NewGlobalRef, pythonNativeState);
+    jobject jobj = JNUPY_CALL(NewObject, class_, mid, pyState, (jlong)(void *)JNUPY_MP_STATE, (jlong)(void *)pyobj);
 
     return jobj;
 }
@@ -1031,6 +1055,7 @@ mp_obj_t jnupy_obj_j2py(jobject obj) {
 #undef IsInstanceOf
 
 jobject jnupy_obj_py2j(mp_obj_t obj) {
+    // TODO: adding convert flag?
     MP_STACK_CHECK();
 
     if (0) {
@@ -1108,6 +1133,8 @@ jobject jnupy_obj_py2j(mp_obj_t obj) {
         return jresult;
     } else if (0) {
         // TODO: handle set?
+    } else if (MP_OBJ_IS_TYPE(obj, &mp_type_module)) {
+        return jnupy_pyobj_new_from_class(JNUPY_PY_JSTATE, obj, JCLASS(PythonModule), JMETHOD(PythonModule, INIT));
     } else if (MP_OBJ_IS_TYPE(obj, &mp_type_jobject)) {
         return jnupy_jobj_get(obj);
     } else {
@@ -1544,55 +1571,44 @@ JNUPY_FUNC_DEF(void, jnupy_1state_1free)
 }
 
 JNUPY_FUNC_DEF(jobject, jnupy_1code_1compile)
-    (JNIEnv *env, jobject self, jstring code, jint jflag) {
+    (JNIEnv *env, jobject self, jstring code, jobject jkind) {
     JNUPY_FUNC_START_WITH_STATE;
 
-    nlr_buf_t nlr;
-    if (nlr_push(&nlr) == 0) {
-        qstr name = qstr_from_str("<CODE from JAVA>");
-        const char *codebuf = JNUPY_CALL(GetStringUTFChars, code, 0);
+    qstr name = qstr_from_str("<CODE from JAVA>");
+    const char *codebuf = JNUPY_CALL(GetStringUTFChars, code, 0);
 
-        mp_lexer_t *lex = mp_lexer_new_from_str_len(name, codebuf, strlen(codebuf), 0);
+    mp_lexer_t *lex = mp_lexer_new_from_str_len(name, codebuf, strlen(codebuf), 0);
 
-        if (lex == NULL) {
-            JNUPY_CALL(ReleaseStringUTFChars, code, codebuf);
-            return NULL;
-        }
-
-        // TODO: use enum?
-        mp_parse_input_kind_t flag;
-        switch (jflag) {
-            case 1:
-                flag = MP_PARSE_SINGLE_INPUT;
-                break;
-            case 2:
-                flag = MP_PARSE_FILE_INPUT;
-                break;
-            case 3:
-                flag = MP_PARSE_EVAL_INPUT;
-                break;
-            default:
-                JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/IllegalArgumentException", C5K3P), "compile flag is invaild");
-                return NULL;
-        }
-
-        qstr source_name = lex->source_name;
-        mp_parse_node_t pn = mp_parse(lex, flag);
-
+    if (lex == NULL) {
         JNUPY_CALL(ReleaseStringUTFChars, code, codebuf);
-
-        mp_obj_t module_fun = mp_compile(pn, source_name, MP_EMIT_OPT_NONE, false);
-        if (module_fun == NULL) {
-            return NULL;
-        }
-
-        jobject jresult = jnupy_obj_py2j_raw(module_fun);
-
-        nlr_pop();
-        return jresult;
-    } else {
-        nlr_raise(nlr.ret_val);
+        return NULL;
     }
+
+    jint jflag = JNUPY_CALL(CallIntMethod, jkind, JMETHOD(PythonParseInputKind, ordinal));
+    mp_parse_input_kind_t flag;
+    switch (jflag) {
+        case MP_PARSE_SINGLE_INPUT:
+        case MP_PARSE_FILE_INPUT:
+        case MP_PARSE_EVAL_INPUT:
+            flag = jflag;
+            break;
+        default:
+            JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/IllegalArgumentException", C5K3P), "compile flag is invaild");
+            return NULL;
+    }
+
+    qstr source_name = lex->source_name;
+    mp_parse_node_t pn = mp_parse(lex, flag);
+
+    JNUPY_CALL(ReleaseStringUTFChars, code, codebuf);
+
+    mp_obj_t module_fun = mp_compile(pn, source_name, MP_EMIT_OPT_NONE, false);
+    if (module_fun == NULL) {
+        return NULL;
+    }
+
+    jobject jresult = jnupy_obj_py2j_raw(module_fun);
+    return jresult;
 
     JNUPY_FUNC_END_VALUE(NULL);
 }
@@ -1606,16 +1622,8 @@ JNUPY_FUNC_DEF(void, jnupy_1ref_1incr)
         return;
     }
 
-    nlr_buf_t nlr;
-    if (nlr_push(&nlr) == 0) {
-        jnupy_pyref_t *pyref = jnupy_pyref_get(obj);
-        pyref->count++;
-
-        nlr_pop();
-        return;
-    } else {
-        nlr_raise(nlr.ret_val);
-    }
+    jnupy_pyref_t *pyref = jnupy_pyref_get(obj);
+    pyref->count++;
 
     JNUPY_FUNC_END_VOID;
 }
@@ -1629,23 +1637,17 @@ JNUPY_FUNC_DEF(void, jnupy_1ref_1derc)
         return;
     }
 
-    nlr_buf_t nlr;
-    if (nlr_push(&nlr) == 0) {
-        jnupy_pyref_t *pyref = jnupy_pyref_get(obj);
-        pyref->count--;
+    jnupy_pyref_t *pyref = jnupy_pyref_get(obj);
+    pyref->count--;
 
-        if (pyref->count <= 0) {
-            jnupy_pyref_clear(obj);
-        }
-
-        nlr_pop();
-    } else {
-        // TODO: how to handle exception on java side?
-        mp_obj_print_exception(&mp_plat_print, nlr.ret_val);
+    if (pyref->count <= 0) {
+        jnupy_pyref_clear(obj);
     }
+
     JNUPY_FUNC_END_VOID;
 }
 
+// TODO: call flag (from convertResult) should detail... how?
 JNUPY_FUNC_DEF(jobject, jnupy_1func_1call)
     (JNIEnv *env, jobject self, jboolean convertResult, jobject pyref, jarray jargs) {
     JNUPY_FUNC_START_WITH_STATE;
@@ -1675,19 +1677,42 @@ JNUPY_FUNC_DEF(jobject, jnupy_1func_1call)
             jresult = jnupy_obj_py2j_raw(result);
         }
 
+        if (args != MP_OBJ_NULL) {
+            m_free(args, jargs_length);
+        }
+
         nlr_pop();
     } else {
-        // TODO: how to handle exception on java side?
-        mp_obj_print_exception(&mp_plat_print, nlr.ret_val);
+        if (args != MP_OBJ_NULL) {
+            m_free(args, jargs_length);
+        }
 
-        // TODO: fill exception? or throw?
-        jresult = NULL;
-        nlr_gk_jump(nlr.ret_val); // YES! THIS IS...
+        nlr_gk_jump(nlr.ret_val);
     }
 
-    if (args != MP_OBJ_NULL) {
-        m_free(args, jargs_length);
+    return jresult;
+    JNUPY_FUNC_END_VALUE(NULL);
+}
+
+JNUPY_FUNC_DEF(jobject, jnupy_1module_1new)
+    (JNIEnv *env, jobject self, jstring jname) {
+    JNUPY_FUNC_START_WITH_STATE;
+
+    const char *namebuf = JNUPY_CALL(GetStringUTFChars, jname, 0);
+    jobject jresult = NULL;
+    mp_obj_t module = NULL;
+
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) == 0) {
+        module = mp_obj_new_module(qstr_from_str(namebuf));
+        nlr_pop();
+        JNUPY_CALL(ReleaseStringUTFChars, jname, namebuf);
+    } else {
+        JNUPY_CALL(ReleaseStringUTFChars, jname, namebuf);
+        nlr_raise(nlr.ret_val);
     }
+
+    jresult = jnupy_obj_py2j_raw(module);
 
     return jresult;
     JNUPY_FUNC_END_VALUE(NULL);
