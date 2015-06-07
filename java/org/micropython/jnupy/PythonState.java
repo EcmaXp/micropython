@@ -68,6 +68,7 @@ public class PythonState extends PythonNativeState {
 			modsys.get("path").attr("append").call(libpath);
 			
 			PythonObject argv = py.builtins.get("list").rawCall();
+			argv.attr("append").call("<java>");
 			for (String arg : args) {
 				argv.attr("append").call(arg);
 			}
@@ -133,6 +134,17 @@ public class PythonState extends PythonNativeState {
 				} catch (NoSuchElementException e) {
 					return null;
 				}
+			}
+		});
+		
+		modjnupy.set("readfile", new JavaFunction() {
+			@Override
+			public Object invoke(PythonState pythonState, Object... args) throws PythonException {
+				if (args.length == 0) {
+					return null;
+				}
+				
+				return readFile((String)args[0]);
 			}
 		});
 		
@@ -207,7 +219,7 @@ public class PythonState extends PythonNativeState {
 	}
 	
 	private File resolvePath(String path) {
-		return FileSystems.getDefault().getPath(path).toFile();
+		return Paths.get("").resolve(path).toFile();
 	}
 	
 	public PythonImportStat readStat(String path) {

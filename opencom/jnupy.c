@@ -1634,10 +1634,10 @@ JNUPY_FUNC_DEF(jobject, jnupy_1code_1compile)
 }
 
 JNUPY_FUNC_DEF(void, jnupy_1ref_1incr)
-    (JNIEnv *env, jobject self, jobject jobj) {
+    (JNIEnv *env, jobject self, jlong refid) {
     JNUPY_FUNC_START_WITH_STATE;
 
-    jnupy_pyref_t *pyref = jnupy_pyref_get(jobj);
+    jnupy_pyref_t *pyref = (jnupy_pyref_t *)refid;
     if (pyref != NULL) {
         pyref->count++;
     } else {
@@ -1649,10 +1649,10 @@ JNUPY_FUNC_DEF(void, jnupy_1ref_1incr)
 }
 
 JNUPY_FUNC_DEF(void, jnupy_1ref_1derc)
-    (JNIEnv *env, jobject self, jobject jobj) {
+    (JNIEnv *env, jobject self, jlong refid) {
     JNUPY_FUNC_START_WITH_STATE;
 
-    jnupy_pyref_t *pyref = jnupy_pyref_get(jobj);
+    jnupy_pyref_t *pyref = (jnupy_pyref_t *)refid;
     if (pyref != NULL) {
         pyref->count--;
         if (pyref->count <= 0) {

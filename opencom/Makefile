@@ -110,4 +110,4 @@ include ../py/mkrules.mk
 # TODO: replace test with run java vm
 test: $(PROG) ../tests/run-tests
 	$(eval DIRNAME=$(notdir $(CURDIR)))
-	cd ../tests && MICROPY_MICROPYTHON=../$(DIRNAME)/$(PROG) ./run-tests
+	cd ../tests && MICROPY_MICROPYTHON=../$(DIRNAME)/micropython ./run-tests

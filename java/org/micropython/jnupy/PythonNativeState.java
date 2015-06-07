@@ -109,8 +109,8 @@ public class PythonNativeState {
 	native synchronized boolean jnupy_state_new(long stack_size, long heap_size);
 	native synchronized boolean jnupy_state_check();
 	native synchronized void jnupy_state_free();
-    native synchronized long jnupy_ref_incr(PythonObject pyobj);
-    native synchronized void jnupy_ref_derc(PythonObject pyobj);
+    native synchronized void jnupy_ref_incr(long refobj);
+    native synchronized void jnupy_ref_derc(long refobj);
 	native synchronized PythonObject jnupy_code_compile(String code, PythonParseInputKind kind) throws PythonException;
     native synchronized Object jnupy_func_call(boolean convertResult, PythonObject func, Object ...args) throws PythonException;
     native synchronized PythonObject jnupy_module_new(String name) throws PythonException;

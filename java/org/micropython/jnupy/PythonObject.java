@@ -37,7 +37,7 @@ public class PythonObject {
         
         pythonState = pyState;
         refObject = refId;
-        refIncr();
+        refIncr(refId);
     }
     
     PythonObject(PythonState pyState, long refId) {
@@ -45,21 +45,19 @@ public class PythonObject {
         
         pythonState = pyState;
         refObject = refId;
-        refIncr();
+        refIncr(refId);
     }
     
     protected void finalize() throws Throwable {
-        refDerc();
+        refDerc(refObject);
     }
     
-    private void refIncr() {
-        // TODO: just give long?
-        pythonState.jnupy_ref_incr(this);
+    private void refIncr(long refId) {
+        pythonState.jnupy_ref_incr(refId);
     }
     
-    private void refDerc() {
-        // TODO: just give long?
-        pythonState.jnupy_ref_derc(this);        
+    private void refDerc(long refId) {
+        pythonState.jnupy_ref_derc(refId);        
     }
     
     public static PythonObject fromObject(Object obj) {
