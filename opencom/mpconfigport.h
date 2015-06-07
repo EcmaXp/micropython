@@ -32,11 +32,6 @@
 #define MICROPY_PY_COMPILE_SINGLE_WITH_REPL (1)
 
 // options to control how Micro Python is built
-#define MICROPY_EMIT_X64            (0)
-#define MICROPY_EMIT_X86            (0)
-#define MICROPY_EMIT_THUMB          (0)
-#define MICROPY_EMIT_ARM            (0)
-
 #define MICROPY_ALLOC_PATH_MAX      (PATH_MAX)
 #define MICROPY_COMP_MODULE_CONST   (1)
 #define MICROPY_COMP_TRIPLE_TUPLE_ASSIGN (1)

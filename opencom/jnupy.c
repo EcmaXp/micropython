@@ -161,11 +161,11 @@ STATIC JavaVM *jnupy_glob_java_vm;
 STATIC JNIEnv *jnupy_glob_java_env;
 
 /** JNUPY MECRO **/
-#if DEBUG
+//#if DEBUG
 #define _D(x) printf(#x "\n")
-#else
-#define _D(x) (void)0
-#endif
+//#else
+//#define _D(x) (void)0
+//#endif
 
 #define _JNUPY_CUR_STATE(x) (jnupy_cur_state.x)
 #define JNUPY_G_VM jnupy_glob_java_vm
@@ -733,9 +733,9 @@ mp_state_ctx_t *jnupy_get_state_from_pythonnativestate(jobject pythonNativeState
     return (mp_state_ctx_t *)pythonNativeStateId;
 }
 
-bool jnupy_load_state_from_pythonnativestate() {
-    JNUPY_PY_JSTATE = JNUPY_SELF;
-    mp_state_ctx_t *state = jnupy_get_state_from_pythonnativestate(JNUPY_SELF);
+bool jnupy_load_state_from_pythonnativestate(jobject self) {
+    JNUPY_PY_JSTATE = JNUPY_RAW_CALL(NewGlobalRef, self);
+    mp_state_ctx_t *state = jnupy_get_state_from_pythonnativestate(JNUPY_PY_JSTATE);
     return jnupy_load_state(state);
 }
 
@@ -1257,7 +1257,9 @@ STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, c
     jobjectArray jargs = JNUPY_CALL(NewObjectArray, n_args, JCLASS(Object), NULL);
 
     for (int i = 0; i < n_args; i++) {
-        JNUPY_CALL(SetObjectArrayElement, jargs, i, jnupy_obj_py2j(args[i]));
+        jobject jarg = jnupy_obj_py2j(args[i]);
+        JNUPY_CALL(SetObjectArrayElement, jargs, i, jarg);
+        JNUPY_CALL(DeleteLocalRef, jarg);
     }
 
     // TODO: how to handle exception?
@@ -1307,7 +1309,7 @@ const mp_obj_type_t mp_type_jfunc = {
 };
 
 mp_obj_t jnupy_pyref_new(mp_obj_t obj) {
-    jnupy_pyref_t *o = m_new_obj_with_finaliser(jnupy_pyref_t);
+    jnupy_pyref_t *o = m_new_obj(jnupy_pyref_t);
     jnupy_pyref_t *last = (jnupy_pyref_t *)MP_STATE_VM(jnupy_last_pyref);
 
     o->base.type = &mp_type_pyref;
@@ -1358,31 +1360,10 @@ void jnupy_pyref_clear(jnupy_pyref_t *pyref) {
     }
 }
 
-STATIC mp_obj_t pyref_del(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
-    jnupy_pyref_t *self = self_in;
-    self->obj = NULL;
-
-    if (self->count > 0) {
-        // TODO: how to handle this? (reference counting error)
-    }
-
-    return mp_const_none;
-}
-
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(pyref_del_obj, pyref_del);
-
-STATIC const mp_map_elem_t pyref_locals_dict_table[] = {
-    { MP_OBJ_NEW_QSTR(MP_QSTR___del__), (mp_obj_t)&pyref_del_obj },
-};
-
-STATIC MP_DEFINE_CONST_DICT(pyref_locals_dict, pyref_locals_dict_table);
-
 const mp_obj_type_t mp_type_pyref = {
     { &mp_type_type },
     .name = MP_QSTR_PyRef,
-    .locals_dict = (mp_obj_t)&pyref_locals_dict,
 };
-
 
 STATIC mp_obj_t mod_jnupy_test(mp_obj_t asdf) {
     return mp_const_none;
@@ -1485,7 +1466,7 @@ JNUPY_FUNC_DEF(jstring, jnupy_1mp_1version)
                 jnupy_obj_do_exception(_nlr_gk.buf.ret_val); \
                 has_exception = true; \
                 break; \
-            } \
+            }
 
             /* body */
 
@@ -1508,8 +1489,7 @@ JNUPY_FUNC_DEF(jstring, jnupy_1mp_1version)
     _JNUPY_FUNC_BEFORE_RETURN \
     return
 
-#define JNUPY_FUNC_STATE_LOADER jnupy_load_state_from_pythonnativestate
-#define JNUPY_FUNC_START_WITH_STATE _JNUPY_FUNC_BODY_START(true, JNUPY_FUNC_STATE_LOADER())
+#define JNUPY_FUNC_START_WITH_STATE _JNUPY_FUNC_BODY_START(true, jnupy_load_state_from_pythonnativestate(self))
 #define JNUPY_FUNC_START _JNUPY_FUNC_BODY_START(false, true)
 #define JNUPY_FUNC_END_VOID _JNUPY_FUNC_BODY_END(return)
 #define JNUPY_FUNC_END_VALUE(value) _JNUPY_FUNC_BODY_END(return (value))
@@ -1661,6 +1641,7 @@ JNUPY_FUNC_DEF(void, jnupy_1ref_1incr)
     JNUPY_FUNC_START_WITH_STATE;
 
     jnupy_pyref_t *pyref = (jnupy_pyref_t *)refid;
+
     if (pyref != NULL) {
         pyref->count++;
     } else {
@@ -1676,6 +1657,7 @@ JNUPY_FUNC_DEF(void, jnupy_1ref_1derc)
     JNUPY_FUNC_START_WITH_STATE;
 
     jnupy_pyref_t *pyref = (jnupy_pyref_t *)refid;
+
     if (pyref != NULL) {
         pyref->count--;
         if (pyref->count <= 0) {

@@ -63,7 +63,7 @@ public class PythonState extends PythonNativeState {
 			PythonModule modsys = (PythonModule)importer.call("sys");
 			String rompath = System.getenv("MPOC_ROM");
 			String libpath = System.getenv("MICROPYTHON_BATTERY");
-	
+			
 			modsys.get("path").attr("append").call(rompath);
 			modsys.get("path").attr("append").call(libpath);
 			
@@ -73,7 +73,7 @@ public class PythonState extends PythonNativeState {
 				argv.attr("append").call(arg);
 			}
 			
-			modsys.set("argv", py.builtins.get("tuple").rawCall(argv));
+			modsys.set("argv", argv);
 			
 			PythonObject modbios = importer.call("bios");
 			PythonObject result = modbios.attr("main").rawCall();
@@ -84,6 +84,7 @@ public class PythonState extends PythonNativeState {
 			}
 			
 			e.printStackTrace();
+			System.exit(1);
 		}
 	}
 	
@@ -97,21 +98,20 @@ public class PythonState extends PythonNativeState {
 	
 	public PythonState(long stack_size, long heap_size) throws PythonException {
 		super(stack_size, heap_size);
-
-		builtins = new HashMap<String, PythonObject>();
-		helpers = new HashMap<String, PythonObject>();
-		
 		setup();
 	}
 	
 	public void setup() throws PythonException {
+		builtins = new HashMap<String, PythonObject>();
+		helpers = new HashMap<String, PythonObject>();
+		
 		PythonObject importer = pyEval("__import__");	
 		PythonModule modjnupy = (PythonModule)importer.call("jnupy");
 		PythonModule modbuiltins = (PythonModule)importer.call("builtins");
 
 		JavaFunction load = new JavaFunction() {
 			@Override
-			public Object invoke(PythonState pythonState, Object... args) {
+			public Object invoke(PythonState pythonState, Object... args) throws PythonException {
 				if (args[1] != null && args[1] instanceof PythonObject) {
 					pythonState.builtins.put((String)args[0], (PythonObject)args[1]);
 				}

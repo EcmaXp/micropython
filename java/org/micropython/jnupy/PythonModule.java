@@ -27,8 +27,8 @@
 package org.micropython.jnupy;
 
 public class PythonModule extends PythonObject {
-    PythonModule(PythonState pyState, long mpStateId, long objectId) {
-        super(pyState, mpStateId, objectId);
+    PythonModule(PythonState pyState, long mpStateId, long refId) {
+        super(pyState, mpStateId, refId);
     }
     
     public PythonModule(PythonObject pyobj) {
