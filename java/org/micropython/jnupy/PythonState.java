@@ -123,6 +123,10 @@ public class PythonState extends PythonNativeState {
 		String loader = "lambda x, m: [x(s, getattr(m,s)) for s in dir(m)]";
 		pyEval(loader).rawCall(load, modbuiltins);
 		
+		execute("def __raise__(exc):\n\traise exc");
+		helpers.put("raise", pyEval("__raise__"));
+		execute("del __raise__");
+		
 		helpers.put("unbox", pyEval("lambda x: x"));
 		
 		modjnupy.set("input", new JavaFunction() {

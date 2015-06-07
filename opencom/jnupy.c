@@ -1411,6 +1411,29 @@ STATIC mp_obj_t mod_jnupy_get_loaded_modules(void) {
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_jnupy_get_loaded_modules_obj, mod_jnupy_get_loaded_modules);
 
+STATIC mp_obj_t mod_jnupy_get_version(mp_obj_t nameobj) {
+    qstr qname = mp_obj_str_get_qstr(nameobj);
+    const char *buf = NULL;
+
+    if (0) {
+    } else if (qname == MP_QSTR_MICROPY_GIT_TAG) {
+        buf = MICROPY_GIT_TAG;
+    } else if (qname == MP_QSTR_MICROPY_GIT_HASH) {
+        buf = MICROPY_GIT_HASH;
+    } else if (qname == MP_QSTR_MICROPY_BUILD_DATE) {
+        buf = MICROPY_BUILD_DATE;
+    } else if (qname == MP_QSTR_MICROPY_VERSION_STRING) {
+        buf = MICROPY_VERSION_STRING;
+    } else {
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "invaild string"));
+    }
+
+    return mp_obj_new_str(buf, strlen(buf), false);
+}
+
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_jnupy_get_version_obj, mod_jnupy_get_version);
+
+
 STATIC const mp_map_elem_t mp_module_ujnupy_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_micropython) },
     { MP_OBJ_NEW_QSTR(MP_QSTR_JObject), (mp_obj_t)&mp_type_jobject },
@@ -1420,6 +1443,7 @@ STATIC const mp_map_elem_t mp_module_ujnupy_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_get_state_ident), (mp_obj_t)&mod_jnupy_get_state_ident_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_builtin_modules), (mp_obj_t)&mp_builtin_module_dict },
     { MP_OBJ_NEW_QSTR(MP_QSTR_get_loaded_modules), (mp_obj_t)&mod_jnupy_get_loaded_modules_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_get_version), (mp_obj_t)&mod_jnupy_get_version_obj },
 };
 
 STATIC MP_DEFINE_CONST_DICT(mp_module_ujnupy_globals, mp_module_ujnupy_globals_table);
