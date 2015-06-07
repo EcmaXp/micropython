@@ -28,23 +28,23 @@ package org.micropython.jnupy;
 
 public class PythonObject {
     PythonState pythonState;
-    long mpObject;
+    long refObject;
 
-    PythonObject(PythonState pyState, long mpStateId, long objectId) {
+    PythonObject(PythonState pyState, long mpStateId, long refId) {
         if (pyState == null || !pyState.checkState(mpStateId)) {
             throw new IllegalStateException("Python state is invaild.");
         }
         
         pythonState = pyState;
-        mpObject = objectId;
+        refObject = refId;
         refIncr();
     }
     
-    PythonObject(PythonState pyState, long objectId) {
+    PythonObject(PythonState pyState, long refId) {
         pyState.check();
         
         pythonState = pyState;
-        mpObject = objectId;
+        refObject = refId;
         refIncr();
     }
     
@@ -52,11 +52,13 @@ public class PythonObject {
         refDerc();
     }
     
-    void refIncr() {
+    private void refIncr() {
+        // TODO: just give long?
         pythonState.jnupy_ref_incr(this);
     }
     
-    void refDerc() {
+    private void refDerc() {
+        // TODO: just give long?
         pythonState.jnupy_ref_derc(this);        
     }
     

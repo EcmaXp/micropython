@@ -223,7 +223,7 @@ mp_vm_return_kind_t mp_resume_bytecode(mp_code_state *first_code_state, mp_code_
     return mp_execute_bytecode_body(true, first_code_state, code_state, inject_exc);
 }
 
-STATIC mp_vm_return_kind_t mp_execute_bytecode_body(bool is_pauseable, mp_code_state *first_code_state, mp_code_state *code_state, volatile mp_obj_t inject_exc) {
+mp_vm_return_kind_t mp_execute_bytecode_body(bool is_pauseable, mp_code_state *first_code_state, mp_code_state *code_state, volatile mp_obj_t inject_exc) {
 #endif
 #define SELECTIVE_EXC_IP (0)
 #if SELECTIVE_EXC_IP

@@ -164,6 +164,14 @@ typedef const void *machine_const_ptr_t; // must be of pointer size
 #define MICROPY_PORT_BUILTINS
 //    { MP_OBJ_NEW_QSTR(MP_QSTR_open), (mp_obj_t)&mp_builtin_open_obj },
 
+// So, gc can scan pyref linked list.
+#if MICROPY_BUILD_JNI_LIBRARY
+#define MICROPY_PORT_ROOT_POINTERS \
+    mp_obj_t jnupy_last_pyref;
+#else
+#define MICROPY_PORT_ROOT_POINTERS
+#endif
+
 // We need to provide a declaration/definition of alloca()
 #ifdef __FreeBSD__
 #include <stdlib.h>

@@ -32,7 +32,7 @@ public class PythonModule extends PythonObject {
     }
     
     public PythonModule(PythonObject pyobj) {
-        super(pyobj.pythonState, pyobj.mpObject);
+        super(pyobj.pythonState, pyobj.refObject);
     }
 
     public PythonObject get(String name) throws PythonException {

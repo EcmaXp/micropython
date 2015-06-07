@@ -362,10 +362,10 @@ JNUPY_REF_ENUM(EEPIP)
 JNUPY_REF_ENUM(EGOM6)
 // FIELD: org/micropython/jnupy/PythonNativeState->mpState[J]
 JNUPY_REF_FIELD(FJ2IH)
-// FIELD: org/micropython/jnupy/PythonObject->mpObject[J]
-JNUPY_REF_FIELD(FG57O)
 // FIELD: org/micropython/jnupy/PythonObject->pythonState[Lorg/micropython/jnupy/PythonState;]
 JNUPY_REF_FIELD(F4HBX)
+// FIELD: org/micropython/jnupy/PythonObject->refObject[J]
+JNUPY_REF_FIELD(FB723)
 // METHOD: java/io/ByteArrayInputStream-><init>[([B)V]
 JNUPY_REF_METHOD(MUZ6M)
 // METHOD: java/io/ByteArrayOutputStream->toByteArray[()[B]
@@ -455,7 +455,7 @@ JNUPY_AP(EXPORT)
 
 #define JCLASS_PythonObject JNUPY_CLASS("org/micropython/jnupy/PythonObject", CKZG7)
 #define JMETHOD_PythonObject_INIT JNUPY_METHOD("org/micropython/jnupy/PythonObject", "<init>", "(Lorg/micropython/jnupy/PythonState;JJ)V", MHTAY)
-#define JFIELD_PythonObject_mpObject JNUPY_FIELD("org/micropython/jnupy/PythonObject", "mpObject", "J", FG57O)
+#define JFIELD_PythonObject_refObject JNUPY_FIELD("org/micropython/jnupy/PythonObject", "refObject", "J", FB723)
 #define JFIELD_PythonObject_pythonState JNUPY_FIELD("org/micropython/jnupy/PythonObject", "pythonState", "Lorg/micropython/jnupy/PythonState;", F4HBX)
 
 #define JCLASS_PythonModule JNUPY_CLASS("org/micropython/jnupy/PythonModule", CL6LM)
@@ -590,8 +590,8 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNUPY_LOAD_ENUM("org/micropython/jnupy/PythonParseInputKind", "MP_PARSE_FILE_INPUT", C6GOM, EEPIP)
     JNUPY_LOAD_ENUM("org/micropython/jnupy/PythonParseInputKind", "MP_PARSE_SINGLE_INPUT", C6GOM, EGOM6)
     JNUPY_LOAD_FIELD("org/micropython/jnupy/PythonNativeState", "mpState", "J", CEYRH, FJ2IH)
-    JNUPY_LOAD_FIELD("org/micropython/jnupy/PythonObject", "mpObject", "J", CKZG7, FG57O)
     JNUPY_LOAD_FIELD("org/micropython/jnupy/PythonObject", "pythonState", "Lorg/micropython/jnupy/PythonState;", CKZG7, F4HBX)
+    JNUPY_LOAD_FIELD("org/micropython/jnupy/PythonObject", "refObject", "J", CKZG7, FB723)
     JNUPY_LOAD_METHOD("java/io/ByteArrayInputStream", "<init>", "([B)V", CPYWG, MUZ6M)
     JNUPY_LOAD_METHOD("java/io/ByteArrayOutputStream", "toByteArray", "()[B", CPITF, MHUAS)
     JNUPY_LOAD_METHOD("java/lang/Boolean", "booleanValue", "()Z", CDKHI, ME2HS)
@@ -673,8 +673,8 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     JNUPY_UNLOAD_ENUM("org/micropython/jnupy/PythonParseInputKind", "MP_PARSE_FILE_INPUT", C6GOM, EEPIP)
     JNUPY_UNLOAD_ENUM("org/micropython/jnupy/PythonParseInputKind", "MP_PARSE_SINGLE_INPUT", C6GOM, EGOM6)
     JNUPY_UNLOAD_FIELD("org/micropython/jnupy/PythonNativeState", "mpState", "J", CEYRH, FJ2IH)
-    JNUPY_UNLOAD_FIELD("org/micropython/jnupy/PythonObject", "mpObject", "J", CKZG7, FG57O)
     JNUPY_UNLOAD_FIELD("org/micropython/jnupy/PythonObject", "pythonState", "Lorg/micropython/jnupy/PythonState;", CKZG7, F4HBX)
+    JNUPY_UNLOAD_FIELD("org/micropython/jnupy/PythonObject", "refObject", "J", CKZG7, FB723)
     JNUPY_UNLOAD_METHOD("java/io/ByteArrayInputStream", "<init>", "([B)V", CPYWG, MUZ6M)
     JNUPY_UNLOAD_METHOD("java/io/ByteArrayOutputStream", "toByteArray", "()[B", CPITF, MHUAS)
     JNUPY_UNLOAD_METHOD("java/lang/Boolean", "booleanValue", "()Z", CDKHI, ME2HS)
@@ -857,16 +857,37 @@ mp_lexer_t *mp_lexer_new_from_file(const char *filename) {
 
 /** JNUPY INTERNAL MODULE **/
 
+typedef struct _jnupy_jobj_t {
+    mp_obj_base_t base;
+    jobject jobj;
+} jnupy_jobj_t;
+
 const mp_obj_type_t mp_type_jobject;
 mp_obj_t jnupy_jobj_new(jobject jobj);
 jobject jnupy_jobj_get(mp_obj_t self_in);
+
+typedef struct _mp_obj_jfunc_t {
+    mp_obj_base_t base;
+    jobject jstate;
+    jobject jfunc;
+} mp_obj_jfunc_t;
 
 const mp_obj_type_t mp_type_jfunc;
 mp_obj_t mp_obj_jfunc_new(jobject jstate, jobject jfunc);
 jobject mp_obj_jfunc_get(mp_obj_t self_in);
 
+typedef struct _jnupy_pyref_t {
+    mp_obj_base_t base;
+    mp_obj_t obj;
+    struct _jnupy_pyref_t *prev;
+    struct _jnupy_pyref_t *next;
+    mp_uint_t count;
+} jnupy_pyref_t;
+
 const mp_obj_type_t mp_type_pyref;
 mp_obj_t jnupy_pyref_new(mp_obj_t obj);
+jnupy_pyref_t *jnupy_pyref_get(jobject jobj);
+void jnupy_pyref_clear(jnupy_pyref_t *pyref);
 
 jobject jnupy_obj_py2j_raw(mp_obj_t obj);
 jobject jnupy_obj_py2j(mp_obj_t obj);
@@ -944,7 +965,9 @@ TODO: support convert it (jnupy_obj_j2py, jnupy_obj_py2j)
 // TODO: jnupy_pyobj_new -> give old value if already exists.
 jobject jnupy_pyobj_new(jobject pythonNativeState, mp_obj_t pyobj) {
     jobject pyState = JNUPY_CALL(NewGlobalRef, pythonNativeState); // is correct?
-    jobject jobj = JNUPY_CALL(NewObject, JCLASS(PythonObject), JMETHOD(PythonObject, INIT), pyState, (jlong)(void *)JNUPY_MP_STATE, (jlong)(void *)pyobj);
+    mp_obj_t pyref_obj = jnupy_pyref_new(pyobj);
+
+    jobject jobj = JNUPY_CALL(NewObject, JCLASS(PythonObject), JMETHOD(PythonObject, INIT), pyState, (jlong)(void *)JNUPY_MP_STATE, (jlong)(void *)pyref_obj);
 
     return jobj;
 }
@@ -954,16 +977,16 @@ jobject jnupy_pyobj_new_from_class(jobject pythonNativeState, mp_obj_t pyobj, jc
     // JCLASS(PythonObject)
 
     jobject pyState = JNUPY_CALL(NewGlobalRef, pythonNativeState);
-    jobject jobj = JNUPY_CALL(NewObject, class_, mid, pyState, (jlong)(void *)JNUPY_MP_STATE, (jlong)(void *)pyobj);
+    mp_obj_t pyref_obj = jnupy_pyref_new(pyobj);
+
+    jobject jobj = JNUPY_CALL(NewObject, class_, mid, pyState, (jlong)(void *)JNUPY_MP_STATE, (jlong)(void *)pyref_obj);
 
     return jobj;
 }
 
 mp_obj_t jnupy_pyobj_get(jobject jobj) {
-    assert(JNUPY_RAW_CALL(IsInstanceOf, jobj, JCLASS(PythonObject)) == JNI_TRUE);
-
-    mp_obj_t pyobj = (mp_obj_t)JNUPY_CALL(GetLongField, jobj, JFIELD(PythonObject, mpObject));
-    return pyobj;
+    jnupy_pyref_t *ref = jnupy_pyref_get(jobj);
+    return ref->obj;
 }
 
 // TODO: check modmsgpack.c will help coding!
@@ -1154,11 +1177,6 @@ jobject jnupy_obj_py2j_raw(mp_obj_t obj) {
     }
 }
 
-typedef struct _jnupy_jobj_t {
-    mp_obj_base_t base;
-    jobject jobj;
-} jnupy_jobj_t;
-
 mp_obj_t jnupy_jobj_new(jobject jobj) {
     jnupy_jobj_t *o = m_new_obj_with_finaliser(jnupy_jobj_t);
     o->base.type = &mp_type_jobject;
@@ -1212,12 +1230,6 @@ const mp_obj_type_t mp_type_jobject = {
     .print = jobject_print,
     .locals_dict = (mp_obj_t)&jobject_locals_dict,
 };
-
-typedef struct _mp_obj_jfunc_t {
-    mp_obj_base_t base;
-    jobject jstate;
-    jobject jfunc;
-} mp_obj_jfunc_t;
 
 mp_obj_t mp_obj_jfunc_new(jobject jstate, jobject jfunc) {
     mp_obj_jfunc_t *o = m_new_obj_with_finaliser(mp_obj_jfunc_t);
@@ -1294,19 +1306,56 @@ const mp_obj_type_t mp_type_jfunc = {
     .locals_dict = (mp_obj_t)&jfunc_locals_dict,
 };
 
-typedef struct _jnupy_pyref_t {
-    mp_obj_base_t base;
-    mp_obj_t obj;
-    mp_uint_t count;
-} jnupy_pyref_t;
-
 mp_obj_t jnupy_pyref_new(mp_obj_t obj) {
     jnupy_pyref_t *o = m_new_obj_with_finaliser(jnupy_pyref_t);
+    jnupy_pyref_t *last = (jnupy_pyref_t *)MP_STATE_VM(jnupy_last_pyref);
+
     o->base.type = &mp_type_pyref;
     o->obj = obj;
+    o->prev = NULL;
+    o->next = NULL;
     o->count = 0;
 
+    if (last != NULL) {
+        o->prev = last;
+        last->next = o;
+    }
+
+    MP_STATE_VM(jnupy_last_pyref) = (mp_obj_t)o;
     return (mp_obj_t)o;
+}
+
+jnupy_pyref_t *jnupy_pyref_get(jobject jobj) {
+    assert(JNUPY_RAW_CALL(IsInstanceOf, jobj, JCLASS(PythonObject)) == JNI_TRUE);
+
+    mp_obj_t refobj = (mp_obj_t)JNUPY_CALL(GetLongField, jobj, JFIELD(PythonObject, refObject));
+    jnupy_pyref_t *ref = refobj;
+
+    return ref;
+}
+
+void jnupy_pyref_clear(jnupy_pyref_t *pyref) {
+    jnupy_pyref_t *last = (jnupy_pyref_t *)MP_STATE_VM(jnupy_last_pyref);
+
+    if (pyref->prev == NULL && pyref->next == NULL) {
+        MP_STATE_VM(jnupy_last_pyref) = NULL;
+    } else {
+        if (pyref->prev != NULL) {
+            pyref->prev->next = pyref->next;
+            if (last == pyref) {
+                MP_STATE_VM(jnupy_last_pyref) = pyref->prev;
+            }
+        }
+
+        if (pyref->next != NULL) {
+            pyref->next->prev = pyref->prev;
+            if (last == pyref) {
+                // XXX This is possible?
+                MP_STATE_VM(jnupy_last_pyref) = pyref->next;
+                abort();
+            }
+        }
+    }
 }
 
 STATIC mp_obj_t pyref_del(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
@@ -1321,37 +1370,6 @@ STATIC mp_obj_t pyref_del(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, co
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(pyref_del_obj, pyref_del);
-
-mp_int_t jnupy_pyref_get_id(mp_obj_t obj) {
-    mp_int_t objid = ((mp_int_t)obj) >> 2;
-    return objid;
-}
-
-jnupy_pyref_t *jnupy_pyref_get(mp_obj_t obj) {
-    mp_obj_t pyrefs_dict = jnupy_getattr(MP_QSTR_pyrefs);
-    mp_int_t objid = jnupy_pyref_get_id(obj);
-    mp_obj_t keyobj = MP_OBJ_NEW_SMALL_INT(objid);
-    jnupy_pyref_t *pyref = MP_OBJ_NULL;
-
-    nlr_buf_t nlr;
-    if (nlr_push(&nlr) == 0) {
-        pyref = mp_obj_dict_get(pyrefs_dict, keyobj);
-        nlr_pop();
-    } else {
-        pyref = jnupy_pyref_new(obj);
-        mp_obj_dict_store(pyrefs_dict, keyobj, pyref);
-    }
-
-    return pyref;
-}
-
-void jnupy_pyref_clear(mp_obj_t obj) {
-    mp_obj_t pyrefs_dict = jnupy_getattr(MP_QSTR_pyrefs);
-    mp_int_t objid = jnupy_pyref_get_id(obj);
-    mp_obj_t keyobj = MP_OBJ_NEW_SMALL_INT(objid);
-
-    mp_obj_dict_delete(pyrefs_dict, keyobj);
-}
 
 STATIC const mp_map_elem_t pyref_locals_dict_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___del__), (mp_obj_t)&pyref_del_obj },
@@ -1518,7 +1536,6 @@ JNUPY_FUNC_DEF(jboolean, jnupy_1state_1new)
 
         mp_obj_module_t *module_jnupy = mp_obj_new_module(MP_QSTR_jnupy);
         mp_obj_dict_t *module_jnupy_dict = mp_call_function_0(mp_load_attr(mp_module_ujnupy.globals, MP_QSTR_copy));
-        mp_obj_dict_store(module_jnupy_dict, MP_OBJ_NEW_QSTR(MP_QSTR_pyrefs), mp_obj_new_dict(0));
         module_jnupy->globals = module_jnupy_dict;
 
         mp_state_store(state);
@@ -1620,13 +1637,13 @@ JNUPY_FUNC_DEF(void, jnupy_1ref_1incr)
     (JNIEnv *env, jobject self, jobject jobj) {
     JNUPY_FUNC_START_WITH_STATE;
 
-    mp_obj_t obj = jnupy_pyobj_get(jobj);
-    if (!MP_OBJ_IS_OBJ(obj)) {
-        return;
+    jnupy_pyref_t *pyref = jnupy_pyref_get(jobj);
+    if (pyref != NULL) {
+        pyref->count++;
+    } else {
+        // invaild
+        assert(! "invaild pointer while reference counting");
     }
-
-    jnupy_pyref_t *pyref = jnupy_pyref_get(obj);
-    pyref->count++;
 
     JNUPY_FUNC_END_VOID;
 }
@@ -1635,16 +1652,15 @@ JNUPY_FUNC_DEF(void, jnupy_1ref_1derc)
     (JNIEnv *env, jobject self, jobject jobj) {
     JNUPY_FUNC_START_WITH_STATE;
 
-    mp_obj_t obj = jnupy_pyobj_get(jobj);
-    if (!MP_OBJ_IS_OBJ(obj)) {
-        return;
-    }
-
-    jnupy_pyref_t *pyref = jnupy_pyref_get(obj);
-    pyref->count--;
-
-    if (pyref->count <= 0) {
-        jnupy_pyref_clear(obj);
+    jnupy_pyref_t *pyref = jnupy_pyref_get(jobj);
+    if (pyref != NULL) {
+        pyref->count--;
+        if (pyref->count <= 0) {
+            jnupy_pyref_clear(pyref);
+        }
+    } else {
+        // invaild
+        assert(! "invaild pointer while reference counting");
     }
 
     JNUPY_FUNC_END_VOID;
