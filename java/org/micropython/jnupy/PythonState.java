@@ -109,6 +109,8 @@ public class PythonState extends PythonNativeState {
 		PythonModule modjnupy = (PythonModule)importer.call("jnupy");
 		PythonModule modbuiltins = (PythonModule)importer.call("builtins");
 
+		// TODO: warp stdout, stdin, stderr...
+
 		JavaFunction load = new JavaFunction() {
 			@Override
 			public Object invoke(PythonState pythonState, Object... args) throws PythonException {
