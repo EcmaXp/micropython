@@ -71,8 +71,8 @@
 #define MICROPY_PY_COLLECTIONS_ORDEREDDICT (1)
 #define MICROPY_PY_MATH_SPECIAL_FUNCTIONS (1)
 #define MICROPY_PY_CMATH            (1)
-#define MICROPY_PY_IO               (0) // Default: 1
-#define MICROPY_PY_IO_FILEIO        (0) // Default: 1
+#define MICROPY_PY_IO               (1) // TODO: jnupy with stdout (lazy) (Default: 1)
+#define MICROPY_PY_IO_FILEIO        (1) // TODO: jnupy with stdout (lazy) (Default: 1)
 #define MICROPY_PY_GC_COLLECT_RETVAL (1)
 #define MICROPY_MODULE_FROZEN       (0) // Default: 1
 
@@ -156,8 +156,9 @@ typedef long mp_off_t;
 typedef void *machine_ptr_t; // must be of pointer size
 typedef const void *machine_const_ptr_t; // must be of pointer size
 
-#define MICROPY_PORT_BUILTINS
-//    { MP_OBJ_NEW_QSTR(MP_QSTR_open), (mp_obj_t)&mp_builtin_open_obj },
+extern const struct _mp_obj_fun_builtin_t mp_builtin_open_obj;
+#define MICROPY_PORT_BUILTINS \
+    { MP_OBJ_NEW_QSTR(MP_QSTR_open), (mp_obj_t)&mp_builtin_open_obj },
 
 // So, gc can scan pyref linked list.
 #if MICROPY_BUILD_JNI_LIBRARY

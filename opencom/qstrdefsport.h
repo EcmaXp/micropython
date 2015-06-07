@@ -26,6 +26,11 @@
 
 // qstrs specific to this port
 
+// io
+Q(fileno)
+Q(FileIO)
+Q(flush)
+
 // microthread
 Q(microthread)
 Q(umicrothread)

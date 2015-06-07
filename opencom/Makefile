@@ -111,6 +111,7 @@ endif
 SRC_C = \
 	jnupy.c \
 	gccollect.c \
+	file.c \
 	$(SRC_MOD)
 
 OBJ = $(PY_O) $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
@@ -133,7 +134,7 @@ $(PROGJAR): $(BUILD_JAVA) ../java/org/micropython/jnupy/*
 	$(JAR) -cvmf ../java/MANIFEST-jnupy $(PROGJAR) -C $(BUILD_JAVA) . || exit 1
 	$(JAVA) -cp $(PROGJAR) org.micropython.jnupy.PythonNativeState
 
-test: $(PROG) ../tests/run-tests
+test: $(PROG) $(PROGJAR) ../tests/run-tests
 	$(eval DIRNAME=$(notdir $(CURDIR)))
 	cd ../tests && MICROPY_MICROPYTHON=../$(DIRNAME)/$(PROGBIN) ./run-tests
 .PHONY: test
