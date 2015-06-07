@@ -53,6 +53,11 @@ public class PythonNativeState {
 	
 	private static final int APIVERSION = 1;
 	
+	public static void main(String args[]) {
+		PythonNativeState py = new PythonNativeState(PythonState.DEFAULT_STACK_SIZE, PythonState.DEFAULT_HEAP_SIZE);
+		py.close();
+	}
+	
 	// store pointer, never access on java side!
 	private long mpState;
 

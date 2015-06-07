@@ -3,10 +3,24 @@ include ../py/mkenv.mk
 
 # define main target
 PROG = libmicropython.so
+PROGJAR = jnupy.jar
 
 ifeq ($(JAVA_HOME),)
 $(error Require setup JAVA_HOME)
 endif
+
+BUILD_JAVA = $(BUILD)/java
+
+CLASSPATH = "jnupy.jar"
+
+JAVA = $(JAVA_HOME)/bin/java
+JAVAFLAGS = 
+
+JAVAC = $(JAVA_HOME)/bin/javac
+JAVACFLAGS =
+
+JAR = $(JAVA_HOME)/bin/jar
+JARFLAGS =
 
 # qstr definitions (must come before including py.mk)
 QSTR_DEFS = qstrdefsport.h
@@ -105,9 +119,23 @@ OBJ = $(PY_O) $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
 
 include ../py/mkrules.mk
 
-.PHONY: test
+all: $(PROG) $(PROGJAR)
 
-# TODO: replace test with run java vm
+clean: clean-jar
+clean-jar:
+	$(RM) -f $(PROGJAR)
+.PHONY: clean
+
+$(BUILD_JAVA):
+	$(MKDIR) -p $(BUILD_JAVA)
+
+# TODO: wildcard discard or change to other thing...
+$(PROGJAR): $(BUILD_JAVA) ../java/org/micropython/jnupy/*
+	$(Q)$(JAVAC) ../java/org/micropython/jnupy/*.java -d $(BUILD_JAVA)
+	$(Q)$(JAR) $(JARFLAGS) -cmf ../java/MANIFEST-jnupy $(PROGJAR) -C $(BUILD_JAVA) . || exit 1
+	$(Q)$(JAVA) $(JAVAFLAGS) -cp $(PROGJAR) org.micropython.jnupy.PythonNativeState
+
 test: $(PROG) ../tests/run-tests
 	$(eval DIRNAME=$(notdir $(CURDIR)))
 	cd ../tests && MICROPY_MICROPYTHON=../$(DIRNAME)/micropython ./run-tests
+.PHONY: test
