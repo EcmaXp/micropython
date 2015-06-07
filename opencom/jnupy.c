@@ -115,6 +115,26 @@ THE SOFTWARE.
 #define JNUPY_JNIVERSION JNI_VERSION_1_6
 // TODO: fill this.
 
+/** JNUPY DEBUG **/
+int DEBUG_printf(const char *fmt, ...) {
+    // TODO: use java output?
+    va_list ap;
+    va_start(ap, fmt);
+    int ret = vfprintf(stderr, fmt, ap);
+    va_end(ap);
+    return ret;
+}
+
+#if 0 // print debugging info
+#define DEBUG_PRINT (1)
+#define DEBUG_printf DEBUG_printf
+#define _D(x) printf(#x "\n")
+#else // don't print debugging info
+#define DEBUG_PRINT (0)
+#define DEBUG_printf(...) (void)0
+#define _D(x) (void)0
+#endif
+
 /** JNUPY INTERNAL VALUE **/
 STATIC int initialized = 0;
 
@@ -161,12 +181,6 @@ STATIC JavaVM *jnupy_glob_java_vm;
 STATIC JNIEnv *jnupy_glob_java_env;
 
 /** JNUPY MECRO **/
-//#if DEBUG
-#define _D(x) printf(#x "\n")
-//#else
-//#define _D(x) (void)0
-//#endif
-
 #define _JNUPY_CUR_STATE(x) (jnupy_cur_state.x)
 #define JNUPY_G_VM jnupy_glob_java_vm
 #define JNUPY_G_ENV jnupy_glob_java_env
@@ -753,15 +767,6 @@ void jnupy_setup_env(JNIEnv *env, jobject self) {
 
 /** PORT IMPL VALUE/FUNCTIONS **/
 MP_THREAD mp_uint_t mp_verbose_flag = 0;
-
-int DEBUG_printf(const char *fmt, ...) {
-    // TODO: use java output?
-    va_list ap;
-    va_start(ap, fmt);
-    int ret = vfprintf(stderr, fmt, ap);
-    va_end(ap);
-    return ret;
-}
 
 STATIC bool _jnupy_attach_env() {
     if (JNUPY_ENV == NULL && JNUPY_G_ENV != NULL) {

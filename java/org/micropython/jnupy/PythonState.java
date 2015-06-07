@@ -129,6 +129,19 @@ public class PythonState extends PythonNativeState {
 		
 		helpers.put("unbox", pyEval("lambda x: x"));
 		
+		modjnupy.set("abspath", new JavaFunction() {
+			@Override
+			public Object invoke(PythonState pythonState, Object... args) throws PythonException {
+				if (args.length == 0) {
+					return null;
+				}
+				
+				String filename = (String)args[0];
+				File file = resolvePath(filename);
+				return file.getAbsolutePath();
+			}
+		});
+		
 		modjnupy.set("input", new JavaFunction() {
 			@Override
 			public Object invoke(PythonState pythonState, Object... args) throws PythonException {
