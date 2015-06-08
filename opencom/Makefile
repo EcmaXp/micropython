@@ -14,6 +14,7 @@ BUILD_JAVA = $(BUILD)/java
 
 JAVA = $(JAVA_HOME)/bin/java
 JAVAC = $(JAVA_HOME)/bin/javac
+JAVAP = $(JAVA_HOME)/bin/javap
 JAR = $(JAVA_HOME)/bin/jar
 JAVACFLAGS =
 
@@ -131,6 +132,9 @@ $(PROGJAR): $(BUILD_JAVA) ../java/org/micropython/jnupy/*
 	$(JAVAC) $(JAVACFLAGS) ../java/org/micropython/jnupy/*.java -d $(BUILD_JAVA)
 	$(JAR) -cvmf ../java/MANIFEST-jnupy $(PROGJAR) -C $(BUILD_JAVA) . || exit 1
 	$(JAVA) -cp $(PROGJAR) org.micropython.jnupy.PythonNativeState
+	
+print-jni: $(PROGJAR)
+	$(JAVAP) -cp $(PROGJAR) -s org.micropython.jnupy.PythonNativeState
 
 test: $(PROG) $(PROGJAR) ../tests/run-tests
 	$(eval DIRNAME=$(notdir $(CURDIR)))
