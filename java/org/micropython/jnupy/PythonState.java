@@ -58,25 +58,26 @@ public class PythonState extends PythonNativeState {
 			throw new RuntimeException("createing state are failed", e);
 		}
 		
+		if (args.length == 0) {
+			throw new RuntimeException("launch PythonState require the launcher are writtern in Python.");
+		}
+		
 		try {
 			PythonObject importer = py.builtins.get("__import__");
 			PythonModule modsys = (PythonModule)importer.call("sys");
-			String rompath = System.getenv("MPOC_ROM");
-			String libpath = System.getenv("MICROPYTHON_BATTERY");
-			
-			modsys.get("path").attr("append").call(rompath);
-			modsys.get("path").attr("append").call(libpath);
-			
+
 			PythonObject argv = py.builtins.get("list").rawCall();
-			argv.attr("append").call("<java>");
 			for (String arg : args) {
 				argv.attr("append").call(arg);
 			}
-			
 			modsys.set("argv", argv);
 			
-			PythonObject modbios = importer.call("bios");
-			PythonObject result = modbios.attr("main").rawCall();
+			String launcher = args[0];
+			PythonModule modmain = (PythonModule)importer.call("__main__");
+			modmain.set("__file__", launcher);
+			
+			String code = py.readFile(launcher);
+			py.execute(code);
 		} catch (PythonException e) {
 			String name = e.getName();
 			if (name.equals("SystemExit")) {
@@ -164,6 +165,17 @@ public class PythonState extends PythonNativeState {
 				}
 				
 				return readFile((String)args[0]);
+			}
+		});
+		
+		modjnupy.set("getenv", new JavaFunction() {
+			@Override
+			public Object invoke(PythonState pythonState, Object... args) throws PythonException {
+				if (args.length == 0) {
+					return null;
+				}
+				
+				return System.getenv((String)args[0]);
 			}
 		});
 		

@@ -12,8 +12,6 @@ endif
 
 BUILD_JAVA = $(BUILD)/java
 
-CLASSPATH = "jnupy.jar"
-
 JAVA = $(JAVA_HOME)/bin/java
 JAVAC = $(JAVA_HOME)/bin/javac
 JAR = $(JAVA_HOME)/bin/jar
