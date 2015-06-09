@@ -6,10 +6,12 @@ PROG = libmicropython.so
 PROGBIN = micropython
 PROGJAR = micropython.jar
 
+# check java environ
 ifeq ($(JAVA_HOME),)
 $(error Require setup JAVA_HOME)
 endif
 
+# setup java environ
 BUILD_JAVA = $(BUILD)/java
 
 JAVA = $(JAVA_HOME)/bin/java
@@ -17,6 +19,22 @@ JAVAC = $(JAVA_HOME)/bin/javac
 JAVAP = $(JAVA_HOME)/bin/javap
 JAR = $(JAVA_HOME)/bin/jar
 JAVACFLAGS =
+
+# test directory
+TESTDIR = \
+	opencom \
+	basics \
+	micropython \
+	float \
+	import \
+	io \
+	misc \
+	unicode \
+	extmod \
+	cmdline \
+	unix
+
+TESTFLAGS = -d $(TESTDIR)
 
 # qstr definitions (must come before including py.mk)
 QSTR_DEFS = qstrdefsport.h
@@ -132,11 +150,12 @@ $(PROGJAR): $(BUILD_JAVA) ../java/org/micropython/jnupy/*
 	$(JAVAC) $(JAVACFLAGS) ../java/org/micropython/jnupy/*.java -d $(BUILD_JAVA)
 	$(JAR) -cvmf ../java/MANIFEST-jnupy $(PROGJAR) -C $(BUILD_JAVA) . || exit 1
 	$(JAVA) -cp $(PROGJAR) org.micropython.jnupy.PythonNativeState
-	
+
 print-jni: $(PROGJAR)
 	$(JAVAP) -cp $(PROGJAR) -s org.micropython.jnupy.PythonNativeState
 
 test: $(PROG) $(PROGJAR) ../tests/run-tests
 	$(eval DIRNAME=$(notdir $(CURDIR)))
-	cd ../tests && MICROPY_MICROPYTHON=../$(DIRNAME)/$(PROGBIN) ./run-tests
+	cd ../tests && MICROPY_MICROPYTHON=../$(DIRNAME)/$(PROGBIN) ./run-tests $(TESTFLAGS)
+
 .PHONY: test
