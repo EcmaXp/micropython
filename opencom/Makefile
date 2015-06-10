@@ -48,6 +48,7 @@ include ../py/py.mk
 INC =  -I.
 INC +=  -I..
 INC += -I$(BUILD)
+# TODO: msgpack? (or remove msgpack from opencom port)
 
 # jni include files
 INC += -I$(JAVA_HOME)/include
