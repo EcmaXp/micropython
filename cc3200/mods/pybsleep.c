@@ -54,6 +54,7 @@
 #include "mperror.h"
 #include "sleeprestore.h"
 #include "serverstask.h"
+#include "antenna.h"
 
 /******************************************************************************
  DECLARE PRIVATE CONSTANTS
@@ -397,6 +398,11 @@ void pybsleep_suspend_exit (void) {
     // ungate the clock to the shared spi bus
     MAP_PRCMPeripheralClkEnable(PRCM_SSPI, PRCM_RUN_MODE_CLK | PRCM_SLP_MODE_CLK);
 
+#if MICROPY_HW_ANTENNA_DIVERSITY
+    // re-configure the antenna selection pins
+    antenna_init0();
+#endif
+
     // reinitialize simplelink's interface
     sl_IfOpen (NULL, 0);
 
@@ -493,9 +499,17 @@ STATIC void pybsleep_iopark (bool hibernate) {
     if (hibernate) {
 #endif
         // park the antenna selection pins
+        // (tri-stated with pull down enabled)
         HWREG(0x4402E108) = 0x00000E61;
         HWREG(0x4402E10C) = 0x00000E61;
 #if MICROPY_HW_ANTENNA_DIVERSITY
+    } else {
+        // park the antenna selection pins
+        // (tri-stated without changing the pull up/down resistors)
+        HWREG(0x4402E108) &= ~0x000000FF;
+        HWREG(0x4402E108) |=  0x00000C61;
+        HWREG(0x4402E10C) &= ~0x000000FF;
+        HWREG(0x4402E10C) |=  0x00000C61;
     }
 #endif
 }
