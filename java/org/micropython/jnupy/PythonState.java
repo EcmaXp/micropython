@@ -115,9 +115,9 @@ public class PythonState extends PythonNativeState {
 
 		JavaFunction load = new JavaFunction() {
 			@Override
-			public Object invoke(PythonState pythonState, Object... args) throws PythonException {
-				if (args[1] != null && args[1] instanceof PythonObject) {
-					pythonState.builtins.put((String)args[0], (PythonObject)args[1]);
+			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
+				if (args.length == 2) {
+					pythonState.builtins.put((String)args.get(0), args.rawGet(1));
 				}
 				
 				return null;
@@ -135,12 +135,8 @@ public class PythonState extends PythonNativeState {
 		
 		modjnupy.set("abspath", new JavaFunction() {
 			@Override
-			public Object invoke(PythonState pythonState, Object... args) throws PythonException {
-				if (args.length == 0) {
-					return null;
-				}
-				
-				String filename = (String)args[0];
+			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
+				String filename = (String)args.get(0);
 				File file = resolvePath(filename);
 				return file.getAbsolutePath();
 			}
@@ -148,7 +144,7 @@ public class PythonState extends PythonNativeState {
 		
 		modjnupy.set("input", new JavaFunction() {
 			@Override
-			public Object invoke(PythonState pythonState, Object... args) throws PythonException {
+			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
 				Console c = System.console();
 				if (c == null) {
 					// TODO: raise error?
@@ -161,23 +157,15 @@ public class PythonState extends PythonNativeState {
 		
 		modjnupy.set("readfile", new JavaFunction() {
 			@Override
-			public Object invoke(PythonState pythonState, Object... args) throws PythonException {
-				if (args.length == 0) {
-					return null;
-				}
-				
-				return readFile((String)args[0]);
+			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
+				return readFile((String)args.get(0));
 			}
 		});
 		
 		modjnupy.set("getenv", new JavaFunction() {
 			@Override
-			public Object invoke(PythonState pythonState, Object... args) throws PythonException {
-				if (args.length == 0) {
-					return null;
-				}
-				
-				return System.getenv((String)args[0]);
+			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
+				return System.getenv((String)args.get(0));
 			}
 		});
 		
@@ -186,28 +174,26 @@ public class PythonState extends PythonNativeState {
 		
 		modutime.set("time", new JavaFunction() {
 			@Override
-			public Object invoke(PythonState pythonState, Object... args) {
-				if (args.length != 0) {
-					throw new RuntimeException("invaild argument... ?");
-				}
-				
+			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
 				return new Double(System.currentTimeMillis() / 1000);
 			}
 		});
 		
 		modutime.set("sleep", new JavaFunction() {
 			@Override
-			public Object invoke(PythonState pythonState, Object... args) {
+			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
 				if (args.length != 1) {
 					throw new RuntimeException("invaild argument... ?");
 				}
 				
+				Object arg = args.get(0);
+				
 				try {
-					if (args[0] instanceof Float) {
-						Float val = (Float)args[0];
+					if (arg instanceof Float) {
+						Float val = (Float)arg;
 						Thread.sleep(new Float(val * 1000).longValue());
-					} else if (args[0] instanceof Double) {
-						Double val = (Double)args[0];
+					} else if (arg instanceof Double) {
+						Double val = (Double)arg;
 						Thread.sleep(new Double(val * 1000).longValue());
 					} else {
 						throw new RuntimeException("invaild argument... ?");

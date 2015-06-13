@@ -71,6 +71,10 @@ public class PythonObject {
 		throw new RuntimeException("invaild python raw object: " + obj.toString());
 	}
 
+    public Object convertToJava() throws PythonException {
+        return pythonState.jnupy_obj_py2j(this);
+    }
+
     // TODO: move to PythonState?
     private PythonObject getHelper(String name) {
         return pythonState.builtins.get(name);

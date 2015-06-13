@@ -26,6 +26,7 @@
 
 package org.micropython.jnupy;
 import java.io.IOException;
+import java.util.HashMap;
 
 public class PythonNativeState {
 	// TODO: PythonNativeState is correct name?
@@ -119,4 +120,5 @@ public class PythonNativeState {
 	native synchronized PythonObject jnupy_code_compile(String code, PythonParseInputKind kind) throws PythonException;
     native synchronized Object jnupy_func_call(boolean convertResult, PythonObject func, Object ...args) throws PythonException;
     native synchronized PythonObject jnupy_module_new(String name) throws PythonException;
+    native synchronized Object jnupy_obj_py2j(PythonObject obj) throws PythonException;
 }

@@ -136,7 +136,7 @@ OBJ = $(PY_O) $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
 
 include ../py/mkrules.mk
 
-all: $(PROG) $(PROGJAR)
+all: $(PROG) $(PROGJAR) vaild-jni
 
 clean: clean-jar
 clean-jar:
@@ -150,10 +150,12 @@ $(BUILD_JAVA):
 $(PROGJAR): $(BUILD_JAVA) ../java/org/micropython/jnupy/*
 	$(JAVAC) $(JAVACFLAGS) ../java/org/micropython/jnupy/*.java -d $(BUILD_JAVA)
 	$(JAR) -cvmf ../java/MANIFEST-jnupy $(PROGJAR) -C $(BUILD_JAVA) . || exit 1
-	$(JAVA) -cp $(PROGJAR) org.micropython.jnupy.PythonNativeState
-
+	
 print-jni: $(PROGJAR)
 	$(JAVAP) -cp $(PROGJAR) -s org.micropython.jnupy.PythonNativeState
+
+vaild-jni: $(PROGJAR)
+	MICROPYTHON_LIB=$(abspath $(PROG)) $(JAVA) -cp $(PROGJAR) org.micropython.jnupy.PythonNativeState
 
 test: $(PROG) $(PROGJAR) ../tests/run-tests
 	$(eval DIRNAME=$(notdir $(CURDIR)))

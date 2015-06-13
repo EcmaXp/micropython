@@ -362,6 +362,8 @@ JNUPY_REF_CLASS(CEKJY)
 JNUPY_REF_CLASS(CXMH3)
 // CLASS: org/micropython/jnupy/JavaFunction
 JNUPY_REF_CLASS(CRBZE)
+// CLASS: org/micropython/jnupy/PythonArguments
+JNUPY_REF_CLASS(CGRO2)
 // CLASS: org/micropython/jnupy/PythonImportStat
 JNUPY_REF_CLASS(CEIHH)
 // CLASS: org/micropython/jnupy/PythonModule
@@ -426,8 +428,10 @@ JNUPY_REF_METHOD(MNONY)
 JNUPY_REF_METHOD(M4HPE)
 // METHOD: java/util/HashMap->put[(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;]
 JNUPY_REF_METHOD(MSG5B)
-// METHOD: org/micropython/jnupy/JavaFunction->invoke[(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;]
-JNUPY_REF_METHOD(MEFVT)
+// METHOD: org/micropython/jnupy/JavaFunction->invoke[(Lorg/micropython/jnupy/PythonState;Lorg/micropython/jnupy/PythonArguments;)Ljava/lang/Object;]
+JNUPY_REF_METHOD(MX2DM)
+// METHOD: org/micropython/jnupy/PythonArguments-><init>[([Lorg/micropython/jnupy/PythonObject;Ljava/util/HashMap;)V]
+JNUPY_REF_METHOD(MHXVF)
 // METHOD: org/micropython/jnupy/PythonImportStat->ordinal[()I]
 JNUPY_REF_METHOD(M6CJ5)
 // METHOD: org/micropython/jnupy/PythonModule-><init>[(Lorg/micropython/jnupy/PythonState;JJ)V]
@@ -484,6 +488,9 @@ JNUPY_AP(EXPORT)
 #define JFIELD_PythonObject_refObject JNUPY_FIELD("org/micropython/jnupy/PythonObject", "refObject", "J", FB723)
 #define JFIELD_PythonObject_pythonState JNUPY_FIELD("org/micropython/jnupy/PythonObject", "pythonState", "Lorg/micropython/jnupy/PythonState;", F4HBX)
 
+#define JCLASS_PythonArguments JNUPY_CLASS("org/micropython/jnupy/PythonArguments", CGRO2)
+#define JMETHOD_PythonArguments_INIT JNUPY_METHOD("org/micropython/jnupy/PythonArguments", "<init>", "([Lorg/micropython/jnupy/PythonObject;Ljava/util/HashMap;)V", MHXVF)
+
 #define JCLASS_PythonModule JNUPY_CLASS("org/micropython/jnupy/PythonModule", CL6LM)
 #define JMETHOD_PythonModule_INIT JNUPY_METHOD("org/micropython/jnupy/PythonModule", "<init>", "(Lorg/micropython/jnupy/PythonState;JJ)V", MTE4H)
 
@@ -493,7 +500,7 @@ JNUPY_AP(EXPORT)
 #define JMETHOD_PythonNativeException_INIT JNUPY_METHOD("org/micropython/jnupy/PythonNativeException", "<init>", "(Ljava/lang/String;)V", MOBLI)
 
 #define JCLASS_JavaFunction JNUPY_CLASS("org/micropython/jnupy/JavaFunction", CRBZE)
-#define JMETHOD_JavaFunction_invoke JNUPY_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", MEFVT)
+#define JMETHOD_JavaFunction_invoke JNUPY_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;Lorg/micropython/jnupy/PythonArguments;)Ljava/lang/Object;", MX2DM)
 
 #define JCLASS_PythonImportStat JNUPY_CLASS("org/micropython/jnupy/PythonImportStat", CEIHH)
 #define JENUM_MP_IMPORT_STAT_NO_EXIST JNUPY_ENUM("org/micropython/jnupy/PythonImportStat", "MP_IMPORT_STAT_NO_EXIST", E3MMX)
@@ -603,6 +610,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNUPY_LOAD_CLASS("java/util/HashMap", CEKJY)
     JNUPY_LOAD_CLASS("org/micropython/jnupy/InternalException", CXMH3)
     JNUPY_LOAD_CLASS("org/micropython/jnupy/JavaFunction", CRBZE)
+    JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonArguments", CGRO2)
     JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonImportStat", CEIHH)
     JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonModule", CL6LM)
     JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonNativeException", CLGS4)
@@ -635,7 +643,8 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNUPY_LOAD_METHOD("java/lang/String", "getBytes", "(Ljava/lang/String;)[B", CCHCW, MNONY)
     JNUPY_LOAD_METHOD("java/util/HashMap", "<init>", "(I)V", CEKJY, M4HPE)
     JNUPY_LOAD_METHOD("java/util/HashMap", "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;", CEKJY, MSG5B)
-    JNUPY_LOAD_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", CRBZE, MEFVT)
+    JNUPY_LOAD_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;Lorg/micropython/jnupy/PythonArguments;)Ljava/lang/Object;", CRBZE, MX2DM)
+    JNUPY_LOAD_METHOD("org/micropython/jnupy/PythonArguments", "<init>", "([Lorg/micropython/jnupy/PythonObject;Ljava/util/HashMap;)V", CGRO2, MHXVF)
     JNUPY_LOAD_METHOD("org/micropython/jnupy/PythonImportStat", "ordinal", "()I", CEIHH, M6CJ5)
     JNUPY_LOAD_METHOD("org/micropython/jnupy/PythonModule", "<init>", "(Lorg/micropython/jnupy/PythonState;JJ)V", CL6LM, MTE4H)
     JNUPY_LOAD_METHOD("org/micropython/jnupy/PythonNativeException", "<init>", "(Ljava/lang/String;)V", CLGS4, MOBLI)
@@ -686,6 +695,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     JNUPY_UNLOAD_CLASS("java/util/HashMap", CEKJY)
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/InternalException", CXMH3)
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/JavaFunction", CRBZE)
+    JNUPY_UNLOAD_CLASS("org/micropython/jnupy/PythonArguments", CGRO2)
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/PythonImportStat", CEIHH)
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/PythonModule", CL6LM)
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/PythonNativeException", CLGS4)
@@ -718,7 +728,8 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     JNUPY_UNLOAD_METHOD("java/lang/String", "getBytes", "(Ljava/lang/String;)[B", CCHCW, MNONY)
     JNUPY_UNLOAD_METHOD("java/util/HashMap", "<init>", "(I)V", CEKJY, M4HPE)
     JNUPY_UNLOAD_METHOD("java/util/HashMap", "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;", CEKJY, MSG5B)
-    JNUPY_UNLOAD_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;[Ljava/lang/Object;)Ljava/lang/Object;", CRBZE, MEFVT)
+    JNUPY_UNLOAD_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;Lorg/micropython/jnupy/PythonArguments;)Ljava/lang/Object;", CRBZE, MX2DM)
+    JNUPY_UNLOAD_METHOD("org/micropython/jnupy/PythonArguments", "<init>", "([Lorg/micropython/jnupy/PythonObject;Ljava/util/HashMap;)V", CGRO2, MHXVF)
     JNUPY_UNLOAD_METHOD("org/micropython/jnupy/PythonImportStat", "ordinal", "()I", CEIHH, M6CJ5)
     JNUPY_UNLOAD_METHOD("org/micropython/jnupy/PythonModule", "<init>", "(Lorg/micropython/jnupy/PythonState;JJ)V", CL6LM, MTE4H)
     JNUPY_UNLOAD_METHOD("org/micropython/jnupy/PythonNativeException", "<init>", "(Ljava/lang/String;)V", CLGS4, MOBLI)
@@ -1286,20 +1297,32 @@ STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, c
     mp_arg_check_num(n_args, n_kw, 0, n_args, false);
     mp_obj_jfunc_t *o = self_in;
 
-    // TODO: if argument convert provided by keyword value, convert by custom converter...
-    // TODO: more detail value convert required.
     JNUPY_PY_JSTATE = o->jstate;
 
-    jobjectArray jargs = JNUPY_CALL(NewObjectArray, n_args, JCLASS(Object), NULL);
+    jobjectArray jargarr = JNUPY_CALL(NewObjectArray, n_args, JCLASS(PythonObject), NULL);
+    jobject jkwargs = NULL;
 
     for (int i = 0; i < n_args; i++) {
-        jobject jarg = jnupy_obj_py2j(args[i]);
-        JNUPY_CALL(SetObjectArrayElement, jargs, i, jarg);
+        jobject jarg = jnupy_pyobj_new(JNUPY_PY_JSTATE, args[i]);
+        JNUPY_CALL(SetObjectArrayElement, jargarr, i, jarg);
         JNUPY_CALL(DeleteLocalRef, jarg);
     }
 
-    jobject jresult = JNUPY_CALL(CallObjectMethod, o->jfunc, JMETHOD(JavaFunction, invoke), JNUPY_SELF, jargs);
+    if (n_kw != 0) {
+        jkwargs = JNUPY_CALL(NewObject, JCLASS(HashMap), JMETHOD(HashMap, INIT), n_kw);
 
+        const mp_obj_t *kwargs = args[n_args + 1];
+        for (int i = 0; i < n_kw; i += 2) {
+            jstring jkey = jnupy_obj_py2j(kwargs[i]);
+            jobject jvalue = jnupy_pyobj_new(JNUPY_PY_JSTATE, kwargs[i + 1]);
+            JNUPY_CALL(CallVoidMethod, jkwargs, JMETHOD(HashMap, put), jkey, jvalue);
+            JNUPY_CALL(DeleteLocalRef, jkey);
+            JNUPY_CALL(DeleteLocalRef, jvalue);
+        }
+    }
+
+    jobject jargs = JNUPY_CALL(NewObject, JCLASS(PythonArguments), JMETHOD(PythonArguments, INIT), jargarr, jkwargs);
+    jobject jresult = JNUPY_CALL(CallObjectMethod, o->jfunc, JMETHOD(JavaFunction, invoke), JNUPY_PY_JSTATE, jargs);
     mp_obj_t result = jnupy_obj_j2py(jresult);
 
 	return result;
@@ -1487,7 +1510,6 @@ JNUPY_FUNC_DEF(jstring, jnupy_1mp_1version)
                 has_exception = true; \
                 break; \
             }
-
             /* body */
 
 #define _JNUPY_FUNC_BODY_END(ret_stmt) \
@@ -1761,6 +1783,18 @@ JNUPY_FUNC_DEF(jobject, jnupy_1module_1new)
     return jresult;
     JNUPY_FUNC_END_VALUE(NULL);
 }
+
+JNUPY_FUNC_DEF(jobject, jnupy_1obj_1py2j)
+    (JNIEnv *env, jobject self, jobject jpyref) {
+    JNUPY_FUNC_START_WITH_STATE;
+
+    mp_obj_t pyref = jnupy_obj_j2py(jpyref);
+    jobject jresult = jnupy_obj_py2j(pyref);
+
+    return jresult;
+    JNUPY_FUNC_END_VALUE(NULL);
+}
+
 
 /** JNI EXPORT FUNCTION MECRO CLNEAUP **/
 #undef return

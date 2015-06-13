@@ -4,6 +4,7 @@
  * The MIT License (MIT)
  *
  * Copyright (c) 2015 EcmaXp
+ * Copyright (C) 2008,2012 Andre Naef
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +27,8 @@
 
 package org.micropython.jnupy;
 
-public abstract class NamedJavaFunction extends JavaFunction {
-    abstract public String getName();
+public class PythonAcceptArguments {
+    // This define accepted argument length
+    // So, micropython never convert argument and fast fail.
+    // TODO: programming this.
 }
