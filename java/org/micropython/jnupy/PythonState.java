@@ -173,7 +173,7 @@ public class PythonState extends PythonNativeState {
 		modutime.set(new NamedJavaFun0("time") {
 			@Override
 			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
-				return new Double(System.currentTimeMillis() / 1000);
+				return new Double(System.currentTimeMillis() / 1000.0);
 			}
 		});
 		
