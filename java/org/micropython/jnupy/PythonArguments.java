@@ -4,7 +4,6 @@
  * The MIT License (MIT)
  *
  * Copyright (c) 2015 EcmaXp
- * Copyright (C) 2008,2012 Andre Naef
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -40,6 +39,10 @@ public class PythonArguments {
     private HashMap<String, PythonObject> kwargs; // can be null!
     public final int length;
     
+    public PythonArguments(PythonObject[] args) {
+        this(args, null);
+    }
+    
     public PythonArguments(PythonObject[] args, HashMap<String, PythonObject> kwargs) {
         this.args = args;
         this.kwargs = kwargs; // can be null!
@@ -63,7 +66,7 @@ public class PythonArguments {
     }
     
     private Object convertObject(PythonObject obj) throws PythonException {
-        return obj.convertToJava();
+        return obj.toJavaObject();
     }
     
     public Object get(int index) throws PythonException {

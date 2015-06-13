@@ -71,7 +71,7 @@ public class PythonObject {
 		throw new RuntimeException("invaild python raw object: " + obj.toString());
 	}
 
-    public Object convertToJava() throws PythonException {
+    public Object toJavaObject() throws PythonException {
         return pythonState.jnupy_obj_py2j(this);
     }
 
@@ -109,17 +109,20 @@ public class PythonObject {
 
     public Object invoke(Object... args) throws PythonException {
         // TODO: given flag to convert to anything?
+        // TODO: use toJavaObject
         return pythonState.jnupy_func_call(true, this, args);
     }
 
     public Object rawInvoke(Object... args) throws PythonException {
         // TODO: remove it?? (is possible?)
         // TODO: given flag to never convert it... (when it is JavaObject...?)
+        // TODO: use toJavaObject
         return pythonState.jnupy_func_call(false, this, args);
     }
 
     public PythonObject call(Object... args) throws PythonException {
         // TODO: remove rawCall and given flag to only convert to PythonXXX object...
+        // TODO: use toJavaObject
         Object result = pythonState.jnupy_func_call(true, this, args);
         if (result == null) {
             return null;

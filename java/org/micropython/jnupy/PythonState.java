@@ -38,6 +38,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.FileSystems;
+import org.micropython.jnupy.JavaFunction.*;
 
 public class PythonState extends PythonNativeState {
 	public static final long DEFAULT_STACK_SIZE = 1024 * 32 * MEMORY_SCALE; // 32 KB
@@ -113,13 +114,10 @@ public class PythonState extends PythonNativeState {
 
 		// TODO: warp stdout, stdin, stderr...
 
-		JavaFunction load = new JavaFunction() {
+		JavaFunction load = new JavaFun2() {
 			@Override
 			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
-				if (args.length == 2) {
-					pythonState.builtins.put((String)args.get(0), args.rawGet(1));
-				}
-				
+				pythonState.builtins.put((String)args.get(0), args.rawGet(1));
 				return null;
 			}
 		};
@@ -133,7 +131,7 @@ public class PythonState extends PythonNativeState {
 		
 		helpers.put("unbox", pyEval("lambda x: x"));
 		
-		modjnupy.set("abspath", new JavaFunction() {
+		modjnupy.set("abspath", new JavaFun1() {
 			@Override
 			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
 				String filename = (String)args.get(0);
@@ -142,7 +140,7 @@ public class PythonState extends PythonNativeState {
 			}
 		});
 		
-		modjnupy.set("input", new JavaFunction() {
+		modjnupy.set("input", new JavaFun0() {
 			@Override
 			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
 				Console c = System.console();
@@ -155,14 +153,14 @@ public class PythonState extends PythonNativeState {
 			}
 		});
 		
-		modjnupy.set("readfile", new JavaFunction() {
+		modjnupy.set("readfile", new JavaFun1() {
 			@Override
 			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
 				return readFile((String)args.get(0));
 			}
 		});
 		
-		modjnupy.set("getenv", new JavaFunction() {
+		modjnupy.set("getenv", new JavaFun1() {
 			@Override
 			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
 				return System.getenv((String)args.get(0));
@@ -172,20 +170,16 @@ public class PythonState extends PythonNativeState {
 		// TODO: move to module.xxx
 		PythonModule modutime = newModule("utime");
 		
-		modutime.set("time", new JavaFunction() {
+		modutime.set("time", new JavaFun0() {
 			@Override
 			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
 				return new Double(System.currentTimeMillis() / 1000);
 			}
 		});
 		
-		modutime.set("sleep", new JavaFunction() {
+		modutime.set("sleep", new JavaFun1() {
 			@Override
 			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
-				if (args.length != 1) {
-					throw new RuntimeException("invaild argument... ?");
-				}
-				
 				Object arg = args.get(0);
 				
 				try {

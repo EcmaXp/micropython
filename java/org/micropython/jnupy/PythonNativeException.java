@@ -31,19 +31,22 @@ public class PythonNativeException extends PythonException {
     // only jnupy.c can throw this exception.
     // TODO: have PythonObject?
     
+    private PythonObject pyobj;
     private String name;
     private String detail;
     
-	private PythonNativeException(String msg) {
+    private PythonNativeException(String msg) {
 	    super(msg);
 	    parseMessage(msg);
+	    this.pyobj = null;
 	}
-
-	private PythonNativeException(String msg, Throwable cause) {
-		super(msg, cause);
+    
+    PythonNativeException(String msg, PythonObject pyobj) {
+	    super(msg);
 	    parseMessage(msg);
+	    this.pyobj = pyobj;
 	}
-	
+    
 	private void parseMessage(String msg) {
 	    String[] splited = msg.split(Pattern.quote(": "), 2);
 	    if (splited.length == 1) {
