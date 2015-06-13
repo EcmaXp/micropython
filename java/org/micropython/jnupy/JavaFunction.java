@@ -110,6 +110,11 @@ public interface JavaFunction {
             super(takes_kw, n_args_min, n_args_max);
             this.name = name;    
         }
+        
+        @Override
+        public String getName() {
+            return name;
+        }
     }
     
     public static abstract class NamedJavaFun0 extends NamedJavaFun {

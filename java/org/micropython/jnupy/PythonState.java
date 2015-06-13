@@ -131,7 +131,7 @@ public class PythonState extends PythonNativeState {
 		
 		helpers.put("unbox", pyEval("lambda x: x"));
 		
-		modjnupy.set("abspath", new JavaFun1() {
+		modjnupy.set(new NamedJavaFun1("abspath") {
 			@Override
 			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
 				String filename = (String)args.get(0);
@@ -140,7 +140,7 @@ public class PythonState extends PythonNativeState {
 			}
 		});
 		
-		modjnupy.set("input", new JavaFun0() {
+		modjnupy.set(new NamedJavaFun0("input") {
 			@Override
 			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
 				Console c = System.console();
@@ -153,14 +153,14 @@ public class PythonState extends PythonNativeState {
 			}
 		});
 		
-		modjnupy.set("readfile", new JavaFun1() {
+		modjnupy.set(new NamedJavaFun1("readfile") {
 			@Override
 			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
 				return readFile((String)args.get(0));
 			}
 		});
 		
-		modjnupy.set("getenv", new JavaFun1() {
+		modjnupy.set(new NamedJavaFun1("getenv") {
 			@Override
 			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
 				return System.getenv((String)args.get(0));
@@ -170,14 +170,14 @@ public class PythonState extends PythonNativeState {
 		// TODO: move to module.xxx
 		PythonModule modutime = newModule("utime");
 		
-		modutime.set("time", new JavaFun0() {
+		modutime.set(new NamedJavaFun0("time") {
 			@Override
 			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
 				return new Double(System.currentTimeMillis() / 1000);
 			}
 		});
 		
-		modutime.set("sleep", new JavaFun1() {
+		modutime.set(new NamedJavaFun1("sleep") {
 			@Override
 			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
 				Object arg = args.get(0);

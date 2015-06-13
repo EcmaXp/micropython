@@ -1299,6 +1299,7 @@ mp_obj_t mp_obj_jfunc_new(jobject jstate, jobject jfunc) {
     o->base.type = &mp_type_jfunc;
     o->jstate = JNUPY_CALL(NewGlobalRef, jstate);
     o->jfunc = JNUPY_CALL(NewGlobalRef, jfunc);
+    // TODO: get name?
 
     return (mp_obj_t)o;
 }
