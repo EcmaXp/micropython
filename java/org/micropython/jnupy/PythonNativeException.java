@@ -57,7 +57,7 @@ public class PythonNativeException extends PythonException {
 	    }
 	}
 
-	@Override	
+	@Override
 	public String getName() {
 	    return name;
 	}

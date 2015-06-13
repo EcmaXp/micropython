@@ -26,6 +26,6 @@
 
 package org.micropython.jnupy;
 
-public abstract class NamedJavaFunction extends JavaFunction {
-    abstract public String getName();
+public interface NamedJavaFunction extends JavaFunction {
+    public String getName();
 }

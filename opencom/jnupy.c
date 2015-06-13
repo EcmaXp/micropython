@@ -1371,6 +1371,9 @@ STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, c
         jresult = JNUPY_CALL(CallObjectMethod, jfunc, JMETHOD(JavaFunction, invoke), JNUPY_PY_JSTATE, jargs);
         nlr_pop();
     } else {
+        // TODO: if jname instanceof NamedJavaFunction, then just call NamedJavaFunction with getName
+        //  => JavaFunction, file=<java>; lineno=0; block=classname
+        //  => NamedJavaFunction,  file=<java: 'classname'>; lineno=0; block=funcname
         jclass cls = JNUPY_CALL(GetObjectClass, jfunc);
         jstring jname = JNUPY_CALL(CallObjectMethod, cls, JMETHOD(Class, getName));
 

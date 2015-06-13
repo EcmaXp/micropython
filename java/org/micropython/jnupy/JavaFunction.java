@@ -26,13 +26,11 @@
 
 package org.micropython.jnupy;
 
-public abstract class JavaFunction {
-    abstract public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException;
-    public void checkInvoke(PythonState pythonState, int n_args, int n_kw) throws PythonException {
-        // ...
-    };
+public interface JavaFunction {
+    public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException;
+    public void checkInvoke(PythonState pythonState, int n_args, int n_kw) throws PythonException;
     
-    public static abstract class JavaFun extends JavaFunction {
+    public static abstract class JavaFun implements JavaFunction {
         static public final int inf = -1;
         boolean takes_kw;
         int n_args_min;
@@ -49,7 +47,7 @@ public abstract class JavaFunction {
         }
         
         @Override
-        public void checkInvoke(PythonState pythonState, int n_args, int n_kw) {
+        public void checkInvoke(PythonState pythonState, int n_args, int n_kw) throws PythonException {
             boolean vaild = (takes_kw || n_kw == 0) &&
                 (n_args_min <= n_args) &&
                 (n_args <= n_args_max || n_args_max == inf);
@@ -102,6 +100,57 @@ public abstract class JavaFunction {
     public static abstract class JavaFunKW extends JavaFun {
         public JavaFunKW(int n_args_min) {
             super(true, n_args_min, inf);
+        }
+    }
+    
+    public static abstract class NamedJavaFun extends JavaFun implements NamedJavaFunction {
+        private String name;
+        
+        public NamedJavaFun(String name, boolean takes_kw, int n_args_min, int n_args_max) {
+            super(takes_kw, n_args_min, n_args_max);
+            this.name = name;    
+        }
+    }
+    
+    public static abstract class NamedJavaFun0 extends NamedJavaFun {
+        public NamedJavaFun0(String name) {
+            super(name, false, 0, 0);
+        }
+    }
+    
+    public static abstract class NamedJavaFun1 extends NamedJavaFun {
+        public NamedJavaFun1(String name) {
+            super(name, false, 1, 1);
+        }
+    }
+    
+    public static abstract class NamedJavaFun2 extends NamedJavaFun {
+        public NamedJavaFun2(String name) {
+            super(name, false, 2, 2);
+        }
+    }
+    
+    public static abstract class NamedJavaFun3 extends NamedJavaFun {
+        public NamedJavaFun3(String name) {
+            super(name, false, 3, 3);
+        }
+    }
+    
+    public static abstract class NamedJavaFunVar extends NamedJavaFun {
+        public NamedJavaFunVar(String name, int n_args_min) {
+            super(name, false, n_args_min, inf);
+        }
+    }
+    
+    public static abstract class NamedJavaFunVarBetween extends NamedJavaFun {
+        public NamedJavaFunVarBetween(String name, int n_args_min, int n_args_max) {
+            super(name, false, n_args_min, n_args_max);
+        }
+    }
+    
+    public static abstract class NamedJavaFunKW extends NamedJavaFun {
+        public NamedJavaFunKW(String name, int n_args_min) {
+            super(name, true, n_args_min, inf);
         }
     }
 }
