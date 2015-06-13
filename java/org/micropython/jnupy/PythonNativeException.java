@@ -41,7 +41,7 @@ public class PythonNativeException extends PythonException {
 	    this.pyobj = null;
 	}
     
-    PythonNativeException(String msg, PythonObject pyobj) {
+    private PythonNativeException(String msg, PythonObject pyobj) {
 	    super(msg);
 	    parseMessage(msg);
 	    this.pyobj = pyobj;

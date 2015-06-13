@@ -121,5 +121,5 @@ public class PythonNativeState {
     native synchronized Object jnupy_func_call(boolean convertResult, PythonObject func, Object ...args) throws PythonException;
     native synchronized PythonObject jnupy_module_new(String name) throws PythonException;
     native synchronized Object jnupy_obj_py2j(PythonObject obj) throws PythonException;
-    native synchronized void jnupy_func_arg_check_num(int n_args, int n_kw, int n_args_min, int n_args_max, boolean takes_kw);
+    native synchronized void jnupy_func_arg_check_num(int n_args, int n_kw, int n_args_min, int n_args_max, boolean takes_kw) throws PythonException;
 }

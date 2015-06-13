@@ -148,12 +148,12 @@ typedef struct _jnupy_current_state_t {
     // JNUPY_MP_STATE
     // micropython state context
     mp_state_ctx_t *mp_state;
-    
+
     // JNUPY_STACK_TOP
     // micropython stack top
     // TODO: use this?
     mp_uint_t *stack_top;
-    
+
     // NLR_GK_TOP
     // nlr goalkeeper top (for JNI function call warpper)
     nlr_gk_buf_t *nlr_gk_top;
@@ -238,7 +238,7 @@ void nlr_gk_set_buf_raw(nlr_gk_buf_t *gk_buf) {
 
 void nlr_gk_push_raw(nlr_gk_buf_t *gk_buf) {
     gk_buf->is_working = true;
-    
+
     gk_buf->prev = NLR_GK_TOP;
     NLR_GK_TOP = gk_buf;
 }
@@ -247,7 +247,7 @@ void nlr_gk_pop_raw(nlr_gk_buf_t *gk_buf) {
     if (gk_buf->is_working) {
         // assert(mp_nlr_top == NLR_GK_TOP);
         // assert(mp_nlr_top.prev == NLR_GK_TOP.prev)?
-        
+
         NLR_GK_TOP->is_working = false;
         NLR_GK_TOP = NLR_GK_TOP->prev;
         nlr_gk_set_buf(NLR_GK_TOP);
@@ -256,10 +256,10 @@ void nlr_gk_pop_raw(nlr_gk_buf_t *gk_buf) {
 
 NORETURN void nlr_gk_jump_raw(void *val) {
     NLR_GK_TOP->is_working = false;
-    
+
     nlr_gk_set_buf(NLR_GK_TOP);
     NLR_GK_TOP = NLR_GK_TOP->prev;
-    
+
     nlr_jump(val);
 }
 
@@ -338,6 +338,8 @@ JNUPY_REF_CLASS(CPITF)
 JNUPY_REF_CLASS(CM4H2)
 // CLASS: java/lang/Boolean
 JNUPY_REF_CLASS(CDKHI)
+// CLASS: java/lang/Class
+JNUPY_REF_CLASS(CWQVW)
 // CLASS: java/lang/Double
 JNUPY_REF_CLASS(CMCKJ)
 // CLASS: java/lang/Float
@@ -402,6 +404,8 @@ JNUPY_REF_METHOD(MUZ6M)
 JNUPY_REF_METHOD(MHUAS)
 // METHOD: java/lang/Boolean->booleanValue[()Z]
 JNUPY_REF_METHOD(ME2HS)
+// METHOD: java/lang/Class->getName[()Ljava/lang/String;]
+JNUPY_REF_METHOD(MNDS4)
 // METHOD: java/lang/Double-><init>[(D)V]
 JNUPY_REF_METHOD(MONM4)
 // METHOD: java/lang/Double->doubleValue[()D]
@@ -523,6 +527,9 @@ JNUPY_AP(EXPORT)
 #define JENUM_MP_PARSE_EVAL_INPUT JNUPY_ENUM("org/micropython/jnupy/PythonParseInputKind", "MP_PARSE_EVAL_INPUT", E6JE6)
 #define JMETHOD_PythonParseInputKind_ordinal JNUPY_METHOD("org/micropython/jnupy/PythonParseInputKind", "ordinal", "()I", MAUVV)
 
+#define JCLASS_Class JNUPY_CLASS("java/lang/Class", CWQVW)
+#define JMETHOD_Class_getName JNUPY_METHOD("java/lang/Class", "getName", "()Ljava/lang/String;", MNDS4)
+
 #define JCLASS_Object JNUPY_CLASS("java/lang/Object", CVNFN)
 
 #define JCLASS_Short JNUPY_CLASS("java/lang/Short", CMUMS)
@@ -607,6 +614,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNUPY_LOAD_CLASS("java/io/ByteArrayOutputStream", CPITF)
     JNUPY_LOAD_CLASS("java/lang/AssertionError", CM4H2)
     JNUPY_LOAD_CLASS("java/lang/Boolean", CDKHI)
+    JNUPY_LOAD_CLASS("java/lang/Class", CWQVW)
     JNUPY_LOAD_CLASS("java/lang/Double", CMCKJ)
     JNUPY_LOAD_CLASS("java/lang/Float", CLJBD)
     JNUPY_LOAD_CLASS("java/lang/IllegalArgumentException", C5K3P)
@@ -639,6 +647,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNUPY_LOAD_METHOD("java/io/ByteArrayInputStream", "<init>", "([B)V", CPYWG, MUZ6M)
     JNUPY_LOAD_METHOD("java/io/ByteArrayOutputStream", "toByteArray", "()[B", CPITF, MHUAS)
     JNUPY_LOAD_METHOD("java/lang/Boolean", "booleanValue", "()Z", CDKHI, ME2HS)
+    JNUPY_LOAD_METHOD("java/lang/Class", "getName", "()Ljava/lang/String;", CWQVW, MNDS4)
     JNUPY_LOAD_METHOD("java/lang/Double", "<init>", "(D)V", CMCKJ, MONM4)
     JNUPY_LOAD_METHOD("java/lang/Double", "doubleValue", "()D", CMCKJ, MRBT7)
     JNUPY_LOAD_METHOD("java/lang/Double", "floatValue", "()F", CMCKJ, MTEKP)
@@ -695,6 +704,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     JNUPY_UNLOAD_CLASS("java/io/ByteArrayOutputStream", CPITF)
     JNUPY_UNLOAD_CLASS("java/lang/AssertionError", CM4H2)
     JNUPY_UNLOAD_CLASS("java/lang/Boolean", CDKHI)
+    JNUPY_UNLOAD_CLASS("java/lang/Class", CWQVW)
     JNUPY_UNLOAD_CLASS("java/lang/Double", CMCKJ)
     JNUPY_UNLOAD_CLASS("java/lang/Float", CLJBD)
     JNUPY_UNLOAD_CLASS("java/lang/IllegalArgumentException", C5K3P)
@@ -727,6 +737,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     JNUPY_UNLOAD_METHOD("java/io/ByteArrayInputStream", "<init>", "([B)V", CPYWG, MUZ6M)
     JNUPY_UNLOAD_METHOD("java/io/ByteArrayOutputStream", "toByteArray", "()[B", CPITF, MHUAS)
     JNUPY_UNLOAD_METHOD("java/lang/Boolean", "booleanValue", "()Z", CDKHI, ME2HS)
+    JNUPY_UNLOAD_METHOD("java/lang/Class", "getName", "()Ljava/lang/String;", CWQVW, MNDS4)
     JNUPY_UNLOAD_METHOD("java/lang/Double", "<init>", "(D)V", CMCKJ, MONM4)
     JNUPY_UNLOAD_METHOD("java/lang/Double", "doubleValue", "()D", CMCKJ, MRBT7)
     JNUPY_UNLOAD_METHOD("java/lang/Double", "floatValue", "()F", CMCKJ, MTEKP)
@@ -965,15 +976,6 @@ void jnupy_obj_do_exception(mp_obj_t exception) {
                 mp_obj_t value = mp_obj_exception_get_value(exception);
                 if (MP_OBJ_IS_TYPE(value, &mp_type_jobject)) {
                     jthrowable exc = jnupy_obj_py2j_raw(value);
-                    /*if (JNUPY_RAW_CALL(IsInstanceOf, exc, JCLASS(PythonNativeException))) {
-                        jobject pyref = JNUPY_CALL(GetObjectField, exc, JFIELD(PythonNativeException, pyobj));
-                        exception = jnupy_obj_j2py(pyref);
-                        // TODO: require add trace for later (in any point)
-                        if (exception != MP_OBJ_NULL) {
-                            nlr_pop();
-                            nlr_raise(exception);
-                        }
-                    }*/
                     JNUPY_RAW_CALL(Throw, exc);
                     break;
                 }
@@ -988,13 +990,14 @@ void jnupy_obj_do_exception(mp_obj_t exception) {
             mp_obj_print_helper(&print, exception, PRINT_EXC);
             const char *message = vstr_null_terminated_str(&vstr);
 
-            /* jobject pyref = jnupy_obj_py2j_raw(exception);
+            jstring jmsg = JNUPY_CALL(NewStringUTF, message);
+            jobject pyref = jnupy_obj_py2j_raw(exception);
 
             // TODO: detail exception for catch that.
-            jthrowable exc = JNUPY_CALL(NewObject, JCLASS(PythonNativeException), JMETHODV(PythonNativeException, INIT, with_pyobj), message, pyref);
+            jthrowable exc = JNUPY_CALL(NewObject, JCLASS(PythonNativeException), JMETHODV(PythonNativeException, INIT, with_pyobj), jmsg, pyref);
 
-            JNUPY_RAW_CALL(Throw, exc); */
-            JNUPY_RAW_CALL(ThrowNew, JCLASS(PythonNativeException), message);
+            JNUPY_CALL(ReleaseStringUTFChars, jmsg, NULL);
+            JNUPY_RAW_CALL(Throw, exc);
 
             vstr_clear(&vstr);
             break;
@@ -1307,14 +1310,23 @@ jobject mp_obj_jfunc_get(mp_obj_t self_in) {
 }
 
 NORETURN void jnupy_throw_jerror(jthrowable jerror) {
-
-    (*JNUPY_ENV)->ExceptionClear(JNUPY_ENV);
+    JNUPY_RAW_CALL_SINGLE(ExceptionClear);
     nlr_buf_t nlr;
     if (nlr_push(&nlr) == 0) {
-	    mp_obj_t rawexc = jnupy_obj_j2py(jerror);
+        mp_obj_t pyexc = MP_OBJ_NULL;
+	    if (JNUPY_RAW_CALL(IsInstanceOf, jerror, JCLASS(PythonNativeException))) {
+            jobject pyref = JNUPY_RAW_CALL(GetObjectField, jerror, JFIELD(PythonNativeException, pyobj));
+            pyexc = jnupy_obj_j2py(pyref);
+            if (pyexc != MP_OBJ_NULL) {
+                nlr_pop();
+                nlr_raise(pyexc);
+            }
+        }
+
+	    pyexc = jnupy_obj_j2py(jerror);
 
 	    nlr_pop();
-	    nlr_raise(mp_obj_new_exception_arg1(&mp_type_JavaError, rawexc));
+	    nlr_raise(mp_obj_new_exception_arg1(&mp_type_JavaError, pyexc));
     } else {
 	    nlr_raise(mp_obj_new_exception_msg(&mp_type_JavaError, "Unknown java error"));
     }
@@ -1323,11 +1335,11 @@ NORETURN void jnupy_throw_jerror(jthrowable jerror) {
 }
 
 STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
-    mp_arg_check_num(n_args, n_kw, 0, n_args, false);
     mp_obj_jfunc_t *o = self_in;
+    jobject jfunc = o->jfunc;
 
     JNUPY_PY_JSTATE = o->jstate;
-    JNUPY_CALL(CallVoidMethod, o->jfunc, JMETHOD(JavaFunction, checkInvoke), JNUPY_PY_JSTATE, (jint)n_args, (jint)n_kw);
+    JNUPY_CALL(CallVoidMethod, jfunc, JMETHOD(JavaFunction, checkInvoke), JNUPY_PY_JSTATE, (jint)n_args, (jint)n_kw);
 
     jobjectArray jargarr = JNUPY_CALL(NewObjectArray, n_args, JCLASS(PythonObject), NULL);
     jobject jkwargs = NULL;
@@ -1352,9 +1364,25 @@ STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, c
     }
 
     jobject jargs = JNUPY_CALL(NewObject, JCLASS(PythonArguments), JMETHOD(PythonArguments, INIT), jargarr, jkwargs);
-    jobject jresult = JNUPY_CALL(CallObjectMethod, o->jfunc, JMETHOD(JavaFunction, invoke), JNUPY_PY_JSTATE, jargs);
-    mp_obj_t result = jnupy_obj_j2py(jresult);
+    jobject jresult = NULL;
 
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) == 0) {
+        jresult = JNUPY_CALL(CallObjectMethod, jfunc, JMETHOD(JavaFunction, invoke), JNUPY_PY_JSTATE, jargs);
+        nlr_pop();
+    } else {
+        jclass cls = JNUPY_CALL(GetObjectClass, jfunc);
+        jstring jname = JNUPY_CALL(CallObjectMethod, cls, JMETHOD(Class, getName));
+
+        const char *name = JNUPY_CALL(GetStringUTFChars, jname, JNI_FALSE);
+        qstr qname = qstr_from_str(name);
+        JNUPY_CALL(ReleaseStringUTFChars, jname, name);
+
+        mp_obj_exception_add_traceback(nlr.ret_val, MP_QSTR__lt_java_gt_, 0, qname);
+        nlr_raise(nlr.ret_val);
+    }
+
+    mp_obj_t result = jnupy_obj_j2py(jresult);
 	return result;
 }
 
