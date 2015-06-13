@@ -193,8 +193,8 @@ STATIC JNIEnv *jnupy_glob_java_env;
 /** JNUPY CALL MECRO **/
 #define JNUPY_RAW_CALL_WITH(env, func, ...) (*env)->func(env, __VA_ARGS__)
 #define JNUPY_RAW_CALL(func, ...) (*JNUPY_ENV)->func(JNUPY_ENV, __VA_ARGS__)
-#define JNUPY_IS_RAW_CALL_HAS_ERROR() (*JNUPY_ENV)->ExceptionOccurred(JNUPY_ENV)
-#define JNUPY_RAW_AUTO_THROW (JNUPY_IS_RAW_CALL_HAS_ERROR()? nlr_gk_jump(NULL): (void)0)
+#define JNUPY_RAW_CALL_SINGLE(func) (*JNUPY_ENV)->func(JNUPY_ENV)
+#define JNUPY_RAW_AUTO_THROW (jnupy_throw_jerror_auto())
 #define JNUPY_CALL(func, ...) (*JNUPY_ENV)->func(JNUPY_ENV, __VA_ARGS__); JNUPY_RAW_AUTO_THROW
 /*
 JNUPY_CALL usage:
@@ -206,9 +206,9 @@ jobject msg = JNUPY_CALL(GetLongField, JNUPY_SELF, JFIELD(PythonNativeState, mpS
 JNUPY_CALL(NewGlobalRef, jfunc);
 
 // It can't mix with if, for, while, return, or etc control block.
-// But you can use JNUPY_RAW_CALL, and after call, must check by JNUPY_IS_RAW_CALL_HAS_ERROR()
+// But you can use JNUPY_RAW_CALL, and after call, must check by JNUPY_RAW_CALL_SINGLE(ExceptionOccurred)
 if (JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/AssertionError", CM4H2), "There is no state") == 0) {
-    if (JNUPY_IS_RAW_CALL_HAS_ERROR()) {
+    if (JNUPY_RAW_CALL_SINGLE(ExceptionOccurred)) {
         return;
     }
 }
@@ -245,6 +245,10 @@ void nlr_gk_push_raw(nlr_gk_buf_t *gk_buf) {
 
 void nlr_gk_pop_raw(nlr_gk_buf_t *gk_buf) {
     if (gk_buf->is_working) {
+        // assert(mp_nlr_top == NLR_GK_TOP);
+        // assert(mp_nlr_top.prev == NLR_GK_TOP.prev)?
+        
+        NLR_GK_TOP->is_working = false;
         NLR_GK_TOP = NLR_GK_TOP->prev;
         nlr_gk_set_buf(NLR_GK_TOP);
     }
@@ -257,6 +261,14 @@ NORETURN void nlr_gk_jump_raw(void *val) {
     NLR_GK_TOP = NLR_GK_TOP->prev;
     
     nlr_jump(val);
+}
+
+NORETURN void jnupy_throw_jerror(jthrowable jerror);
+void jnupy_throw_jerror_auto() {
+    jthrowable jerror = JNUPY_RAW_CALL_SINGLE(ExceptionOccurred);
+    if (jerror != NULL) {
+        jnupy_throw_jerror(jerror);
+    }
 }
 
 /** JNI CLASS/VALUE REFERENCE MECRO **/
@@ -791,6 +803,9 @@ NORETURN void mp_assert_fail(const char *assertion, const char *file,
 
     if (_jnupy_attach_env()) {
         JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/AssertionError", CM4H2), buf);
+
+        // assert is very special error. so just bypass all handler.
+        // (and that's why need nlr goal keeper.)
         nlr_gk_jump(NULL);
     } else {
         printf("%s\n", buf);
@@ -1251,6 +1266,22 @@ jobject mp_obj_jfunc_get(mp_obj_t self_in) {
     return self->jfunc;
 }
 
+NORETURN void jnupy_throw_jerror(jthrowable jerror) {
+
+    (*JNUPY_ENV)->ExceptionClear(JNUPY_ENV);
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) == 0) {
+	    mp_obj_t rawexc = jnupy_obj_j2py(jerror);
+
+	    nlr_pop();
+	    nlr_raise(mp_obj_new_exception_arg1(&mp_type_JavaError, rawexc));
+    } else {
+	    nlr_raise(mp_obj_new_exception_msg(&mp_type_JavaError, "Unknown java error"));
+    }
+
+    abort();
+}
+
 STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 0, n_args, false);
     mp_obj_jfunc_t *o = self_in;
@@ -1267,26 +1298,10 @@ STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, c
         JNUPY_CALL(DeleteLocalRef, jarg);
     }
 
-    // TODO: how to handle exception?
-    jobject jresult = JNUPY_RAW_CALL(CallObjectMethod, o->jfunc, JMETHOD(JavaFunction, invoke), JNUPY_SELF, jargs);
-    jthrowable jerror = JNUPY_IS_RAW_CALL_HAS_ERROR();
-
-	if (jerror != NULL) {
-	    (*JNUPY_ENV)->ExceptionClear(JNUPY_ENV);
-	    nlr_buf_t nlr;
-	    if (nlr_push(&nlr) == 0) {
-    	    mp_obj_t rawexc = jnupy_obj_j2py(jerror);
-
-    	    nlr_pop();
-    	    nlr_raise(mp_obj_new_exception_arg1(&mp_type_JavaError, rawexc));
-	    } else {
-    	    nlr_raise(mp_obj_new_exception_msg(&mp_type_JavaError, "Unknown java error"));
-	    }
-
-        abort();
-	}
+    jobject jresult = JNUPY_CALL(CallObjectMethod, o->jfunc, JMETHOD(JavaFunction, invoke), JNUPY_SELF, jargs);
 
     mp_obj_t result = jnupy_obj_j2py(jresult);
+
 	return result;
 }
 

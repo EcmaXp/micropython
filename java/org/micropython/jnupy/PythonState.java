@@ -26,12 +26,11 @@
 
 package org.micropython.jnupy;
 
+import java.io.Console;
 import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
-import java.util.Scanner;
-import java.util.NoSuchElementException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.io.File;
@@ -47,6 +46,7 @@ public class PythonState extends PythonNativeState {
 	// TODO: private?
 	HashMap<String, PythonObject> builtins;
 	HashMap<String, PythonObject> helpers;
+	PythonModule modmain;
 	
 	public static void main(String args[]) {
 		System.gc(); // Remove incorrect reference.
@@ -73,7 +73,7 @@ public class PythonState extends PythonNativeState {
 			modsys.set("argv", argv);
 			
 			String launcher = args[0];
-			PythonModule modmain = (PythonModule)importer.call("__main__");
+			PythonModule modmain = py.getMainModule();
 			modmain.set("__file__", launcher);
 			
 			String code = py.readFile(launcher);
@@ -103,10 +103,11 @@ public class PythonState extends PythonNativeState {
 	}
 	
 	public void setup() throws PythonException {
-		builtins = new HashMap<String, PythonObject>();
-		helpers = new HashMap<String, PythonObject>();
+		this.builtins = new HashMap<String, PythonObject>();
+		this.helpers = new HashMap<String, PythonObject>();
+		this.modmain = new PythonModule(newRawModule("__main__"));
 		
-		PythonObject importer = pyEval("__import__");	
+		PythonObject importer = pyEval("__import__");
 		PythonModule modjnupy = (PythonModule)importer.call("jnupy");
 		PythonModule modbuiltins = (PythonModule)importer.call("builtins");
 
@@ -148,12 +149,13 @@ public class PythonState extends PythonNativeState {
 		modjnupy.set("input", new JavaFunction() {
 			@Override
 			public Object invoke(PythonState pythonState, Object... args) throws PythonException {
-				Scanner scan = new Scanner(System.in);
-				try {
-					return scan.nextLine();
-				} catch (NoSuchElementException e) {
+				Console c = System.console();
+				if (c == null) {
+					// TODO: raise error?
 					return null;
 				}
+				
+				return c.readLine();
 			}
 		});
 		
@@ -242,11 +244,16 @@ public class PythonState extends PythonNativeState {
 	}
 	
 	public PythonModule newModule(String name) throws PythonException {
+		// TODO: with package? (just split with dot...)
 		return new PythonModule(newRawModule(name));
 	}
 	
 	public PythonObject newRawModule(String name) throws PythonException {
 		return jnupy_module_new(name);
+	}
+	
+	public PythonModule getMainModule() {
+		return this.modmain;
 	}
 	
 	private File resolvePath(String path) {
