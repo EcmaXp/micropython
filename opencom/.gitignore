@@ -1,9 +1,6 @@
 build
-build-fast
-build-minimal
 micropython
-micropython_fast
-micropython_minimal
 libmicropython
 jnupy.ap.c
 micropython.jar
+hs_err_pid*.log
