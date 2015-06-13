@@ -43,6 +43,11 @@ public class PythonModule extends PythonObject {
         setattr(name, func);
     }
     
+    public void set(NamedJavaFunction func) throws PythonException {
+        String name = func.getName();
+        setattr(name, func);
+    }
+    
     public void set(String name, PythonObject pyobj) throws PythonException {
         setattr(name, pyobj);
     }
