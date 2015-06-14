@@ -106,11 +106,11 @@ public class PythonState extends PythonNativeState {
 	public void setup() throws PythonException {
 		this.builtins = new HashMap<String, PythonObject>();
 		this.helpers = new HashMap<String, PythonObject>();
-		this.modmain = new PythonModule(newRawModule("__main__"));
+		this.helpers.put("import", pyEval("__import__"));
+		this.modmain = importModule("__main__");
 		
-		PythonObject importer = pyEval("__import__");
-		PythonModule modjnupy = (PythonModule)importer.call("jnupy");
-		PythonModule modbuiltins = (PythonModule)importer.call("builtins");
+		PythonModule modjnupy = importModule("jnupy");
+		PythonModule modbuiltins = importModule("builtins");
 
 		// TODO: warp stdout, stdin, stderr...
 
@@ -126,10 +126,10 @@ public class PythonState extends PythonNativeState {
 		pyEval(loader).rawCall(load, modbuiltins);
 		
 		execute("def __raise__(exc):\n\traise exc");
-		helpers.put("raise", pyEval("__raise__"));
+		this.helpers.put("raise", pyEval("__raise__"));
 		execute("del __raise__");
 		
-		helpers.put("unbox", pyEval("lambda x: x"));
+		this.helpers.put("unbox", pyEval("lambda x: x"));
 		
 		modjnupy.set(new NamedJavaFun1("abspath") {
 			@Override
@@ -204,6 +204,8 @@ public class PythonState extends PythonNativeState {
 		// other thing should override also, example: map.
 	}
 	
+	// TODO: execute code for __main__ module? (and never call again...?)
+	
 	public void execute(String code) throws PythonException {
 		PythonObject func = jnupy_code_compile(code, PythonParseInputKind.MP_PARSE_FILE_INPUT);
 		func.invoke();
@@ -232,8 +234,16 @@ public class PythonState extends PythonNativeState {
 		return jnupy_module_new(name);
 	}
 	
+	public PythonModule importModule(String name) throws PythonException {
+		return (PythonModule)this.helpers.get("import").call(name);
+	}
+	
 	public PythonModule getMainModule() {
 		return this.modmain;
+	}
+	
+	public PythonObject getBuiltin(String name) {
+		return this.builtins.get(name);
 	}
 	
 	private File resolvePath(String path) {

@@ -155,7 +155,7 @@ print-jni: $(PROGJAR)
 	$(JAVAP) -cp $(PROGJAR) -s org.micropython.jnupy.PythonNativeState
 
 vaild-jni: $(PROGJAR)
-	MICROPYTHON_LIB=$(abspath $(PROG)) $(JAVA) -cp $(PROGJAR) org.micropython.jnupy.PythonNativeState
+	$(Q)MICROPYTHON_LIB=$(abspath $(PROG)) $(JAVA) -cp $(PROGJAR) org.micropython.jnupy.PythonNativeState
 
 test: $(PROG) $(PROGJAR) ../tests/run-tests
 	$(eval DIRNAME=$(notdir $(CURDIR)))
