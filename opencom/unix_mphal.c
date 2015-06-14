@@ -87,10 +87,10 @@ void mp_hal_stdio_mode_raw(void) {
     tcgetattr(0, &orig_termios);
     static struct termios termios;
     termios = orig_termios;
+    // TODO: flag setting...
     termios.c_iflag = (termios.c_iflag & ~(BRKINT | INPCK | ISTRIP | IXON)) | ICRNL;
     termios.c_cflag = (termios.c_cflag & ~(CSIZE | PARENB)) | CS8;
-    termios.c_lflag = (termios.c_cflag & ~(ICANON)) | (ISIG | ECHO | ECHOE | ECHOCTL);
-    termios.c_cc[VINTR] = 0;
+    termios.c_lflag = (termios.c_lflag & ~(ICANON)) | ECHOPRT;
     termios.c_cc[VMIN] = 1;
     termios.c_cc[VEOF] = 1;
     termios.c_cc[VTIME] = 0;
