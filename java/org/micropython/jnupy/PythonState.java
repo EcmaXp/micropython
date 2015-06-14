@@ -140,7 +140,7 @@ public class PythonState extends PythonNativeState {
 			}
 		});
 		
-		modjnupy.set(new NamedJavaFun0("input") {
+		modjnupy.set(new NamedJavaFun0("javainput") {
 			@Override
 			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
 				Console c = System.console();

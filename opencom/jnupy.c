@@ -80,6 +80,10 @@ THE SOFTWARE.
 #include "py/statectrl.h"
 #include "genhdr/mpversion.h"
 
+#include "input.h"
+#include MICROPY_HAL_H
+
+
 /** BUILD LIMITER **/
 #if !MICROPY_MULTI_STATE_CONTEXT
 #error jnupy require MICROPY_MULTI_STATE_CONTEXT
@@ -1089,10 +1093,12 @@ mp_obj_t jnupy_obj_j2py(jobject obj) {
         jint val = JNUPY_CALL(CallIntMethod, obj, JMETHOD(Integer, intValue));
 
         return mp_obj_new_int(val);
+    #if MICROPY_LONGINT_IMPL == MICROPY_LONGINT_IMPL_LONGLONG
     } else if (IsInstanceOf(obj, JCLASS(Long))) {
         jlong val = JNUPY_CALL(CallLongMethod, obj, JMETHOD(Long, longValue));
 
         return mp_obj_new_int_from_ll(val);
+    #endif
     } else if (IsInstanceOf(obj, JCLASS(Float))) {
         jfloat val = JNUPY_CALL(CallFloatMethod, obj, JMETHOD(Float, floatValue));
 
@@ -1160,12 +1166,14 @@ jobject jnupy_obj_py2j(mp_obj_t obj) {
 
         jobject jobj = JNUPY_CALL(NewObject, JCLASS(Integer), JMETHOD(Integer, INIT), val);
         return jobj;
+    #if MICROPY_LONGINT_IMPL == MICROPY_LONGINT_IMPL_LONGLONG
     } else if (MP_OBJ_IS_INT(obj)) {
         mp_obj_int_t *intobj = obj;
         long long val = intobj->val;
 
         jobject jobj = JNUPY_CALL(NewObject, JCLASS(Long), JMETHOD(Long, INIT), val);
         return jobj;
+    #endif
     } else if (MP_OBJ_IS_TYPE(obj, &mp_type_float)) {
         mp_float_t val = mp_obj_get_float(obj);
 
@@ -1519,6 +1527,35 @@ STATIC mp_obj_t mod_jnupy_get_version(mp_obj_t nameobj) {
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_jnupy_get_version_obj, mod_jnupy_get_version);
 
+STATIC mp_obj_t mod_jnupy_input(uint n_args, const mp_obj_t *args) {
+    if (n_args == 1) {
+        mp_obj_print(args[0], PRINT_STR);
+    }
+
+    char *line = NULL;
+
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) == 0) {
+        mp_hal_set_interrupt_char(CHAR_CTRL_C);
+
+        line = prompt("");
+
+        nlr_pop();
+    } else {
+        mp_hal_set_interrupt_char(-1);
+        nlr_raise(nlr.ret_val);
+    }
+
+    if (line == NULL) {
+        nlr_raise(mp_obj_new_exception(&mp_type_EOFError));
+    }
+    mp_obj_t o = mp_obj_new_str(line, strlen(line), false);
+    free(line);
+    return o;
+}
+
+MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_jnupy_input_obj, 0, 1, mod_jnupy_input);
+
 STATIC const mp_map_elem_t mp_module_ujnupy_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_micropython) },
     { MP_OBJ_NEW_QSTR(MP_QSTR_JObject), (mp_obj_t)&mp_type_jobject },
@@ -1529,6 +1566,7 @@ STATIC const mp_map_elem_t mp_module_ujnupy_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_builtin_modules), (mp_obj_t)&mp_builtin_module_dict },
     { MP_OBJ_NEW_QSTR(MP_QSTR_get_loaded_modules), (mp_obj_t)&mod_jnupy_get_loaded_modules_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_get_version), (mp_obj_t)&mod_jnupy_get_version_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_input), (mp_obj_t)&mod_jnupy_input_obj },
 };
 
 STATIC MP_DEFINE_CONST_DICT(mp_module_ujnupy_globals, mp_module_ujnupy_globals_table);
@@ -1644,6 +1682,11 @@ JNUPY_FUNC_DEF(jboolean, jnupy_1state_1new)
         mp_obj_module_t *module_jnupy = mp_obj_new_module(MP_QSTR_jnupy);
         mp_obj_dict_t *module_jnupy_dict = mp_call_function_0(mp_load_attr(mp_module_ujnupy.globals, MP_QSTR_copy));
         module_jnupy->globals = module_jnupy_dict;
+
+        #ifndef _WIN32
+        // create keyboard interrupt object
+        MP_STATE_VM(keyboard_interrupt_obj) = mp_obj_new_exception(&mp_type_KeyboardInterrupt);
+        #endif
 
         mp_state_store(state);
         JNUPY_CALL(SetLongField, JNUPY_SELF, JFIELD(PythonNativeState, mpState), (mp_uint_t)state);

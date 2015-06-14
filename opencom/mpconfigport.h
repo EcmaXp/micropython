@@ -163,10 +163,14 @@ extern const struct _mp_obj_fun_builtin_t mp_builtin_open_obj;
 // So, gc can scan pyref linked list.
 #if MICROPY_BUILD_JNI_LIBRARY
 #define MICROPY_PORT_ROOT_POINTERS \
-    mp_obj_t jnupy_last_pyref;
+    mp_obj_t jnupy_last_pyref; \
+    mp_obj_t keyboard_interrupt_obj;
 #else
-#define MICROPY_PORT_ROOT_POINTERS
+#define MICROPY_PORT_ROOT_POINTERS \
+    mp_obj_t keyboard_interrupt_obj;
 #endif
+
+#define MICROPY_HAL_H "unix/unix_mphal.h"
 
 // We need to provide a declaration/definition of alloca()
 #ifdef __FreeBSD__

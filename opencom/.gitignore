@@ -4,3 +4,4 @@ libmicropython
 jnupy.ap.c
 micropython.jar
 hs_err_pid*.log
+setupenv.sh

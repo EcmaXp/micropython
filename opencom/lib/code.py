@@ -78,13 +78,15 @@ def interact(banner=None, readfunc=None, local=None):
         try:
             code = readfunc(">>> ")
         except EOFError:
-            return
-        
+            print()
+            continue
+
         while mp_repl_continue_with_input(code):
             try:
                 code += "\n" + readfunc("... ") 
             except EOFError:
-                return
+                print()
+                continue
     
         try:
             fun = compile(code, "<stdin>", "single")

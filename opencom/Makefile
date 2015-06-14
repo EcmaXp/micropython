@@ -130,6 +130,8 @@ SRC_C = \
 	jnupy.c \
 	gccollect.c \
 	file.c \
+	input.c \
+	unix_mphal.c \
 	$(SRC_MOD)
 
 OBJ = $(PY_O) $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
