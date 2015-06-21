@@ -175,7 +175,11 @@ mp_code_state *mp_obj_fun_bc_prepare_codestate(mp_obj_t self_in, mp_uint_t n_arg
     mp_code_state *code_state;
     code_state = m_new_obj_var_maybe(mp_code_state, byte, state_size);
     if (!code_state) {
-        return NULL;
+        #if MICROPY_STACKLESS_STRICT
+            mp_exc_recursion_depth();
+        #else
+            return NULL;
+        #endif
     }
 
     code_state->n_state = n_state;

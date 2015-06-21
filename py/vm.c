@@ -1024,12 +1024,6 @@ unwind_jump:;
                             PUSH_CODE_STATE(new_state);
                             goto run_code_state;
                         }
-                        #if MICROPY_STACKLESS_STRICT
-                        else {
-                        deep_recursion_error:
-                            mp_exc_recursion_depth();
-                        }
-                        #endif
                     }
                     #endif
                     SET_TOP(mp_call_function_n_kw(*sp, unum & 0xff, (unum >> 8) & 0xff, sp + 1));
@@ -1058,11 +1052,6 @@ unwind_jump:;
                             PUSH_CODE_STATE(new_state);
                             goto run_code_state;
                         }
-                        #if MICROPY_STACKLESS_STRICT
-                        else {
-                            goto deep_recursion_error;
-                        }
-                        #endif
                     }
                     #endif
                     SET_TOP(mp_call_method_n_kw_var(false, unum, sp));
@@ -1089,11 +1078,6 @@ unwind_jump:;
                             PUSH_CODE_STATE(new_state);
                             goto run_code_state;
                         }
-                        #if MICROPY_STACKLESS_STRICT
-                        else {
-                            goto deep_recursion_error;
-                        }
-                        #endif
                     }
                     #endif
                     SET_TOP(mp_call_method_n_kw(unum & 0xff, (unum >> 8) & 0xff, sp));
@@ -1123,11 +1107,6 @@ unwind_jump:;
                             PUSH_CODE_STATE(new_state);
                             goto run_code_state;
                         }
-                        #if MICROPY_STACKLESS_STRICT
-                        else {
-                            goto deep_recursion_error;
-                        }
-                        #endif
                     }
                     #endif
                     SET_TOP(mp_call_method_n_kw_var(true, unum, sp));
