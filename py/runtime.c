@@ -942,6 +942,11 @@ STATIC mp_obj_t checked_fun_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n
 
 #if MICROPY_STACKLESS_EXTRA
 STATIC mp_obj_t checked_fun_flatcall(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+    mp_flatcall_fun_t flatcall = mp_obj_get_type(self->fun)->flatcall;
+    if (flatcall == NULL) {
+        return NULL;
+    }
+    
     mp_obj_checked_fun_t *self = self_in;
     if (n_args > 0) {
         const mp_obj_type_t *arg0_type = mp_obj_get_type(args[0]);
@@ -956,12 +961,7 @@ STATIC mp_obj_t checked_fun_flatcall(mp_obj_t self_in, mp_uint_t n_args, mp_uint
         }
     }
     
-    mp_flatcall_fun_t flatcall = mp_obj_get_type(self->fun)->flatcall;
-    if (flatcall != NULL) {
-        return flatcall(self->fun, n_args, n_kw, args);
-    } else {
-        return NULL;
-    }
+    return flatcall(self->fun, n_args, n_kw, args);
 }
 #endif
 
