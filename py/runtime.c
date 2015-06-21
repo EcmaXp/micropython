@@ -940,10 +940,38 @@ STATIC mp_obj_t checked_fun_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n
     return mp_call_function_n_kw(self->fun, n_args, n_kw, args);
 }
 
+#if MICROPY_STACKLESS_EXTRA
+STATIC mp_obj_t checked_fun_flatcall(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+    mp_obj_checked_fun_t *self = self_in;
+    if (n_args > 0) {
+        const mp_obj_type_t *arg0_type = mp_obj_get_type(args[0]);
+        if (arg0_type != self->type) {
+            if (MICROPY_ERROR_REPORTING != MICROPY_ERROR_REPORTING_DETAILED) {
+                nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError,
+                    "argument has wrong type"));
+            } else {
+                nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError,
+                    "argument should be a '%q' not a '%q'", self->type->name, arg0_type->name));
+            }
+        }
+    }
+    
+    mp_flatcall_fun_t flatcall = mp_obj_get_type(self->fun)->flatcall;
+    if (flatcall != NULL) {
+        return flatcall(self->fun, n_args, n_kw, args);
+    } else {
+        return NULL;
+    }
+}
+#endif
+
 STATIC const mp_obj_type_t mp_type_checked_fun = {
     { &mp_type_type },
     .name = MP_QSTR_function,
     .call = checked_fun_call,
+#if MICROPY_STACKLESS_EXTRA
+    .flatcall = checked_fun_flatcall,
+#endif
 };
 
 STATIC mp_obj_t mp_obj_new_checked_fun(const mp_obj_type_t *type, mp_obj_t fun) {
