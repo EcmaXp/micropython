@@ -178,6 +178,64 @@ For example::
     
        Dump the WIZnet5x00 registers.  Useful for debugging.
 
+.. only:: port_esp8266
+
+    class WLAN
+    ==========
+
+    .. _network.WLAN:
+
+    This class provides a driver for WiFi network processor in the ESP8266.  Example usage::
+
+        import network
+        # setup as a station
+        nic = network.WLAN()
+        nic.connect('your-ssid', 'your-password')
+        # now use socket as usual
+
+    Constructors
+    ------------
+    .. class:: WLAN()
+
+    Create a WLAN driver object.
+
+    Methods
+    -------
+
+    .. method:: wlan.connect(ssid, password)
+
+        Connect to the specified wireless network, using the specified password.
+
+    .. method:: wlan.disconnect()
+
+        Disconnect from the currently connected wireless network.
+
+    .. method:: wlan.scan(cb)
+
+        Initiate scanning for the available wireless networks.
+
+        Scanning is only possible if the radio is in station or station+AP mode; if
+        called while in AP only mode, an OSError exception will be raised.
+
+        Once the scanning is complete, the provided callback function ``cb`` will
+        be called once for each network found, and passed a tuple with information
+        about that network:
+
+            (ssid, bssid, channel, RSSI, authmode, hidden)
+
+        There are five values for authmode:
+
+            * 0 -- open
+            * 1 -- WEP
+            * 2 -- WPA-PSK
+            * 3 -- WPA2-PSK
+            * 4 -- WPA/WPA2-PSK
+
+        and two for hidden:
+
+            * 0 -- visible
+            * 1 -- hidden
+
 .. only:: port_wipy
 
     class WLAN
