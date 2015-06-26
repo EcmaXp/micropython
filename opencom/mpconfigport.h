@@ -66,13 +66,13 @@
 #define MICROPY_PY_SYS_EXIT         (1)
 #define MICROPY_PY_SYS_PLATFORM     "jnupy"
 #define MICROPY_PY_SYS_MAXSIZE      (1)
-#define MICROPY_PY_SYS_STDFILES     (0) // Default: 1
+#define MICROPY_PY_SYS_STDFILES     (0) // TODO: jnupy with stdout (lazy) (Default: 1)
 #define MICROPY_PY_SYS_EXC_INFO     (1)
 #define MICROPY_PY_COLLECTIONS_ORDEREDDICT (1)
 #define MICROPY_PY_MATH_SPECIAL_FUNCTIONS (1)
 #define MICROPY_PY_CMATH            (1)
-#define MICROPY_PY_IO               (1) // TODO: jnupy with stdout (lazy) (Default: 1)
-#define MICROPY_PY_IO_FILEIO        (1) // TODO: jnupy with stdout (lazy) (Default: 1)
+#define MICROPY_PY_IO               (1) // TODO: jnupy open file (lazy) (Default: 1)
+#define MICROPY_PY_IO_FILEIO        (0) // TODO: jnupy with stdout (lazy) (Default: 1)
 #define MICROPY_PY_GC_COLLECT_RETVAL (1)
 #define MICROPY_MODULE_FROZEN       (0) // Default: 1
 
@@ -157,20 +157,16 @@ typedef void *machine_ptr_t; // must be of pointer size
 typedef const void *machine_const_ptr_t; // must be of pointer size
 
 extern const struct _mp_obj_fun_builtin_t mp_builtin_open_obj;
-#define MICROPY_PORT_BUILTINS \
-    { MP_OBJ_NEW_QSTR(MP_QSTR_open), (mp_obj_t)&mp_builtin_open_obj },
+
+#define MICROPY_PORT_BUILTINS
 
 // So, gc can scan pyref linked list.
 #if MICROPY_BUILD_JNI_LIBRARY
 #define MICROPY_PORT_ROOT_POINTERS \
-    mp_obj_t jnupy_last_pyref; \
-    mp_obj_t keyboard_interrupt_obj;
+    mp_obj_t jnupy_last_pyref;
 #else
-#define MICROPY_PORT_ROOT_POINTERS \
-    mp_obj_t keyboard_interrupt_obj;
+#define MICROPY_PORT_ROOT_POINTERS
 #endif
-
-#define MICROPY_HAL_H "unix/unix_mphal.h"
 
 // We need to provide a declaration/definition of alloca()
 #ifdef __FreeBSD__

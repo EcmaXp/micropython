@@ -140,7 +140,7 @@ public class PythonState extends PythonNativeState {
 			}
 		});
 		
-		modjnupy.set(new NamedJavaFun0("javainput") {
+		modjnupy.set(new NamedJavaFun0("input") {
 			@Override
 			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
 				Console c = System.console();
@@ -149,6 +149,7 @@ public class PythonState extends PythonNativeState {
 					return null;
 				}
 				
+				// TODO: how to handle Ctrl-C or Ctrl-D;
 				return c.readLine();
 			}
 		});

@@ -80,10 +80,6 @@ THE SOFTWARE.
 #include "py/statectrl.h"
 #include "genhdr/mpversion.h"
 
-#include "input.h"
-#include MICROPY_HAL_H
-
-
 /** BUILD LIMITER **/
 #if !MICROPY_MULTI_STATE_CONTEXT
 #error jnupy require MICROPY_MULTI_STATE_CONTEXT
@@ -916,6 +912,50 @@ mp_lexer_t *mp_lexer_new_from_file(const char *filename) {
     return mp_lexer_new_from_str_len(qstr_from_str(filename), codestr, codelen, codelen);
 }
 
+#if MICROPY_PY_IO
+// check unix/file.c
+
+STATIC mp_uint_t jnupy_stdout_write(mp_obj_t self_in, const void *buf, mp_uint_t len, int *errcode) {
+    (void)errcode;
+    assert(mp_sys_stdout_obj == self_in);
+    jnupy_print_strn((const char *)buf, len);
+    return len;
+}
+
+STATIC const mp_stream_p_t jnupy_stdout_stream_p = {
+    .write = jnupy_stdout_write,
+    .is_text = true,
+};
+
+const mp_obj_type_t mp_type_jnupy_stdout = {
+    { &mp_type_type },
+    .stream_p = &jnupy_stdout_stream_p,
+};
+
+typedef struct _mp_type_jnupy_stdout_t {
+    mp_obj_base_t base;
+} mp_type_jnupy_stdout_t;
+
+const mp_type_jnupy_stdout_t mp_sys_stdout_obj = {{&mp_type_jnupy_stdout}};
+
+#if MICROPY_PY_IO_FILEIO
+// mp_type_fileio;
+// mp_type_textio;
+
+// mp_sys_stdin_obj
+// mp_sys_stdout_obj
+// mp_sys_stderr_obj
+#endif // MICROPY_PY_IO_FILEIO
+
+mp_obj_t mp_builtin_open(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
+    // TODO: get JNUPY_PY_JSTATE and call it.
+    // ...
+    nlr_raise(mp_obj_new_exception_msg(&mp_type_JavaError, "builtin open are not override. (by java side)"));
+}
+
+MP_DEFINE_CONST_FUN_OBJ_KW(mp_builtin_open_obj, 0, mp_builtin_open);
+#endif // MICROPY_PY_IO
+
 /** JNUPY INTERNAL MODULE **/
 
 typedef struct _jnupy_jobj_t {
@@ -1527,35 +1567,6 @@ STATIC mp_obj_t mod_jnupy_get_version(mp_obj_t nameobj) {
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_jnupy_get_version_obj, mod_jnupy_get_version);
 
-STATIC mp_obj_t mod_jnupy_input(uint n_args, const mp_obj_t *args) {
-    if (n_args == 1) {
-        mp_obj_print(args[0], PRINT_STR);
-    }
-
-    char *line = NULL;
-
-    nlr_buf_t nlr;
-    if (nlr_push(&nlr) == 0) {
-        mp_hal_set_interrupt_char(CHAR_CTRL_C);
-
-        line = prompt("");
-
-        nlr_pop();
-    } else {
-        mp_hal_set_interrupt_char(-1);
-        nlr_raise(nlr.ret_val);
-    }
-
-    if (line == NULL) {
-        nlr_raise(mp_obj_new_exception(&mp_type_EOFError));
-    }
-    mp_obj_t o = mp_obj_new_str(line, strlen(line), false);
-    free(line);
-    return o;
-}
-
-MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_jnupy_input_obj, 0, 1, mod_jnupy_input);
-
 STATIC const mp_map_elem_t mp_module_ujnupy_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_micropython) },
     { MP_OBJ_NEW_QSTR(MP_QSTR_JObject), (mp_obj_t)&mp_type_jobject },
@@ -1566,7 +1577,6 @@ STATIC const mp_map_elem_t mp_module_ujnupy_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_builtin_modules), (mp_obj_t)&mp_builtin_module_dict },
     { MP_OBJ_NEW_QSTR(MP_QSTR_get_loaded_modules), (mp_obj_t)&mod_jnupy_get_loaded_modules_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_get_version), (mp_obj_t)&mod_jnupy_get_version_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_input), (mp_obj_t)&mod_jnupy_input_obj },
 };
 
 STATIC MP_DEFINE_CONST_DICT(mp_module_ujnupy_globals, mp_module_ujnupy_globals_table);
@@ -1682,11 +1692,6 @@ JNUPY_FUNC_DEF(jboolean, jnupy_1state_1new)
         mp_obj_module_t *module_jnupy = mp_obj_new_module(MP_QSTR_jnupy);
         mp_obj_dict_t *module_jnupy_dict = mp_call_function_0(mp_load_attr(mp_module_ujnupy.globals, MP_QSTR_copy));
         module_jnupy->globals = module_jnupy_dict;
-
-        #ifndef _WIN32
-        // create keyboard interrupt object
-        MP_STATE_VM(keyboard_interrupt_obj) = mp_obj_new_exception(&mp_type_KeyboardInterrupt);
-        #endif
 
         mp_state_store(state);
         JNUPY_CALL(SetLongField, JNUPY_SELF, JFIELD(PythonNativeState, mpState), (mp_uint_t)state);
