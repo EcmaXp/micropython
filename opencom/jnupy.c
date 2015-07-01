@@ -939,6 +939,8 @@ typedef struct _mp_type_jnupy_stdout_t {
 const mp_type_jnupy_stdout_t mp_sys_stdout_obj = {{&mp_type_jnupy_stdout}};
 
 #if MICROPY_PY_IO_FILEIO
+// TODO: JavaStream in java-jnupy?
+
 // mp_type_fileio;
 // mp_type_textio;
 
