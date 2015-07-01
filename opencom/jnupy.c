@@ -1172,8 +1172,7 @@ mp_obj_t jnupy_obj_j2py(jobject obj) {
             pobj = mp_obj_new_bytes((byte *)buf, arrsize);
         }
 
-        JNUPY_CALL(ReleaseByteArrayElements, bytearr, NULL, 0);
-		free(buf);
+        JNUPY_CALL(ReleaseByteArrayElements, bytearr, buf, 0);
 
         return pobj;
     } else if (0) {

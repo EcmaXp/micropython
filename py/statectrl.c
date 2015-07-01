@@ -56,12 +56,7 @@ void mp_state_load_raw(mp_state_ctx_t *state) {
     // current state
     mp_state_ctx = state;
     
-	// !!! NEVER COMMENT THIS !!!
-	// ONLY FOCUS ON PYTHON CODE, NOT C!
-	// TODO: jnupy.c should handle state correctly! (and nlr_gk also!)
-
-    // assert(!MP_STATE_VM(is_state_loaded));
-
+    assert(!MP_STATE_VM(is_state_loaded));
     MP_STATE_VM(is_state_loaded) = true;
 }
 
