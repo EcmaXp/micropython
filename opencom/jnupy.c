@@ -61,6 +61,8 @@ THE SOFTWARE.
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "mpconfigport.h"
+
 #include "py/bc.h"
 #include "py/builtin.h"
 #include "py/compile.h"
@@ -917,7 +919,7 @@ mp_lexer_t *mp_lexer_new_from_file(const char *filename) {
 
 STATIC mp_uint_t jnupy_stdout_write(mp_obj_t self_in, const void *buf, mp_uint_t len, int *errcode) {
     (void)errcode;
-    assert(mp_sys_stdout_obj == self_in);
+    // assert(mp_sys_stdout_obj == self_in);
     jnupy_print_strn((const char *)buf, len);
     return len;
 }

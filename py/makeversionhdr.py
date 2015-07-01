@@ -54,7 +54,7 @@ def get_version_info_from_git():
     return git_tag, git_hash, ver
 
 def get_version_info_from_docs_conf():
-    with open("%s/docs/conf.py" % sys.argv[0].rsplit("/", 2)[0]) as f:
+    with open(os.path.abspath("%s/docs/conf.py" % os.path.abspath(sys.argv[0])).rsplit(os.sep, 2)[0]) as f:
         for line in f:
             if line.startswith("release = '"):
                 ver = line.strip()[10:].strip("'")
@@ -70,7 +70,8 @@ def make_version_header(filename):
     info = get_version_info_from_git()
     if info is None:
         info = get_version_info_from_docs_conf()
-
+        if info is None:
+            info = "v0.0.0-000-deadbeef-unknown", "<no hash>", ("0", "0", "0")
     git_tag, git_hash, ver = info
 
     # Generate the file with the git and version info

@@ -19,7 +19,7 @@
   <Target Name="MakeQstrData" DependsOnTargets="MakeDestDir">
     <PropertyGroup>
       <PreProc>$(DestDir)qstrdefs.preprocessed.h</PreProc>
-      <QstrDefs>$(PyBaseDir)unix\qstrdefsport.h</QstrDefs>
+      <QstrDefs>$(PyBaseDir)opencom\qstrdefsport.h</QstrDefs>
       <DestFile>$(DestDir)qstrdefs.generated.h</DestFile>
       <TmpFile>$(DestFile).tmp</TmpFile>
     </PropertyGroup>
@@ -27,7 +27,7 @@
       <PyIncDirs Include="$(PyIncDirs)"/>
     </ItemGroup>
     <Exec Command="cl /nologo /I@(PyIncDirs, ' /I') /Fi$(PreProc) /P $(PySrcDir)qstrdefs.h"/>
-    <Exec Command="python $(PySrcDir)makeqstrdata.py $(PreProc) $(QstrDefs) > $(TmpFile)"/>
+    <Exec Command="py $(PySrcDir)makeqstrdata.py $(PreProc) $(QstrDefs) > $(TmpFile)"/>
     <MSBuild Projects="$(MSBuildThisFileFullPath)" Targets="CopyFileIfDifferent" Properties="SourceFile=$(TmpFile);DestFile=$(DestFile)"/>
   </Target>
 
@@ -36,7 +36,7 @@
       <DestFile>$(DestDir)mpversion.h</DestFile>
       <TmpFile>$(DestFile).tmp</TmpFile>
     </PropertyGroup>
-    <Exec Command="python $(PySrcDir)makeversionhdr.py $(TmpFile)"/>
+    <Exec Command="py $(PySrcDir)makeversionhdr.py $(TmpFile)"/>
     <MSBuild Projects="$(MSBuildThisFileFullPath)" Targets="CopyFileIfDifferent" Properties="SourceFile=$(TmpFile);DestFile=$(DestFile)"/>
   </Target>
 

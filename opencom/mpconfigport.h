@@ -24,6 +24,16 @@
  * THE SOFTWARE.
  */
 
+// TODO: crash with windows/mpconfigport.h
+
+// for windows only
+#if defined( _WIN32 ) | defined( _WIN64 )
+#define MICROPY_MULTI_STATE_CONTEXT (1)
+#define MICROPY_NLR_SETJMP			(1)
+#define MICROPY_OVERRIDE_ASSERT_FAIL (1) // ...
+#define MICROPY_PY_BUILTINS_FLOAT	(1)
+#endif
+
 // for OpenComptuers
 #define MICROPY_BUILD_JNI_LIBRARY   (1)
 #define MICROPY_ALLOW_PAUSE_VM      (1)
@@ -32,7 +42,6 @@
 #define MICROPY_PY_COMPILE_SINGLE_WITH_REPL (1)
 
 // options to control how Micro Python is built
-#define MICROPY_ALLOC_PATH_MAX      (PATH_MAX)
 #define MICROPY_COMP_MODULE_CONST   (1)
 #define MICROPY_COMP_TRIPLE_TUPLE_ASSIGN (1)
 #define MICROPY_ENABLE_GC           (1)
@@ -48,7 +57,6 @@
 #define MICROPY_FLOAT_IMPL          (MICROPY_FLOAT_IMPL_DOUBLE)
 #define MICROPY_LONGINT_IMPL        (MICROPY_LONGINT_IMPL_LONGLONG) // Default: MICROPY_LONGINT_IMPL_MPZ
 #define MICROPY_STREAMS_NON_BLOCK   (1)
-#define MICROPY_OPT_COMPUTED_GOTO   (1) // Default: 1
 #define MICROPY_OPT_CACHE_MAP_LOOKUP_IN_BYTECODE (1) // Default: 1
 #define MICROPY_CAN_OVERRIDE_BUILTINS (1)
 #define MICROPY_PY_FUNCTION_ATTRS   (1)
@@ -97,6 +105,9 @@
 #define MICROPY_ENABLE_EMERGENCY_EXCEPTION_BUF   (1)
 #define MICROPY_EMERGENCY_EXCEPTION_BUF_SIZE  (256)
 
+#define MICROPY_PORT_INIT_FUNC      init()
+#define MICROPY_PORT_DEINIT_FUNC    deinit()
+
 // Porting Program's internal modules.
 extern const struct _mp_obj_module_t mp_module_msgpack;
 extern const struct _mp_obj_module_t mp_module_microthread;
@@ -129,22 +140,49 @@ extern const struct _mp_obj_module_t mp_module_ujnupy;
     MICROPY_PY_JNUPY_DEF \
     MICROPY_PY_MSGPACK_DEF \
     MICROPY_PY_MICROTHREAD_DEF \
-    MICROPY_PY_PERSIST_DEF \
-    {}
+    MICROPY_PY_PERSIST_DEF
 
 // type definitions for the specific machine
 
-#ifdef __LP64__
+#if defined ( _MSC_VER ) && defined( _WIN64 )
+typedef __int64 mp_int_t;
+typedef unsigned __int64 mp_uint_t;
+#define MP_WIN
+#elif defined( __LP64__ )
 typedef long mp_int_t; // must be pointer size
 typedef unsigned long mp_uint_t; // must be pointer size
+
+#if defined ( __MINGW32__ )
+	#define MP_WIN
+#else
+	#define MP_NWIN
+#endif
 #else
 // These are definitions for machines where sizeof(int) == sizeof(void*),
 // regardless for actual size.
 typedef int mp_int_t; // must be pointer size
 typedef unsigned int mp_uint_t; // must be pointer size
+#define MP_NWIN
+#endif
+
+#ifdef MP_WIN
+#define MICROPY_OPT_COMPUTED_GOTO   (0) // Default: 1
+#else
+#define MICROPY_OPT_COMPUTED_GOTO   (1) // Default: 1
 #endif
 
 #define BYTES_PER_WORD sizeof(mp_int_t)
+
+#ifdef MP_WIN
+// Just assume Windows is little-endian - mingw32 gcc doesn't
+// define standard endianness macros.
+#define MP_ENDIANNESS_LITTLE (1)
+#endif
+
+#ifdef MP_WIN
+#define THREAD __declspec(thread)
+#define NORETURN __declspec(noreturn)
+#endif
 
 // Cannot include <sys/types.h>, as it may lead to symbol name clashes
 #if _FILE_OFFSET_BITS == 64 && !defined(__LP64__)
@@ -169,10 +207,55 @@ extern const struct _mp_obj_fun_builtin_t mp_builtin_open_obj;
 #endif
 
 // We need to provide a declaration/definition of alloca()
-#ifdef __FreeBSD__
+#if defined( MP_WIN )
+#include <malloc.h>
+#elif defined( __FreeBSD__ )
 #include <stdlib.h>
 #else
 #include <alloca.h>
+#endif
+
+// MSVC specifics
+#ifdef _MSC_VER
+
+// Sanity check
+
+#if ( _MSC_VER < 1800 )
+#error Can only build with Visual Studio 2013 toolset
+#endif
+
+
+// CL specific overrides from mpconfig
+
+#define NORETURN                    __declspec(noreturn)
+#define MP_LIKELY(x)                (x)
+#define MP_UNLIKELY(x)              (x)
+#define MICROPY_PORT_CONSTANTS      { "dummy", 0 } //can't have zero-sized array
+#ifdef _WIN64
+#define MP_SSIZE_MAX                _I64_MAX
+#else
+#define MP_SSIZE_MAX                _I32_MAX
+#endif
+
+
+// CL specific definitions
+
+#define restrict
+#define inline                      __inline
+#define alignof(t)                  __alignof(t)
+#define STDIN_FILENO                0
+#define STDOUT_FILENO               1
+#define STDERR_FILENO               2
+#define PATH_MAX                    MICROPY_ALLOC_PATH_MAX
+#define S_ISREG(m)                  (((m) & S_IFMT) == S_IFREG)
+#define S_ISDIR(m)                  (((m) & S_IFMT) == S_IFDIR)
+
+
+// System headers (needed e.g. for nlr.h)
+
+#include <stddef.h> //for NULL
+#include <assert.h> //for assert
+
 #endif
 
 #define MP_PLAT_PRINT_STRN(str, len) jnupy_print_strn(str, len)
