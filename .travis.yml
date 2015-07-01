@@ -9,6 +9,7 @@ before_script:
   - sudo apt-get update -qq
   #[OPENCOM-ONLY]#- sudo apt-get install -y python3.4 python3 gcc-4.7 gcc-multilib gcc-arm-none-eabi qemu-system mingw32
   - sudo apt-get install -y python3.4 python3 gcc-4.7 gcc-multilib
+  - sudo apt-get install -y libmsgpack-dev libmsgpack3
   # For teensy build
   - sudo apt-get install realpath
   # For coverage testing

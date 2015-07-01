@@ -5,7 +5,7 @@
 MICROPY_FORCE_32BIT = 0
 
 # Subset of msgpack module
-MICROPY_PY_MSGPACK = 0
+MICROPY_PY_MSGPACK = 1
 
 # Subset of persist module
 MICROPY_PY_PERSIST = 1
