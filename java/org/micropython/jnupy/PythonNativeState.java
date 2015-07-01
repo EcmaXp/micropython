@@ -40,15 +40,12 @@ public class PythonNativeState {
 	public static final int MEMORY_SCALE;
 	static {
 		String model = System.getProperty("sun.arch.data.model");
-		switch (model) {
-			case "32":
-				MEMORY_SCALE = 1;
-				break;
-			case "64":
-				MEMORY_SCALE = 2;
-				break;
-			default:
-				MEMORY_SCALE = 1;
+		if (model.equals("32")) {
+			MEMORY_SCALE = 1;
+		} else if (model.equals("32")) {
+			MEMORY_SCALE = 2;		
+		} else {
+			MEMORY_SCALE = 1;
 		}
 	}
 	
