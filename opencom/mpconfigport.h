@@ -26,8 +26,14 @@
 
 // TODO: crash with windows/mpconfigport.h
 
+#if defined ( _MSC_VER ) || defined ( __MINGW32__ )
+#define MP_WIN
+#else
+#define MP_NWIN
+#endif
+
 // for windows only
-#if defined( _WIN32 ) | defined( _WIN64 )
+#ifdef MP_WIN
 #define MICROPY_MULTI_STATE_CONTEXT (1)
 #define MICROPY_NLR_SETJMP			(1)
 #define MICROPY_OVERRIDE_ASSERT_FAIL (1) // ...
@@ -105,8 +111,10 @@
 #define MICROPY_ENABLE_EMERGENCY_EXCEPTION_BUF   (1)
 #define MICROPY_EMERGENCY_EXCEPTION_BUF_SIZE  (256)
 
+#ifdef MP_WIN
 #define MICROPY_PORT_INIT_FUNC      init()
 #define MICROPY_PORT_DEINIT_FUNC    deinit()
+#endif
 
 // Porting Program's internal modules.
 extern const struct _mp_obj_module_t mp_module_msgpack;
@@ -143,26 +151,17 @@ extern const struct _mp_obj_module_t mp_module_ujnupy;
     MICROPY_PY_PERSIST_DEF
 
 // type definitions for the specific machine
-
 #if defined ( _MSC_VER ) && defined( _WIN64 )
 typedef __int64 mp_int_t;
 typedef unsigned __int64 mp_uint_t;
-#define MP_WIN
 #elif defined( __LP64__ )
 typedef long mp_int_t; // must be pointer size
 typedef unsigned long mp_uint_t; // must be pointer size
-
-#if defined ( __MINGW32__ )
-	#define MP_WIN
-#else
-	#define MP_NWIN
-#endif
 #else
 // These are definitions for machines where sizeof(int) == sizeof(void*),
 // regardless for actual size.
 typedef int mp_int_t; // must be pointer size
 typedef unsigned int mp_uint_t; // must be pointer size
-#define MP_NWIN
 #endif
 
 #ifdef MP_WIN
