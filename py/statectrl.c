@@ -56,7 +56,7 @@ void mp_state_load_raw(mp_state_ctx_t *state) {
     // current state
     mp_state_ctx = state;
     
-    assert(!MP_STATE_VM(is_state_loaded));
+    // assert(!MP_STATE_VM(is_state_loaded));
     MP_STATE_VM(is_state_loaded) = true;
 }
 

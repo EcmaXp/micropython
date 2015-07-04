@@ -35,7 +35,7 @@ void init() {
 #ifdef __MINGW32__
     putenv("PRINTF_EXPONENT_DIGITS=2");
 #else
-    _set_output_format(_TWO_DIGIT_EXPONENT);
+    // _set_output_format(_TWO_DIGIT_EXPONENT);
 #endif
 }
 
@@ -44,3 +44,4 @@ void deinit() {
         CloseHandle(hSleepEvent);
     }
 }
+

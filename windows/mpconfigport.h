@@ -23,8 +23,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-
+#include "opencom/mpconfigport.h"
+/*
 // options to control how Micro Python is built
+#error why?
 
 // Linking with GNU readline (MICROPY_USE_READLINE == 2) causes binary to be licensed under GPL
 #ifndef MICROPY_USE_READLINE
@@ -209,3 +211,4 @@ void msec_sleep(double msec);
 #include <assert.h> //for assert
 
 #endif
+*/

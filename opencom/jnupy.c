@@ -61,6 +61,8 @@ THE SOFTWARE.
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "mpconfigport.h"
+
 #include "py/bc.h"
 #include "py/builtin.h"
 #include "py/compile.h"
@@ -332,6 +334,8 @@ void jnupy_throw_jerror_auto() {
 JNUPY_AP(REF, START)
 // CLASS: [B
 JNUPY_REF_CLASS(CWUC3)
+// CLASS: [Ljava/lang/Object;
+JNUPY_REF_CLASS(CWN4U)
 // CLASS: java/io/ByteArrayInputStream
 JNUPY_REF_CLASS(CPYWG)
 // CLASS: java/io/ByteArrayOutputStream
@@ -534,6 +538,8 @@ JNUPY_AP(EXPORT)
 
 #define JCLASS_Object JNUPY_CLASS("java/lang/Object", CVNFN)
 
+#define JCLASS_ObjectArray JNUPY_CLASS("[Ljava/lang/Object;", CWN4U)
+
 #define JCLASS_Short JNUPY_CLASS("java/lang/Short", CMUMS)
 #define JMETHOD_Short_intValue JNUPY_METHOD("java/lang/Short", "intValue", "()I", ML5BW)
 
@@ -615,6 +621,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     // section for load (DO NOT MODIFY)
     JNUPY_AP(LOAD, START)
     JNUPY_LOAD_CLASS("[B", CWUC3)
+    JNUPY_LOAD_CLASS("[Ljava/lang/Object;", CWN4U)
     JNUPY_LOAD_CLASS("java/io/ByteArrayInputStream", CPYWG)
     JNUPY_LOAD_CLASS("java/io/ByteArrayOutputStream", CPITF)
     JNUPY_LOAD_CLASS("java/lang/AssertionError", CM4H2)
@@ -706,6 +713,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     // section for unload (DO NOT MODIFY)
     JNUPY_AP(UNLOAD, START)
     JNUPY_UNLOAD_CLASS("[B", CWUC3)
+    JNUPY_UNLOAD_CLASS("[Ljava/lang/Object;", CWN4U)
     JNUPY_UNLOAD_CLASS("java/io/ByteArrayInputStream", CPYWG)
     JNUPY_UNLOAD_CLASS("java/io/ByteArrayOutputStream", CPITF)
     JNUPY_UNLOAD_CLASS("java/lang/AssertionError", CM4H2)
@@ -923,7 +931,7 @@ mp_lexer_t *mp_lexer_new_from_file(const char *filename) {
 
 STATIC mp_uint_t jnupy_stdout_write(mp_obj_t self_in, const void *buf, mp_uint_t len, int *errcode) {
     (void)errcode;
-    assert(mp_sys_stdout_obj == self_in);
+    // assert(mp_sys_stdout_obj == self_in);
     jnupy_print_strn((const char *)buf, len);
     return len;
 }
@@ -1154,10 +1162,6 @@ mp_obj_t jnupy_obj_j2py(jobject obj) {
         jdouble val = JNUPY_CALL(CallDoubleMethod, obj, JMETHOD(Double, doubleValue));
 
         return mp_obj_new_float(val);
-    } else if (IsInstanceOf(obj, JCLASS(Double))) {
-        jdouble val = JNUPY_CALL(CallDoubleMethod, obj, JMETHOD(Double, doubleValue));
-
-        return mp_obj_new_float(val);
 	} else if (IsInstanceOf(obj, JCLASS(String))) {
 		const char *buf = JNUPY_CALL(GetStringUTFChars, obj, JNI_FALSE);
 		jsize bufsize = JNUPY_CALL(GetStringUTFLength, obj);
@@ -1175,9 +1179,19 @@ mp_obj_t jnupy_obj_j2py(jobject obj) {
         JNUPY_CALL(ReleaseByteArrayElements, obj, buf, 0);
 
         return pobj;
-    } else if (0) {
-        // TODO: handle array
-        // (Entry? no way...)
+    } else if (IsInstanceOf(obj, JCLASS(ObjectArray))) {
+		jsize arrsize = JNUPY_CALL(GetArrayLength, obj);
+		mp_obj_t *items = m_new(mp_obj_t, arrsize);
+
+		for (mp_uint_t i = 0; i < arrsize; i++) {
+			jobject node = JNUPY_CALL(GetObjectArrayElement, obj, i);
+			items[i] = jnupy_obj_j2py(node);
+		}
+
+		mp_obj_t pobj = mp_obj_new_tuple(arrsize, items);
+		m_free(items, sizeof(mp_obj_t) * arrsize);
+
+		return pobj;
     } else if (0) {
         // TODO: handle dictionary
     } else if (0) {
