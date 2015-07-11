@@ -357,7 +357,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_socket_gethostbyname_obj, mod_socket_gethos
 
 STATIC mp_obj_t mod_socket_getaddrinfo(mp_uint_t n_args, const mp_obj_t *args) {
     // TODO: Implement all args
-    assert(n_args == 2);
+    assert(n_args >= 2 && n_args <= 4);
     assert(MP_OBJ_IS_STR(args[0]));
 
     const char *host = mp_obj_str_get_str(args[0]);
@@ -367,9 +367,9 @@ STATIC mp_obj_t mod_socket_getaddrinfo(mp_uint_t n_args, const mp_obj_t *args) {
     // getaddrinfo accepts port in string notation, so however
     // it may seem stupid, we need to convert int to str
     if (MP_OBJ_IS_SMALL_INT(args[1])) {
-        int port = (short)MP_OBJ_SMALL_INT_VALUE(args[1]);
+        unsigned port = (unsigned short)MP_OBJ_SMALL_INT_VALUE(args[1]);
         char buf[6];
-        sprintf(buf, "%d", port);
+        sprintf(buf, "%u", port);
         serv = buf;
         hints.ai_flags = AI_NUMERICSERV;
 #ifdef __UCLIBC_MAJOR__
@@ -388,6 +388,13 @@ STATIC mp_obj_t mod_socket_getaddrinfo(mp_uint_t n_args, const mp_obj_t *args) {
 #endif
     } else {
         serv = mp_obj_str_get_str(args[1]);
+    }
+
+    if (n_args > 2) {
+        hints.ai_family = MP_OBJ_SMALL_INT_VALUE(args[2]);
+        if (n_args > 3) {
+            hints.ai_socktype = MP_OBJ_SMALL_INT_VALUE(args[3]);
+        }
     }
 
     struct addrinfo *addr_list;
