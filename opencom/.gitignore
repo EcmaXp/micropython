@@ -1,5 +1,4 @@
 build
-micropython
 libmicropython
 jnupy.ap.c
 micropython.jar

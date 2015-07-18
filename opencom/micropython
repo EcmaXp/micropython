@@ -1,0 +1,4 @@
+#!/bin/bash
+
+export MICROPYTHON_LIB=`realpath libmicropython.so`
+$JAVA_HOME/bin/java -jar micropython.jar ./main.py
