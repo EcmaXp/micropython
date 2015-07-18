@@ -799,8 +799,6 @@ bool jnupy_load_state(mp_state_ctx_t *state) {
         return false;
     }
 
-    mp_state_force_load(state);
-
     JNUPY_MP_STATE = state;
     return true;
 }
@@ -1623,12 +1621,17 @@ JNUPY_FUNC_DEF(jstring, jnupy_1mp_1version)
 #define _JNUPY_FUNC_BODY_START(_with_state, init_expr) \
     jnupy_setup_env(env, self); \
     bool with_state = _with_state; \
+    bool is_first_load = false; \
     bool has_exception = false; \
     void *stack_top = NULL; \
     nlr_buf_t *nlr_ptr = mp_nlr_top; \
     nlr_gk_buf_t _nlr_gk = nlr_gk_new(); \
     if (init_expr) { \
         if (with_state) { \
+            is_first_load = !mp_state_is_loaded(JNUPY_MP_STATE); \
+            if (is_first_load) { \
+                mp_state_load(JNUPY_MP_STATE); \
+            } \
             stack_top = MP_STATE_VM(stack_top); \
             mp_stack_ctrl_init(); \
         } \
@@ -1645,9 +1648,14 @@ JNUPY_FUNC_DEF(jstring, jnupy_1mp_1version)
     } \
     ret_stmt;
 
+// TODO: gc collect with java function call must be safe...
+
 #define _JNUPY_FUNC_BEFORE_RETURN \
-    if (with_state) { \
+    if (with_state && JNUPY_MP_STATE != NULL) { \
         MP_STATE_VM(stack_top) = stack_top; \
+        if (is_first_load) { \
+            mp_state_store(JNUPY_MP_STATE); \
+        } \
     } \
     if (!has_exception) { \
         (*JNUPY_ENV)->ExceptionClear(JNUPY_ENV); \
@@ -1759,6 +1767,7 @@ JNUPY_FUNC_DEF(void, jnupy_1state_1free)
     mp_state_store(JNUPY_MP_STATE);
 
     mp_state_free(JNUPY_MP_STATE);
+    JNUPY_MP_STATE = NULL;
 
     JNUPY_FUNC_END_VOID;
 }

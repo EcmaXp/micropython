@@ -279,8 +279,14 @@ void gc_collect_start(void) {
 
     #if MICROPY_MULTI_STATE_CONTEXT
     // Yes: mp_nlr_top is external value when MICROPY_MULTI_STATE_CONTEXT is enabled.
+    DEBUG_printf("GC drain mp_nlr_top=%p (multi state only)\n", mp_nlr_top);
     if (mp_nlr_top != NULL) {
         gc_collect_root((void**)(void*)mp_nlr_top, 1);
+    }
+    
+    DEBUG_printf("GC drain state=%p (multi state only)\n", MP_STATE_CTX_PTR);
+    if (MP_STATE_CTX_PTR == NULL) {
+        return;
     }
     #endif
     
@@ -475,9 +481,11 @@ void gc_free(void *ptr_in) {
             gc_dump_alloc_table();
             #endif
         } else {
+            DEBUG_printf("gc_free(%p) has bad free\n", ptr);
             assert(!"bad free");
         }
     } else if (ptr_in != NULL) {
+        DEBUG_printf("gc_free(%p) has bad free\n", ptr);
         assert(!"bad free");
     }
 }
