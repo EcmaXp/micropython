@@ -1619,13 +1619,13 @@ JNUPY_FUNC_DEF(jstring, jnupy_1mp_1version)
 // TODO: re-compute stack_limit for setuped stack_top...
 
 typedef struct _jnupy_func_stack_t {
-    bool with_state;
-    bool is_first_load;
-    bool has_exception;
-    bool before_return;
-    void *stack_top;
-    nlr_buf_t *nlr_ptr;
-    nlr_gk_buf_t _nlr_gk;
+    bool with_state; // if require fill JNUPY_MP_STATE
+    bool is_first_load; // false
+    bool has_exception; // false
+    bool before_return; // false
+    void *stack_top; // last MP_STATE_VM(stack_top)
+    nlr_buf_t *nlr_ptr; // last mp_nlr_top
+    nlr_gk_buf_t _nlr_gk; // new nlr_gk buf
 } jnupy_func_stack_t;
 
 void jnupy_func_stack_with_state(jnupy_func_stack_t *jfs) {
