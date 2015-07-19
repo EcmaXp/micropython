@@ -108,7 +108,7 @@ public class PythonObject {
     }
 
     public Object invoke(Object... args) throws PythonException {
-        return pythonState.jnupy_func_call(false, this, args);
+        return pythonState.jnupy_func_call(true, this, args);
     }
 
     public PythonObject call(Object... args) throws PythonException {
