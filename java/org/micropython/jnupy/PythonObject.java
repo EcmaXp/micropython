@@ -87,7 +87,7 @@ public class PythonObject {
 
     private Object rawhelper(String name, Object... args) throws PythonException {
         PythonObject func = getHelper(name);
-        return func.rawInvoke(args);
+        return func.invoke(args);
     }
     // END TODO
 
@@ -108,21 +108,10 @@ public class PythonObject {
     }
 
     public Object invoke(Object... args) throws PythonException {
-        // TODO: given flag to convert to anything?
-        // TODO: use toJavaObject
-        return pythonState.jnupy_func_call(true, this, args);
-    }
-
-    public Object rawInvoke(Object... args) throws PythonException {
-        // TODO: remove it?? (is possible?)
-        // TODO: given flag to never convert it... (when it is JavaObject...?)
-        // TODO: use toJavaObject
         return pythonState.jnupy_func_call(false, this, args);
     }
 
     public PythonObject call(Object... args) throws PythonException {
-        // TODO: remove rawCall and given flag to only convert to PythonXXX object...
-        // TODO: use toJavaObject
         Object result = pythonState.jnupy_func_call(true, this, args);
         if (result == null) {
             return null;

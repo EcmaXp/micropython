@@ -212,14 +212,14 @@ public class PythonState extends PythonNativeState {
 		func.invoke();
 	}
 	
-	public Object eval(String code) throws PythonException {
+	public PythonObject eval(String code) throws PythonException {
 		PythonObject func = jnupy_code_compile(code, PythonParseInputKind.MP_PARSE_EVAL_INPUT);
-		return func.invoke();
+		return func.call();
 	}
 	
 	public Object rawEval(String code) throws PythonException {
 		PythonObject func = jnupy_code_compile(code, PythonParseInputKind.MP_PARSE_EVAL_INPUT);
-		return func.rawInvoke();
+		return func.invoke();
 	}
 	
 	public PythonObject pyEval(String code) throws PythonException {

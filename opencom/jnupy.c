@@ -370,6 +370,8 @@ JNUPY_REF_CLASS(CEKJY)
 JNUPY_REF_CLASS(CXMH3)
 // CLASS: org/micropython/jnupy/JavaFunction
 JNUPY_REF_CLASS(CRBZE)
+// CLASS: org/micropython/jnupy/JavaObject
+JNUPY_REF_CLASS(COLFU)
 // CLASS: org/micropython/jnupy/PythonArguments
 JNUPY_REF_CLASS(CGRO2)
 // CLASS: org/micropython/jnupy/PythonImportStat
@@ -396,6 +398,8 @@ JNUPY_REF_ENUM(E6JE6)
 JNUPY_REF_ENUM(EEPIP)
 // ENUM: org/micropython/jnupy/PythonParseInputKind->MP_PARSE_SINGLE_INPUT
 JNUPY_REF_ENUM(EGOM6)
+// FIELD: org/micropython/jnupy/JavaObject->obj[Ljava/lang/Object;]
+JNUPY_REF_FIELD(FKU6D)
 // FIELD: org/micropython/jnupy/PythonNativeException->pyobj[Lorg/micropython/jnupy/PythonObject;]
 JNUPY_REF_FIELD(FWOHZ)
 // FIELD: org/micropython/jnupy/PythonNativeState->mpState[J]
@@ -521,6 +525,9 @@ JNUPY_AP(EXPORT)
 #define JMETHOD_JavaFunction_invoke JNUPY_METHOD("org/micropython/jnupy/JavaFunction", "invoke", "(Lorg/micropython/jnupy/PythonState;Lorg/micropython/jnupy/PythonArguments;)Ljava/lang/Object;", MX2DM)
 #define JMETHOD_JavaFunction_checkInvoke JNUPY_METHOD("org/micropython/jnupy/JavaFunction", "checkInvoke", "(Lorg/micropython/jnupy/PythonState;II)V", MBSG4)
 
+#define JCLASS_JavaObject JNUPY_CLASS("org/micropython/jnupy/JavaObject", COLFU)
+#define JFIELD_JavaObject_obj JNUPY_FIELD("org/micropython/jnupy/JavaObject", "obj", "Ljava/lang/Object;", FKU6D)
+
 #define JCLASS_PythonImportStat JNUPY_CLASS("org/micropython/jnupy/PythonImportStat", CEIHH)
 #define JENUM_MP_IMPORT_STAT_NO_EXIST JNUPY_ENUM("org/micropython/jnupy/PythonImportStat", "MP_IMPORT_STAT_NO_EXIST", E3MMX)
 #define JENUM_MP_IMPORT_STAT_DIR JNUPY_ENUM("org/micropython/jnupy/PythonImportStat", "MP_IMPORT_STAT_DIR", E4DOQ)
@@ -639,6 +646,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNUPY_LOAD_CLASS("java/util/HashMap", CEKJY)
     JNUPY_LOAD_CLASS("org/micropython/jnupy/InternalException", CXMH3)
     JNUPY_LOAD_CLASS("org/micropython/jnupy/JavaFunction", CRBZE)
+    JNUPY_LOAD_CLASS("org/micropython/jnupy/JavaObject", COLFU)
     JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonArguments", CGRO2)
     JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonImportStat", CEIHH)
     JNUPY_LOAD_CLASS("org/micropython/jnupy/PythonModule", CL6LM)
@@ -652,6 +660,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNUPY_LOAD_ENUM("org/micropython/jnupy/PythonParseInputKind", "MP_PARSE_EVAL_INPUT", C6GOM, E6JE6)
     JNUPY_LOAD_ENUM("org/micropython/jnupy/PythonParseInputKind", "MP_PARSE_FILE_INPUT", C6GOM, EEPIP)
     JNUPY_LOAD_ENUM("org/micropython/jnupy/PythonParseInputKind", "MP_PARSE_SINGLE_INPUT", C6GOM, EGOM6)
+    JNUPY_LOAD_FIELD("org/micropython/jnupy/JavaObject", "obj", "Ljava/lang/Object;", COLFU, FKU6D)
     JNUPY_LOAD_FIELD("org/micropython/jnupy/PythonNativeException", "pyobj", "Lorg/micropython/jnupy/PythonObject;", CLGS4, FWOHZ)
     JNUPY_LOAD_FIELD("org/micropython/jnupy/PythonNativeState", "mpState", "J", CEYRH, FJ2IH)
     JNUPY_LOAD_FIELD("org/micropython/jnupy/PythonObject", "pythonState", "Lorg/micropython/jnupy/PythonState;", CKZG7, F4HBX)
@@ -731,6 +740,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     JNUPY_UNLOAD_CLASS("java/util/HashMap", CEKJY)
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/InternalException", CXMH3)
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/JavaFunction", CRBZE)
+    JNUPY_UNLOAD_CLASS("org/micropython/jnupy/JavaObject", COLFU)
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/PythonArguments", CGRO2)
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/PythonImportStat", CEIHH)
     JNUPY_UNLOAD_CLASS("org/micropython/jnupy/PythonModule", CL6LM)
@@ -744,6 +754,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     JNUPY_UNLOAD_ENUM("org/micropython/jnupy/PythonParseInputKind", "MP_PARSE_EVAL_INPUT", C6GOM, E6JE6)
     JNUPY_UNLOAD_ENUM("org/micropython/jnupy/PythonParseInputKind", "MP_PARSE_FILE_INPUT", C6GOM, EEPIP)
     JNUPY_UNLOAD_ENUM("org/micropython/jnupy/PythonParseInputKind", "MP_PARSE_SINGLE_INPUT", C6GOM, EGOM6)
+    JNUPY_UNLOAD_FIELD("org/micropython/jnupy/JavaObject", "obj", "Ljava/lang/Object;", COLFU, FKU6D)
     JNUPY_UNLOAD_FIELD("org/micropython/jnupy/PythonNativeException", "pyobj", "Lorg/micropython/jnupy/PythonObject;", CLGS4, FWOHZ)
     JNUPY_UNLOAD_FIELD("org/micropython/jnupy/PythonNativeState", "mpState", "J", CEYRH, FJ2IH)
     JNUPY_UNLOAD_FIELD("org/micropython/jnupy/PythonObject", "pythonState", "Lorg/micropython/jnupy/PythonState;", CKZG7, F4HBX)
@@ -1126,6 +1137,8 @@ mp_obj_t jnupy_obj_j2py(jobject obj) {
         return mp_const_none;
     } else if (IsInstanceOf(obj, JCLASS(JavaFunction))) {
         return mp_obj_jfunc_new(JNUPY_PY_JSTATE, obj);
+    } else if (IsInstanceOf(obj, JCLASS(JavaObject))) {
+        return jnupy_jobj_new(obj);
     } else if (IsInstanceOf(obj, JCLASS(PythonObject))) {
         return jnupy_pyobj_get(obj);
     } else if (IsInstanceOf(obj, JCLASS(Boolean))) {
@@ -1195,7 +1208,9 @@ mp_obj_t jnupy_obj_j2py(jobject obj) {
     } else if (0) {
         // TODO: handle set?
     } else {
-        return jnupy_jobj_new(obj);
+        // TODO: change exception (with failed object)
+        JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/IllegalArgumentException", C5K3P), "failed convert object");
+        nlr_jump(NULL);
     }
 
     return mp_const_none;
@@ -1878,7 +1893,7 @@ JNUPY_FUNC_DEF(void, jnupy_1ref_1derc)
 }
 
 // TODO: call flag (from convertResult) should detail... how?
-JNUPY_FUNC_DEF(jobject, jnupy_1func_1call)
+JNUPY_FUNC_DEF(jobject, jnupy_1func_1call) // jnupy_func_call
     (JNIEnv *env, jobject self, jboolean convertResult, jobject pyref, jarray jargs) {
     JNUPY_FUNC_START_WITH_STATE;
 

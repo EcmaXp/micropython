@@ -26,6 +26,17 @@
 
 package org.micropython.jnupy;
 
-public interface JavaObject {
-    // ...?
+public class JavaObject {
+    private Object obj;
+    
+    public JavaObject(Object obj) {
+        this.obj = obj; 
+    }
+    
+    public Object getObject() {
+        return this.obj;
+    }
+    
+    // TODO: implement __getitem__, etc thing.
+    //       but never impl with __call__?
 }
