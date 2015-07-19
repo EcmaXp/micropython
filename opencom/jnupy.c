@@ -1187,7 +1187,7 @@ mp_obj_t jnupy_obj_j2py(jobject obj) {
 		}
 
 		mp_obj_t pobj = mp_obj_new_tuple(arrsize, items);
-		// m_free(items, sizeof(mp_obj_t) * arrsize);
+		m_free(items, sizeof(mp_obj_t) * arrsize);
 
 		return pobj;
     } else if (0) {
@@ -1905,13 +1905,13 @@ JNUPY_FUNC_DEF(jobject, jnupy_1func_1call)
         }
 
         if (args != MP_OBJ_NULL) {
-            // m_free(args, jargs_length);
+            m_free(args, jargs_length);
         }
 
         nlr_pop();
     } else {
         if (args != MP_OBJ_NULL) {
-            // m_free(args, jargs_length);
+            m_free(args, jargs_length);
         }
 
         nlr_gk_jump(nlr.ret_val);
