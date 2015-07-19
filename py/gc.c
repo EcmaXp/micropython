@@ -279,18 +279,24 @@ void gc_collect_start(void) {
 
     #if MICROPY_MULTI_STATE_CONTEXT
     // Yes: mp_nlr_top is external value when MICROPY_MULTI_STATE_CONTEXT is enabled.
-    DEBUG_printf("GC drain mp_nlr_top=%p (multi state only)\n", mp_nlr_top);
+    DEBUG_printf("gc_collect_root(mp_nlr_top=%p)\n", mp_nlr_top);
     if (mp_nlr_top != NULL) {
         gc_collect_root((void**)(void*)mp_nlr_top, 1);
     }
     
-    DEBUG_printf("GC drain state=%p (multi state only)\n", MP_STATE_CTX_PTR);
     if (MP_STATE_CTX_PTR == NULL) {
+        DEBUG_printf("gc_collect_root(mp_state_ctx_t=%p)\n", MP_STATE_CTX_PTR);
         return;
     }
+    
+    DEBUG_printf("gc_collect_root(mp_state_ctx_t=%p) start\n", MP_STATE_CTX_PTR);
     #endif
     
     gc_collect_root(ptrs, offsetof(mp_state_ctx_t, vm.stack_top) / sizeof(mp_uint_t));
+    
+    #if MICROPY_MULTI_STATE_CONTEXT
+    DEBUG_printf("gc_collect_root(mp_state_ctx_t=%p) finish\n", MP_STATE_CTX_PTR);
+    #endif
 }
 
 void gc_collect_root(void **ptrs, mp_uint_t len) {

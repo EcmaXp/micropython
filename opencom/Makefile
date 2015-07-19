@@ -101,8 +101,10 @@ LDFLAGS += -m32
 endif
 
 ifeq ($(MICROPY_OVERRIDE_ASSERT_FAIL),1)
+ifndef DEBUG
 CFLAGS_MOD += -DMICROPY_OVERRIDE_ASSERT_FAIL=1
 INC +=  -I../lib/assert
+endif
 endif
 
 ifeq ($(MICROPY_MULTI_STATE_CONTEXT),1)

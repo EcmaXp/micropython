@@ -88,7 +88,7 @@ THE SOFTWARE.
 #endif
 
 #if !MICROPY_OVERRIDE_ASSERT_FAIL
-#error jnupy require MICROPY_OVERRIDE_ASSERT_FAIL
+// #error jnupy require MICROPY_OVERRIDE_ASSERT_FAIL
 #endif
 
 #if !MICROPY_ENABLE_GC
@@ -1187,7 +1187,7 @@ mp_obj_t jnupy_obj_j2py(jobject obj) {
 		}
 
 		mp_obj_t pobj = mp_obj_new_tuple(arrsize, items);
-		m_free(items, sizeof(mp_obj_t) * arrsize);
+		// m_free(items, sizeof(mp_obj_t) * arrsize);
 
 		return pobj;
     } else if (0) {
@@ -1618,27 +1618,66 @@ JNUPY_FUNC_DEF(jstring, jnupy_1mp_1version)
 // TODO: cleanup body... (nlr_gk, nlr_top, stack_top, etc...)
 // TODO: re-compute stack_limit for setuped stack_top...
 
+typedef struct _jnupy_func_stack_t {
+    bool with_state;
+    bool is_first_load;
+    bool has_exception;
+    void *stack_top;
+    nlr_buf_t *nlr_ptr;
+    nlr_gk_buf_t _nlr_gk;
+} jnupy_func_stack_t;
+
+#define jnupy_func_stack_new() {._nlr_gk = nlr_gk_new()}
+
+void jnupy_func_stack_enter(jnupy_func_stack_t *jfs, bool _with_state) {
+    jfs->with_state = _with_state;
+    jfs->is_first_load = false;
+    jfs->has_exception = false;
+    jfs->stack_top = NULL;
+    jfs->nlr_ptr = mp_nlr_top;
+}
+
+void jnupy_func_stack_with_state(jnupy_func_stack_t *jfs) {
+    jfs->is_first_load = !mp_state_is_loaded(JNUPY_MP_STATE);
+    if (jfs->is_first_load) {
+        mp_state_load(JNUPY_MP_STATE);
+    }
+    jfs->stack_top = MP_STATE_VM(stack_top);
+}
+
+void jnupy_func_stack_error(jnupy_func_stack_t *jfs) {
+    jnupy_obj_do_exception(jfs->_nlr_gk.buf.ret_val);
+    jfs->has_exception = true;
+}
+
+void jnupy_func_stack_leave(jnupy_func_stack_t *jfs) {
+    // TODO: gc collect with java function call must be safe...
+    if (jfs->with_state && JNUPY_MP_STATE != NULL) {
+        MP_STATE_VM(stack_top) = jfs->stack_top;
+        if (jfs->is_first_load) {
+            gc_collect();
+            mp_state_store(JNUPY_MP_STATE);
+        }
+    }
+    if (!jfs->has_exception) {
+        (*JNUPY_ENV)->ExceptionClear(JNUPY_ENV);
+    }
+    nlr_gk_pop(&jfs->_nlr_gk);
+    mp_nlr_top = jfs->nlr_ptr;
+}
+
 #define _JNUPY_FUNC_BODY_START(_with_state, init_expr) \
     jnupy_setup_env(env, self); \
-    bool with_state = _with_state; \
-    bool is_first_load = false; \
-    bool has_exception = false; \
-    void *stack_top = NULL; \
-    nlr_buf_t *nlr_ptr = mp_nlr_top; \
-    nlr_gk_buf_t _nlr_gk = nlr_gk_new(); \
+    jnupy_func_stack_t _jfs = jnupy_func_stack_new(); \
+    jnupy_func_stack_enter(&_jfs, _with_state); \
     if (init_expr) { \
-        if (with_state) { \
-            is_first_load = !mp_state_is_loaded(JNUPY_MP_STATE); \
-            if (is_first_load) { \
-                mp_state_load(JNUPY_MP_STATE); \
-            } \
-            stack_top = MP_STATE_VM(stack_top); \
+        if (_jfs.with_state) { \
+            jnupy_func_stack_with_state(&_jfs); \
             mp_stack_ctrl_init(); \
         } \
         do { \
-            if (nlr_gk_push(&_nlr_gk) != 0) { \
-                jnupy_obj_do_exception(_nlr_gk.buf.ret_val); \
-                has_exception = true; \
+            if (nlr_gk_push(&_jfs._nlr_gk) != 0) { \
+                jnupy_func_stack_error(&_jfs); \
                 break; \
             }
             /* body */
@@ -1648,23 +1687,8 @@ JNUPY_FUNC_DEF(jstring, jnupy_1mp_1version)
     } \
     ret_stmt;
 
-// TODO: gc collect with java function call must be safe...
-
-#define _JNUPY_FUNC_BEFORE_RETURN \
-    if (with_state && JNUPY_MP_STATE != NULL) { \
-        MP_STATE_VM(stack_top) = stack_top; \
-        if (is_first_load) { \
-            mp_state_store(JNUPY_MP_STATE); \
-        } \
-    } \
-    if (!has_exception) { \
-        (*JNUPY_ENV)->ExceptionClear(JNUPY_ENV); \
-    } \
-    nlr_gk_pop(&_nlr_gk); \
-    mp_nlr_top = nlr_ptr;
-
 #define return \
-    _JNUPY_FUNC_BEFORE_RETURN \
+    jnupy_func_stack_leave(&_jfs); \
     return
 
 #define JNUPY_FUNC_START_WITH_STATE _JNUPY_FUNC_BODY_START(true, jnupy_load_state_from_pythonnativestate(self))
@@ -1881,13 +1905,13 @@ JNUPY_FUNC_DEF(jobject, jnupy_1func_1call)
         }
 
         if (args != MP_OBJ_NULL) {
-            m_free(args, jargs_length);
+            // m_free(args, jargs_length);
         }
 
         nlr_pop();
     } else {
         if (args != MP_OBJ_NULL) {
-            m_free(args, jargs_length);
+            // m_free(args, jargs_length);
         }
 
         nlr_gk_jump(nlr.ret_val);
