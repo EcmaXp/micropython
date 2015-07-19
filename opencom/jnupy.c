@@ -1622,20 +1622,11 @@ typedef struct _jnupy_func_stack_t {
     bool with_state;
     bool is_first_load;
     bool has_exception;
+    bool before_return;
     void *stack_top;
     nlr_buf_t *nlr_ptr;
     nlr_gk_buf_t _nlr_gk;
 } jnupy_func_stack_t;
-
-#define jnupy_func_stack_new() {._nlr_gk = nlr_gk_new()}
-
-void jnupy_func_stack_enter(jnupy_func_stack_t *jfs, bool _with_state) {
-    jfs->with_state = _with_state;
-    jfs->is_first_load = false;
-    jfs->has_exception = false;
-    jfs->stack_top = NULL;
-    jfs->nlr_ptr = mp_nlr_top;
-}
 
 void jnupy_func_stack_with_state(jnupy_func_stack_t *jfs) {
     jfs->is_first_load = !mp_state_is_loaded(JNUPY_MP_STATE);
@@ -1646,30 +1637,42 @@ void jnupy_func_stack_with_state(jnupy_func_stack_t *jfs) {
 }
 
 void jnupy_func_stack_error(jnupy_func_stack_t *jfs) {
-    jnupy_obj_do_exception(jfs->_nlr_gk.buf.ret_val);
     jfs->has_exception = true;
+    jnupy_obj_do_exception(jfs->_nlr_gk.buf.ret_val);
 }
 
 void jnupy_func_stack_leave(jnupy_func_stack_t *jfs) {
-    // TODO: gc collect with java function call must be safe...
-    if (jfs->with_state && JNUPY_MP_STATE != NULL) {
-        MP_STATE_VM(stack_top) = jfs->stack_top;
-        if (jfs->is_first_load) {
-            gc_collect();
-            mp_state_store(JNUPY_MP_STATE);
+    if (!jfs->before_return) {
+        jfs->before_return = true;
+
+        if (jfs->with_state && JNUPY_MP_STATE != NULL) {
+            MP_STATE_VM(stack_top) = jfs->stack_top;
+            if (jfs->is_first_load) {
+                gc_collect();
+                mp_state_store(JNUPY_MP_STATE);
+            }
         }
     }
+
     if (!jfs->has_exception) {
         (*JNUPY_ENV)->ExceptionClear(JNUPY_ENV);
     }
+
     nlr_gk_pop(&jfs->_nlr_gk);
     mp_nlr_top = jfs->nlr_ptr;
 }
 
 #define _JNUPY_FUNC_BODY_START(_with_state, init_expr) \
     jnupy_setup_env(env, self); \
-    jnupy_func_stack_t _jfs = jnupy_func_stack_new(); \
-    jnupy_func_stack_enter(&_jfs, _with_state); \
+    jnupy_func_stack_t _jfs = { \
+        .with_state = _with_state, \
+        .is_first_load = false, \
+        .has_exception = false, \
+        .before_return = false, \
+        .stack_top = NULL, \
+        .nlr_ptr = mp_nlr_top, \
+        ._nlr_gk = nlr_gk_new(), \
+    }; \
     if (init_expr) { \
         if (_jfs.with_state) { \
             jnupy_func_stack_with_state(&_jfs); \
