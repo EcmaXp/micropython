@@ -1098,15 +1098,15 @@ jobject jnupy_pyobj_new_from_class(jobject pythonNativeState, mp_obj_t pyobj, jc
 
 mp_obj_t jnupy_pyobj_get(jobject jobj) {
     jnupy_pyref_t *ref = jnupy_pyref_get(jobj);
-    mp_obj_t obj = ref->obj;
 
-    if (obj == MP_OBJ_NULL) {
+    if (ref == MP_OBJ_NULL) {
+        // if PythonObject.close are called; then refence are now invaild.
+        // (but normal java code will never touch refernce counting)
         // TODO: replace exception message?
-        // Normal java code will never touch this code.
-        //  but if PythonObject.close are called; then refence are now invaild.
         nlr_raise(mp_obj_new_exception_msg(&mp_type_ReferenceError, "invaild reference; org.micropython.jnupy.PythonObject are closed."));
     }
 
+    mp_obj_t obj = ref->obj;
     return obj;
 }
 

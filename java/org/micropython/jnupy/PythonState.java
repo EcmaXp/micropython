@@ -222,17 +222,38 @@ public class PythonState extends PythonNativeState {
 	
 	public void execute(String code) throws PythonException {
 		PythonObject func = compile_exec(code);
-		func.invoke();
+
+		try {
+			func.invoke();
+		} finally {
+			func.close();
+		}
 	}
 	
 	public Object eval(String code) throws PythonException {
 		PythonObject func = compile_eval(code);
-		return func.invoke();
+		Object result;
+		
+		try {
+			result = func.invoke();
+		} finally {
+			func.close();
+		}
+	
+		return result;
 	}
 	
 	public PythonObject rawEval(String code) throws PythonException {
 		PythonObject func = compile_eval(code);
-		return func.call();
+		PythonObject result;
+		
+		try {
+			result = func.call();
+		} finally {
+			func.close();
+		}
+		
+		return result;
 	}
 	
 	public PythonObject pyEval(String code) throws PythonException {
