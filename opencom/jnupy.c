@@ -1077,53 +1077,38 @@ void jnupy_obj_do_exception(mp_obj_t exception) {
     }
 }
 
-/* in li.cil.oc.server.machine.Machine.scala ...
-TODO: support convert it (jnupy_obj_j2py, jnupy_obj_py2j)
-- NULL = None [OK]
-- java.lang.Boolean = bool [OK]
-- java.lang.Byte = ? => Double.box(arg.doubleValue) [-]
-- java.lang.Character = ? => Double.box(arg.toDouble) [-]
-- java.lang.Short = int => Double.box(arg.doubleValue) [-]
-- java.lang.Integer = int => Double.box(arg.doubleValue) [py2j only]
-- java.lang.Long = int => Double.box(arg.doubleValue) [-]
-- java.lang.Float = float => Double.box(arg.doubleValue) [OK]
-- java.lang.Double = float [invaild convert...]
-- java.lang.String = str [OK]
-- Array<Byte> = bytes [?: ByteArrayInput/ByteArrayOutputStream only]
-- Map<String, String> = dict? [-]
-- NBTTagCompound = JObject => arg [-]
-*/
-
 // TODO: jnupy_pyobj_new -> give old value if already exists.
 jobject jnupy_pyobj_new(jobject pythonNativeState, mp_obj_t pyobj) {
     jobject pyState = JNUPY_CALL(NewGlobalRef, pythonNativeState); // is correct?
     mp_obj_t pyref_obj = jnupy_pyref_new(pyobj);
 
     jobject jobj = JNUPY_CALL(NewObject, JCLASS(PythonObject), JMETHOD(PythonObject, INIT), pyState, (jlong)(void *)JNUPY_MP_STATE, (jlong)(void *)pyref_obj);
-
     return jobj;
 }
 
 jobject jnupy_pyobj_new_from_class(jobject pythonNativeState, mp_obj_t pyobj, jclass class_, jmethodID mid) {
     // class_ must be from PythonObject (should check them...?)
     // JCLASS(PythonObject)
-
     jobject pyState = JNUPY_CALL(NewGlobalRef, pythonNativeState);
     mp_obj_t pyref_obj = jnupy_pyref_new(pyobj);
 
     jobject jobj = JNUPY_CALL(NewObject, class_, mid, pyState, (jlong)(void *)JNUPY_MP_STATE, (jlong)(void *)pyref_obj);
-
     return jobj;
 }
 
 mp_obj_t jnupy_pyobj_get(jobject jobj) {
     jnupy_pyref_t *ref = jnupy_pyref_get(jobj);
-    return ref->obj;
-}
+    mp_obj_t obj = ref->obj;
 
-// TODO: check modmsgpack.c will help coding!
-// TODO: how to python give (java)PythonObject?
-// TODO: how to java convert argument?
+    if (obj == MP_OBJ_NULL) {
+        // TODO: replace exception message?
+        // Normal java code will never touch this code.
+        //  but if PythonObject.close are called; then refence are now invaild.
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_ReferenceError, "invaild reference; org.micropython.jnupy.PythonObject are closed."));
+    }
+
+    return obj;
+}
 
 #define IsInstanceOf(obj, class_) (JNUPY_RAW_CALL(IsInstanceOf, obj, class_) == JNI_TRUE)
 
@@ -1218,7 +1203,6 @@ mp_obj_t jnupy_obj_j2py(jobject obj) {
 #undef IsInstanceOf
 
 jobject jnupy_obj_py2j(mp_obj_t obj) {
-    // TODO: adding convert flag?
     MP_STACK_CHECK();
 
     if (0) {
@@ -1538,7 +1522,7 @@ void jnupy_pyref_clear(jnupy_pyref_t *pyref) {
             if (last == pyref) {
                 // XXX This is possible?
                 MP_STATE_VM(jnupy_last_pyref) = pyref->next;
-                abort();
+                assert(! "invaild reference");
             }
         }
     }
@@ -1803,6 +1787,8 @@ JNUPY_FUNC_DEF(void, jnupy_1state_1free)
 
     assert(mp_state_is_loaded(JNUPY_MP_STATE));
     JNUPY_CALL(SetLongField, JNUPY_SELF, JFIELD(PythonNativeState, mpState), 0);
+
+    gc_collect();
 
     mp_deinit();
     free(MP_STATE_MEM(gc_alloc_table_start));

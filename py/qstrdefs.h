@@ -144,6 +144,7 @@ Q(OSError)
 Q(TimeoutError)
 #endif
 Q(OverflowError)
+Q(ReferenceError)
 Q(RuntimeError)
 Q(SyntaxError)
 Q(SystemError)

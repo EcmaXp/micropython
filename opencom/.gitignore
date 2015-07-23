@@ -4,3 +4,11 @@ jnupy.ap.c
 micropython.jar
 hs_err_pid*.log
 setupenv.sh
+
+# temp setup
+
+# kr/pe/ecmaxp folder
+kr
+FastMain.java
+FastMain*.class
+

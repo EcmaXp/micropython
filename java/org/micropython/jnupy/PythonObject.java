@@ -48,6 +48,9 @@ public class PythonObject {
         refIncr();
     }
 
+    // TODO: make close method
+    // public void close() { }
+
     protected void finalize() throws Throwable {
         refDerc();
     }

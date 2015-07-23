@@ -207,19 +207,32 @@ public class PythonState extends PythonNativeState {
 	
 	// TODO: execute code for __main__ module? (and never call again...?)
 	
+	public PythonObject compile(String code, PythonParseInputKind kind) throws PythonException {
+		PythonObject func = jnupy_code_compile(code, kind);
+		return func;
+	}
+	
+	public PythonObject compile_exec(String code) throws PythonException {
+		return compile(code, PythonParseInputKind.MP_PARSE_FILE_INPUT);
+	}
+	
+	public PythonObject compile_eval(String code) throws PythonException {
+		return compile(code, PythonParseInputKind.MP_PARSE_EVAL_INPUT);	
+	}
+	
 	public void execute(String code) throws PythonException {
-		PythonObject func = jnupy_code_compile(code, PythonParseInputKind.MP_PARSE_FILE_INPUT);
+		PythonObject func = compile_exec(code);
 		func.invoke();
 	}
 	
-	public PythonObject eval(String code) throws PythonException {
-		PythonObject func = jnupy_code_compile(code, PythonParseInputKind.MP_PARSE_EVAL_INPUT);
-		return func.call();
+	public Object eval(String code) throws PythonException {
+		PythonObject func = compile_eval(code);
+		return func.invoke();
 	}
 	
-	public Object rawEval(String code) throws PythonException {
-		PythonObject func = jnupy_code_compile(code, PythonParseInputKind.MP_PARSE_EVAL_INPUT);
-		return func.invoke();
+	public PythonObject rawEval(String code) throws PythonException {
+		PythonObject func = compile_eval(code);
+		return func.call();
 	}
 	
 	public PythonObject pyEval(String code) throws PythonException {
