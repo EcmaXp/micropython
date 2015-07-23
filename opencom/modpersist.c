@@ -85,7 +85,6 @@ bitmap: 1 KB can handle 128 KB on 64 Bit System.
 */
 
 #include <stdio.h>
-#include <msgpack.h>
 #include "opencom/modmicrothread.h"
 
 #if !MICROPY_ENABLE_GC
