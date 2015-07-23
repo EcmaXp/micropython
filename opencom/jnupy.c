@@ -152,7 +152,7 @@ typedef struct _jnupy_current_state_t {
 
     // JNUPY_NLR_GK_TOP
     // nlr goalkeeper top (for JNI function call warpper)
-    nlr_gk_buf_t *JNUPY_NLR_GK_TOP;
+    nlr_gk_buf_t *nlr_gk_top;
 
     // JNUPY_ENV
     // java env (vaild only current thread)

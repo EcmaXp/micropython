@@ -4,9 +4,6 @@
 # Build 32-bit binaries on a 64-bit host
 MICROPY_FORCE_32BIT = 0
 
-# Subset of msgpack module
-MICROPY_PY_MSGPACK = 0
-
 # Subset of persist module
 MICROPY_PY_PERSIST = 0
 

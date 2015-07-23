@@ -48,7 +48,6 @@ include ../py/py.mk
 INC =  -I.
 INC +=  -I..
 INC += -I$(BUILD)
-# TODO: msgpack? (or remove msgpack from opencom port)
 
 # jni include files
 INC += -I$(JAVA_HOME)/include
@@ -110,12 +109,6 @@ endif
 ifeq ($(MICROPY_MULTI_STATE_CONTEXT),1)
 CFLAGS_MOD += -DMICROPY_MULTI_STATE_CONTEXT=1
 CFLAGS_MOD += -DMICROPY_NLR_SETJMP=1
-endif
-
-ifeq ($(MICROPY_PY_MSGPACK),1)
-CFLAGS_MOD += -DMICROPY_PY_MSGPACK=1
-SRC_MOD += modmsgpack.c
-LDFLAGS_MOD += -lmsgpack
 endif
 
 ifeq ($(MICROPY_PY_PERSIST),1)
