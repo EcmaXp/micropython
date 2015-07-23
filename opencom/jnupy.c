@@ -25,7 +25,6 @@
  */
 
 /** ref: ../java/org/micropython/jnupy/PythonNativeState.java **/
-// TODO: Support JSR 223? (not in jnupy.c)
 
 /** JNLUA-LICENSE
 Copyright (C) 2008,2012 Andre Naef
@@ -151,14 +150,9 @@ typedef struct _jnupy_current_state_t {
     // micropython state context
     mp_state_ctx_t *mp_state;
 
-    // JNUPY_STACK_TOP
-    // micropython stack top
-    // TODO: use this?
-    mp_uint_t *stack_top;
-
-    // NLR_GK_TOP
+    // JNUPY_NLR_GK_TOP
     // nlr goalkeeper top (for JNI function call warpper)
-    nlr_gk_buf_t *nlr_gk_top;
+    nlr_gk_buf_t *JNUPY_NLR_GK_TOP;
 
     // JNUPY_ENV
     // java env (vaild only current thread)
@@ -189,8 +183,8 @@ STATIC JNIEnv *jnupy_glob_java_env;
 #define JNUPY_ENV _JNUPY_CUR_STATE(java_env)
 #define JNUPY_SELF _JNUPY_CUR_STATE(java_self)
 #define JNUPY_MP_STATE _JNUPY_CUR_STATE(mp_state)
-#define JNUPY_STACK_TOP _JNUPY_CUR_STATE(stack_top)
 #define JNUPY_PY_JSTATE _JNUPY_CUR_STATE(java_pystate)
+#define JNUPY_NLR_GK_TOP _JNUPY_CUR_STATE(nlr_gk_top)
 
 /** JNUPY CALL MECRO **/
 #define JNUPY_RAW_CALL_WITH(env, func, ...) (*env)->func(env, __VA_ARGS__)
@@ -198,8 +192,7 @@ STATIC JNIEnv *jnupy_glob_java_env;
 #define JNUPY_RAW_CALL_SINGLE(func) (*JNUPY_ENV)->func(JNUPY_ENV)
 #define JNUPY_RAW_AUTO_THROW (jnupy_throw_jerror_auto())
 #define JNUPY_CALL(func, ...) (*JNUPY_ENV)->func(JNUPY_ENV, __VA_ARGS__); JNUPY_RAW_AUTO_THROW
-/*
-JNUPY_CALL usage:
+/* JNUPY_CALL usage:
 
 // With getting value
 jobject msg = JNUPY_CALL(GetLongField, JNUPY_SELF, JFIELD(PythonNativeState, mpState));
@@ -217,12 +210,9 @@ if (JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/AssertionError", CM4H2), "Th
 assret(! "throwing is failed.");
 */
 
-#define NLR_GK_TOP _JNUPY_CUR_STATE(nlr_gk_top)
-
 /** JNUPY NLR GOAL KEEPER **/
 // nlr goal keeper are wapper for java throw in nested function call.
 // like assert fail.
-// TODO: nlr_gk are currently getting heavy bug... fix them......
 
 #define nlr_gk_set_buf(gk_buf) nlr_gk_set_buf_raw(gk_buf)
 #define nlr_gk_new() {false}
@@ -241,26 +231,26 @@ void nlr_gk_set_buf_raw(nlr_gk_buf_t *gk_buf) {
 void nlr_gk_push_raw(nlr_gk_buf_t *gk_buf) {
     gk_buf->is_working = true;
 
-    gk_buf->prev = NLR_GK_TOP;
-    NLR_GK_TOP = gk_buf;
+    gk_buf->prev = JNUPY_NLR_GK_TOP;
+    JNUPY_NLR_GK_TOP = gk_buf;
 }
 
 void nlr_gk_pop_raw(nlr_gk_buf_t *gk_buf) {
     if (gk_buf->is_working) {
-        // assert(mp_nlr_top == NLR_GK_TOP);
-        // assert(mp_nlr_top.prev == NLR_GK_TOP.prev)?
+        // assert(mp_nlr_top == JNUPY_NLR_GK_TOP);
+        // assert(mp_nlr_top.prev == JNUPY_NLR_GK_TOP.prev)?
 
-        NLR_GK_TOP->is_working = false;
-        NLR_GK_TOP = NLR_GK_TOP->prev;
-        nlr_gk_set_buf(NLR_GK_TOP);
+        JNUPY_NLR_GK_TOP->is_working = false;
+        JNUPY_NLR_GK_TOP = JNUPY_NLR_GK_TOP->prev;
+        nlr_gk_set_buf(JNUPY_NLR_GK_TOP);
     }
 }
 
 NORETURN void nlr_gk_jump_raw(void *val) {
-    NLR_GK_TOP->is_working = false;
+    JNUPY_NLR_GK_TOP->is_working = false;
 
-    nlr_gk_set_buf(NLR_GK_TOP);
-    NLR_GK_TOP = NLR_GK_TOP->prev;
+    nlr_gk_set_buf(JNUPY_NLR_GK_TOP);
+    JNUPY_NLR_GK_TOP = JNUPY_NLR_GK_TOP->prev;
 
     nlr_jump(val);
 }
@@ -1614,8 +1604,8 @@ JNUPY_FUNC_DEF(jstring, jnupy_1mp_1version)
 }
 
 /** JNI EXPORT FUNCTION BODY MECRO **/
-// TODO: cleanup body... (nlr_gk, nlr_top, stack_top, etc...)
 // TODO: re-compute stack_limit for setuped stack_top...
+// TODO: it is possible compute stack_top?
 
 typedef struct _jnupy_func_stack_t {
     bool with_state; // if require fill JNUPY_MP_STATE
@@ -1878,7 +1868,6 @@ JNUPY_FUNC_DEF(void, jnupy_1ref_1derc)
     JNUPY_FUNC_END_VOID;
 }
 
-// TODO: call flag (from convertResult) should detail... how?
 JNUPY_FUNC_DEF(jobject, jnupy_1func_1call) // jnupy_func_call
     (JNIEnv *env, jobject self, jboolean convertResult, jobject pyref, jarray jargs) {
     JNUPY_FUNC_START_WITH_STATE;
