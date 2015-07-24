@@ -5,7 +5,7 @@
 MICROPY_FORCE_32BIT = 0
 
 # Subset of persist module
-MICROPY_PY_PERSIST = 0
+MICROPY_PY_PERSIST = 1
 
 # Subset of microthread module
 MICROPY_PY_MICROTHREAD = 1
