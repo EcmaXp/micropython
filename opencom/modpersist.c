@@ -95,41 +95,44 @@ bitmap: 1 KB can handle 128 KB on 64 Bit System.
 
 #define MP_PERSIST_MAGIC "MP\x80\x01"
 
-#if mp_int_t == int32_t
-#define MP_PERSIST_MAP_ROW_SHIFT 3
-#elif mp_int_t == int64_t
-#define MP_PERSIST_MAP_ROW_SHIFT 4
-#endif
-
-typedef union _persist_union_int_t {
-    char c[8];
-    int8_t int8;
-    int16_t int16;
-    int32_t int32;
-    int64_t int64;
-    uint8_t uint8;
-    uint16_t uint16;
-    uint32_t uint32;
-    uint64_t uint64;
-} persist_union_int_t;
-
 inline mp_uint_t _modpersist_uint_first_(mp_uint_t first, mp_uint_t last) {
     return first;
 }
 
 // TODO: WRITE_INTn and WRITE_UINTn will be platform depend thing!
-#define WRITE_(data) system_buf_write(persister->sysbuf, (data), strlen((data)))
-#define WRITEN_(data, size) system_buf_write(persister->sysbuf, (data), (size))
+#define WRITE_STR(data) system_buf_write(sysbuf, (data), strlen((data)))
+#define WRITE_STRN(data, size) system_buf_write(sysbuf, (data), (size))
 
-#define WRITE_INT8(data) system_buf_write_int(persister->sysbuf, (data), (1))
-#define WRITE_UINT8(data) system_buf_write_int(persister->sysbuf, (data), (1))
-#define WRITE_INT16(data) system_buf_write_int(persister->sysbuf, (data), (2))
-#define WRITE_UINT16(data) system_buf_write_int(persister->sysbuf, (data), (2))
-#define WRITE_INT32(data) system_buf_write_int(persister->sysbuf, (data), (4))
-#define WRITE_UINT32(data) system_buf_write_int(persister->sysbuf, (data), (4))
-#define WRITE_INT64(data) system_buf_write_int(persister->sysbuf, (data), (8))
-#define WRITE_UINT64(data) system_buf_write_int(persister->sysbuf, (data), (8))
+#define WRITE_SIZE(size) system_buf_write_size(sysbuf, (size))
+
+#define WRITE_INT8(data) system_buf_write_int(sysbuf, (data), (1))
+#define WRITE_UINT8(data) system_buf_write_uint(sysbuf, (data), (1))
+
+#define WRITE_INT16(data) system_buf_write_int(sysbuf, (data), (2))
+#define WRITE_UINT16(data) system_buf_write_uint(sysbuf, (data), (2))
+
+#define WRITE_INT32(data) system_buf_write_int(sysbuf, (data), (4))
+#define WRITE_UINT32(data) system_buf_write_uint(sysbuf, (data), (4))
+
+#define WRITE_INT64(data) system_buf_write_int(sysbuf, (data), (8))
+#define WRITE_UINT64(data) system_buf_write_uint(sysbuf, (data), (8))
+
 #define WRITE_PTR(data) WRITE_UINT32(data)
+
+#define DUMP_START() \
+    mp_uint_t _ref = sysbuf->len;
+
+#define DUMP_END() \
+    return _ref;
+
+#define PACK_START() \
+    mp_uint_t _ref = 0; \
+    if (modpersist_starting_pack(persister, obj, &_ref)) {
+        /* body */
+
+#define PACK_END() \
+    } \
+    return _ref;
 
 // 3-way tagging
 
@@ -139,13 +142,13 @@ inline mp_uint_t _modpersist_uint_first_(mp_uint_t first, mp_uint_t last) {
 
 // TODO: BASEPTR should accept ?
 #define PACK_BASEPTR(baseptr, ptr, size) persister_dump_baseptr(persister, (baseptr), (char *)(ptr), size)
-#define PACK_ERROR(message) _modpersist_uint_first_(WRITE_("E:"), (WRITE_(message), WRITE_INT8(0)))
+#define PACK_ERROR(message) _modpersist_uint_first_(WRITE_STR("E:"), (WRITE_STR(message), WRITE_INT8(0)))
 
 typedef struct _mp_obj_system_buf_t {
     // system malloc
     mp_obj_base_t base;
 
-    char *buf;
+    byte *buf;
     mp_uint_t alloc;
     mp_uint_t len;
 
@@ -174,10 +177,10 @@ STATIC mp_obj_system_buf_t *system_buf_new() {
 STATIC mp_uint_t system_buf_write(mp_obj_system_buf_t *system_buf, const char *str, unsigned int size) {
     mp_uint_t new_alloc = system_buf->alloc;
     while (new_alloc < system_buf->len + size) {
-        new_alloc = sizeof(char) * new_alloc * 3 + 1;    
+        new_alloc = sizeof(byte) * new_alloc * 3 + 1;    
     }
 
-    char *new_buf = realloc(system_buf->buf, new_alloc);
+    byte *new_buf = realloc(system_buf->buf, new_alloc);
     assert(new_buf != NULL);
     
     memset(new_buf + system_buf->len, 0, new_alloc - system_buf->len);
@@ -192,15 +195,80 @@ STATIC mp_uint_t system_buf_write(mp_obj_system_buf_t *system_buf, const char *s
     return last_len;
 }
 
+typedef union _persist_union_int_t {
+    char c[8];
+    int8_t int8;
+    int16_t int16;
+    int32_t int32;
+    int64_t int64;
+    uint8_t uint8;
+    uint16_t uint16;
+    uint32_t uint32;
+    uint64_t uint64;
+} persist_union_int_t;
+
 #define PUI_SWAP(a, b) do { \
     char tmp = pui.c[a]; \
     pui.c[a] = pui.c[b]; \
     pui.c[b] = tmp; \
 } while(0)
 
-STATIC mp_uint_t system_buf_write_int(mp_obj_system_buf_t *system_buf, unsigned long long num, unsigned int size) {
+STATIC mp_uint_t system_buf_write_int(mp_obj_system_buf_t *sysbuf, long long num, unsigned int size) {
+    // TODO: should test this function working well
     persist_union_int_t pui;
+    bool is_minus = num < 0;
+    if (is_minus) {
+        num = -num;
+    }
     
+    switch (size) {
+        case 1:
+            pui.int8 = num;
+            break;
+        case 2:
+            pui.int16 = num;
+            break;
+        case 4:
+            pui.int32 = num;
+            break;
+        case 8:
+            pui.int64 = num;
+            break;
+        default:
+            assert(! "invaild int size");
+            abort();
+    }
+    
+    #if MP_ENDIANNESS_LITTLE
+    switch (size) {
+        case 1:
+            break;
+        case 2:
+            PUI_SWAP(0, 1);       
+            break;
+        case 4:
+            PUI_SWAP(0, 3); 
+            PUI_SWAP(1, 2);
+            break;
+        case 8:
+            PUI_SWAP(0, 7);
+            PUI_SWAP(1, 6);
+            PUI_SWAP(2, 5);
+            PUI_SWAP(3, 4);
+            break;
+    }
+    #endif
+    
+    if (is_minus) {
+        pui.c[0] |= 1 << (sizeof(char) - 1);
+    }
+    
+    return system_buf_write(sysbuf, (char *)&pui.c, size);
+}
+
+STATIC mp_uint_t system_buf_write_uint(mp_obj_system_buf_t *sysbuf, unsigned long long num, unsigned int size) {
+    persist_union_int_t pui;
+
     switch (size) {
         case 1:
             pui.uint8 = num;
@@ -239,7 +307,27 @@ STATIC mp_uint_t system_buf_write_int(mp_obj_system_buf_t *system_buf, unsigned 
     }
     #endif
     
-    return system_buf_write(system_buf, (char *)&pui.c, size);
+    return system_buf_write(sysbuf, (char *)&pui.c, size);
+}
+
+STATIC mp_int_t system_buf_write_size(mp_obj_system_buf_t *sysbuf, mp_uint_t size) {
+    mp_uint_t start = sysbuf->len;
+
+    if (size <= 0xFF) {
+        WRITE_INT8('1');
+        WRITE_UINT8(size);
+    } else if (size <= 0xFFFF) {
+        WRITE_INT8('2');
+        WRITE_UINT16(size);
+    } else if (size <= 0xFFFFFFFF) {
+        WRITE_INT8('4');
+        WRITE_UINT32(size);
+    } else {
+        WRITE_INT8('8');
+        WRITE_UINT64(size);
+    }
+    
+    return start;
 }
 
 STATIC mp_int_t system_buf_get_buffer(mp_obj_t self_in, mp_buffer_info_t *bufinfo, mp_uint_t flags) {
@@ -283,9 +371,6 @@ const mp_obj_type_t mp_type_system_buf = {
     .locals_dict = (mp_obj_t)&system_buf_locals_dict_table,
 };
 
-// not impl yet and using map.
-#define MP_PERSIST_USE_REGMAP 0
-
 typedef struct _mp_obj_persister_t {
     mp_obj_base_t base;
 
@@ -300,7 +385,26 @@ typedef struct _mp_obj_persister_t {
 
 const mp_obj_type_t mp_type_persister;
 
-// some type require for dump thing, like printer?
+STATIC bool modpersist_starting_pack(mp_obj_persister_t *persister, mp_obj_t obj, mp_uint_t *ref) {
+    mp_map_elem_t *persist_reg = mp_map_lookup(persister->objmap, obj, MP_MAP_LOOKUP_ADD_IF_NOT_FOUND);
+
+    bool require_packing = (persist_reg->value == MP_OBJ_NULL);
+    if (require_packing) {
+        persist_reg->value = (mp_obj_t)(persister->sysbuf->len);
+    }
+    
+    *ref = (mp_uint_t)persist_reg->value;   
+    return require_packing;
+}
+
+// not impl yet and using map.
+#define MP_PERSIST_USE_REGMAP 0
+
+#if mp_int_t == int32_t
+#define MP_PERSIST_MAP_ROW_SHIFT 3
+#elif mp_int_t == int64_t
+#define MP_PERSIST_MAP_ROW_SHIFT 4
+#endif
 
 #if MP_PERSIST_USE_REGMAP
 #define MP_RM_INIT(x) \
@@ -351,7 +455,21 @@ STATIC mp_obj_t persister_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t
     return persister;
 }
 
-STATIC void persister_dump_microthread(mp_obj_persister_t *persister, mp_obj_t thread_obj) {
+STATIC void persister_dump_mp_int_t(mp_obj_persister_t *persister, mp_int_t num) {
+    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
+
+    (void)sysbuf;
+}
+
+STATIC void persister_dump_mp_uint_t(mp_obj_persister_t *persister, mp_uint_t num) {
+    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
+
+    (void)sysbuf;
+}
+
+STATIC mp_uint_t persister_dump_microthread(mp_obj_persister_t *persister, mp_obj_t thread_obj) {
+    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
+
     assert(MP_OBJ_IS_TYPE(thread_obj, &mp_type_microthread));
 
     mp_obj_microthread_t *thread = thread_obj;
@@ -362,63 +480,162 @@ STATIC void persister_dump_microthread(mp_obj_persister_t *persister, mp_obj_t t
     // PACK(int64, 32);
 
     (void)thread;
-}
-
-STATIC void persister_dump_mp_int_t(mp_obj_persister_t *persister, mp_int_t num) {
-}
-
-STATIC void persister_dump_mp_uint_t(mp_obj_persister_t *persister, mp_uint_t num) {
+    (void)sysbuf;
+    
+    return 0;
 }
 
 STATIC mp_uint_t persister_dump_code_state(mp_obj_persister_t *persister, mp_code_state *code_state) {
+    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
+    (void)sysbuf;
     return 0;
 }
 
 STATIC mp_uint_t persister_dump_stack(mp_obj_persister_t *persister) {
+    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
+    (void)sysbuf;
     return 0;
 }
 
 STATIC mp_uint_t persister_dump_vm_state(mp_obj_persister_t *persister) {
+    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
+    (void)sysbuf;
     return 0;
 }
 
 STATIC mp_uint_t persister_dump_str(mp_obj_persister_t *persister, mp_obj_t obj) {
-    return 0;
-}
+    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
-STATIC mp_uint_t persister_dump_qstr(mp_obj_persister_t *persister, mp_obj_t qstr) {
-    // should check already registerd!
-    return 0;
-}
-
-STATIC mp_uint_t persister_dump_small_int(mp_obj_persister_t *persister, mp_obj_t small_int) {
-    // should check already registerd!
-    return 0;
-}
-
-STATIC mp_uint_t persister_dump_obj(mp_obj_persister_t *persister, mp_obj_t o) {
-    // should check already registerd!
+    assert(MP_OBJ_IS_STR(obj));
+    DUMP_START();
     
+    mp_uint_t len = 0;
+    const char* str = mp_obj_str_get_data(obj, &len);
+    
+    WRITE_INT8('s');
+    WRITE_SIZE(len);
+    WRITE_STRN(str, len);
+    
+    DUMP_END();
+}
+
+STATIC mp_uint_t persister_dump_bytes(mp_obj_persister_t *persister, mp_obj_t obj) {
+    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
+
+    assert(MP_OBJ_IS_TYPE(obj, &mp_type_bytes));
+    DUMP_START();
+    
+    mp_buffer_info_t objbuf;
+    mp_get_buffer_raise(obj, &objbuf, MP_BUFFER_READ);
+    
+    WRITE_INT8('b');
+    WRITE_SIZE(objbuf.len);
+    WRITE_STRN(objbuf.buf, objbuf.len);
+    
+    DUMP_END();
+}
+
+STATIC mp_uint_t persister_dump_qstr(mp_obj_persister_t *persister, mp_obj_t obj) {
+    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
+
+    assert(MP_OBJ_IS_QSTR(obj));
+    DUMP_START();
+    
+    mp_uint_t len = 0;
+    const byte* str = qstr_data(MP_OBJ_QSTR_VALUE(obj), &len);
+    
+    WRITE_INT8('q');
+    WRITE_SIZE(len);
+    WRITE_STRN((const char*)str, len);
+    
+    DUMP_END();
+}
+
+STATIC mp_uint_t persister_dump_small_int(mp_obj_persister_t *persister, mp_obj_t obj) {
+    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
+
+    assert(MP_OBJ_IS_SMALL_INT(obj));
+
+    mp_int_t value = MP_OBJ_SMALL_INT_VALUE(obj);
+    persist_union_int_t pui = {.int32 = value};
+
+    if (pui.int32 != value) {
+        DUMP_START();
+        
+        WRITE_INT8('i');
+        WRITE_INT8('8');
+        WRITE_INT64(value);
+        
+        DUMP_END();
+    }
+    
+    return 0;
+}
+
+STATIC mp_uint_t persister_dump_common_obj(mp_obj_persister_t *persister, mp_obj_t obj) {
+    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
+
     void *start = MP_STATE_MEM(gc_pool_start);
     void *end = MP_STATE_MEM(gc_pool_end);
 
-    if (!(start <= o && o < end)) {
-        return 0;
+    if (!(start <= obj && obj < end)) {
+        return PACK_ERROR("failed to find original object");
     }
+    
+    PACK_START();
+    
+    if (0) {
+    } else if (MP_OBJ_IS_STR(obj)) {
+        PACK(str, obj);
+    } else if (MP_OBJ_IS_TYPE(obj, &mp_type_bytes)) {
+        PACK(bytes, obj);
+    } else if (MP_OBJ_IS_FUN(obj)) {
+        PACK_ERROR("failed to persist function");
+    } else {
+        PACK_ERROR("failed to find pointer");
+    }
+    
+    PACK_END();
+}
 
-    mp_map_elem_t *elem = mp_map_lookup(
-        persister->objmap,
-        o,
-        MP_MAP_LOOKUP_ADD_IF_NOT_FOUND);
-    
-    if (elem->value != MP_OBJ_NULL) {
-        
+STATIC mp_uint_t persister_dump_obj(mp_obj_persister_t *persister, mp_obj_t obj) {
+    // should check already registerd!
+    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
+
+    if (0) {
+    // X tagging is special pointer.
+    } else if (obj == MP_OBJ_NULL) {
+        WRITE_INT8('X');
+        WRITE_INT8('N');
+    } else if (obj == MP_OBJ_STOP_ITERATION) {
+        WRITE_INT8('X');
+        WRITE_INT8('I');
+    } else if (obj == MP_OBJ_SENTINEL) {
+        WRITE_INT8('X');
+        WRITE_INT8('S');
+    #if MICROPY_ALLOW_PAUSE_VM
+    } else if (obj == MP_OBJ_PAUSE_VM) {
+        WRITE_INT8('X');
+        WRITE_INT8('P');
+    #endif
+    // C tagging is const pointer.
+    } else if (obj == mp_const_none) {
+        WRITE_INT8('C');
+        WRITE_INT8('N');
+    } else if (obj == mp_const_true) {
+        WRITE_INT8('C');
+        WRITE_INT8('T');
+    } else if (obj == mp_const_false) {
+        WRITE_INT8('C');
+        WRITE_INT8('F');
+    } else if (obj == (mp_obj_t)&mp_const_ellipsis_obj) {
+        WRITE_INT8('C');
+        WRITE_INT8('E');
+    } else {
+        // common 
+        return PACK(common_obj, obj);
     }
-    if (MP_OBJ_IS_STR(o)) {
-        return PACK(str, o);
-    }
     
-    PACK_ERROR("unknown");
     return 0;
 }
 
@@ -430,17 +647,9 @@ STATIC void persister_dump_baseptr(mp_obj_t baseptr, char *ptr, mp_uint_t size) 
 }
 
 STATIC mp_uint_t persister_dump_any(mp_obj_persister_t *persister, mp_obj_t o) {
-    if (o == MP_OBJ_NULL) {
-        return 0;
-    } else if (o == MP_OBJ_STOP_ITERATION) {
-        return 0;
-    } else if (o == MP_OBJ_SENTINEL) {
-        return 0;
-    #if MICROPY_ALLOW_PAUSE_VM
-    } else if (o == MP_OBJ_PAUSE_VM) {
-        return 0;
-    #endif
-    } else if (MP_OBJ_IS_SMALL_INT(o)) {
+    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
+
+    if (MP_OBJ_IS_SMALL_INT(o)) {
         return PACK(small_int, o);
     } else if (MP_OBJ_IS_QSTR(o)) {
         return PACK(qstr, o);
@@ -449,35 +658,37 @@ STATIC mp_uint_t persister_dump_any(mp_obj_persister_t *persister, mp_obj_t o) {
     } else {
         return PACK_ERROR("unknown type");
     }
-    
-    // do not need persist pointer
-    return 0;
 }
 
 STATIC void persister_dump_ptr(mp_obj_persister_t *persister, mp_obj_t obj, mp_uint_t ref) {
-    if (obj == MP_OBJ_NULL) {
-        WRITE_INT8('X');
-        WRITE_PTR(0);
-    } else if (obj == MP_OBJ_STOP_ITERATION) {
-        WRITE_INT8('X');
-        WRITE_PTR(4);
-    } else if (obj == MP_OBJ_SENTINEL) {
-        WRITE_INT8('X');
-        WRITE_PTR(8);
-    #if MICROPY_ALLOW_PAUSE_VM
-    } else if (obj == MP_OBJ_PAUSE_VM) {
-        WRITE_INT8('X');
-        WRITE_PTR(16);
-    #endif
+    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
+
+    if (0) {
     } else if (MP_OBJ_IS_SMALL_INT(obj)) {
-        WRITE_INT8('S');
-        WRITE_PTR(ref);
+        if (ref != 0) {
+            WRITE_INT8('I');
+            WRITE_PTR(ref);
+        } else {
+            WRITE_INT8('S');
+            WRITE_PTR(MP_OBJ_SMALL_INT_VALUE(obj));
+        }
     } else if (MP_OBJ_IS_QSTR(obj)) {
         WRITE_INT8('Q');
         WRITE_PTR(ref);
     } else if (MP_OBJ_IS_OBJ(obj)) {
-        WRITE_INT8('O');
-        WRITE_PTR(ref);
+        if (ref == 0) {
+            // pass
+            // Already const value writed by persister_dump_any.
+        } else if (ref <= 0xFFFF) {
+            WRITE_INT8('o');
+            WRITE_UINT16(ref);
+        } else if (ref <= 0XFFFFFFFF) {
+            WRITE_INT8('O');
+            WRITE_UINT32(ref);
+        } else {
+            // XXX WOW?
+            nlr_raise(mp_obj_new_exception_msg(&mp_type_RuntimeError, "too large refernce index"));
+        }
     } else {
         WRITE_INT8('E');
         WRITE_PTR(ref);
@@ -494,7 +705,9 @@ STATIC mp_obj_t mod_persist_test(mp_obj_t persister_obj, mp_obj_t obj) {
     assert(MP_OBJ_IS_TYPE(persister_obj, &mp_type_persister));
     
     mp_obj_persister_t *persister = persister_obj;
-    WRITE_(MP_PERSIST_MAGIC "\n" "micropython persist v0.1\n");
+    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
+
+    WRITE_STR(MP_PERSIST_MAGIC "\n" "micropython persist v0.1\n");
     PACK_PTR(obj, PACK_ANY(obj));
     
     (void)persister_dump_microthread;
@@ -509,11 +722,7 @@ STATIC mp_obj_t mod_persist_test(mp_obj_t persister_obj, mp_obj_t obj) {
     (void)persister_dump_mp_int_t;
     (void)persister_dump_mp_uint_t;
 
-    mp_obj_t items[] = {
-        mp_obj_new_bytes((const byte *)persister->sysbuf->buf, persister->sysbuf->len),
-    };
-    
-    return mp_obj_new_tuple(2, items);
+    return mp_obj_new_bytes(persister->sysbuf->buf, persister->sysbuf->len);
 }
 
 MP_DEFINE_CONST_FUN_OBJ_2(mod_persist_test_obj, mod_persist_test);

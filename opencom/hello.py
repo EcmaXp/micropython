@@ -1,6 +1,14 @@
 import upersist
 persister = upersist.Persister()
-for tag, content in zip(("obj", "ptr"), upersist.test(persister, "hello")):
-    print(tag)
-    print(content)
-    print()
+
+obj = b"hello"
+
+
+result = upersist.test(persister, obj)
+print("object:", obj)
+
+assert result.startswith(b"MP\x80\x01"), result[:4]
+magic, header, content = result.split(b"\n", 2)
+assert magic == b"MP\x80\x01"
+assert header == b'micropython persist v0.1'
+print(content)
