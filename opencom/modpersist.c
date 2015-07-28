@@ -455,6 +455,10 @@ STATIC mp_obj_t persister_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t
     return persister;
 }
 
+// 2 functions are used for persist anything.
+STATIC mp_uint_t persister_dump_any(mp_obj_persister_t *persister, mp_obj_t o);
+STATIC void persister_dump_ptr(mp_obj_persister_t *persister, mp_obj_t obj, mp_uint_t ref);
+
 STATIC void persister_dump_mp_int_t(mp_obj_persister_t *persister, mp_int_t num) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
@@ -567,10 +571,59 @@ STATIC mp_uint_t persister_dump_small_int(mp_obj_persister_t *persister, mp_obj_
         WRITE_INT64(value);
         
         DUMP_END();
+    } else {
+        return 0;
+    }
+}
+
+STATIC mp_uint_t persister_dump_int(mp_obj_persister_t *persister, mp_obj_t obj) {
+    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
+
+    assert(MP_OBJ_IS_TYPE(obj, &mp_type_int));
+
+    // TODO: how to persist large int?
+    mp_int_t value = mp_obj_int_get_truncated(obj);
+    
+    DUMP_START();
+    
+    // XXX only works with small int...
+    WRITE_INT8('i');
+    WRITE_INT8('8');
+    WRITE_INT64(value);
+    
+    DUMP_END();
+}
+
+STATIC mp_uint_t persister_dump_tuple(mp_obj_persister_t *persister, mp_obj_t obj) {
+    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
+
+    assert(MP_OBJ_IS_TYPE(obj, &mp_type_tuple));
+
+    // TODO: how to persist large int?
+    
+    mp_obj_t iter = mp_getiter(obj);
+    mp_int_t size = mp_obj_get_int(mp_obj_len(obj));
+    mp_uint_t *ref = m_new0(mp_uint_t, size);
+
+    for (mp_int_t i = 0; i < size; i++){
+        mp_obj_t cur = mp_iternext(iter);
+        *(ref + i) = PACK_ANY(cur);
     }
     
-    return 0;
+    DUMP_START();
+    
+    WRITE_INT8('t');
+    WRITE_SIZE(size);
+    
+    iter = mp_getiter(obj);
+    for (mp_int_t i = 0; i < size; i++){
+        mp_obj_t cur = mp_iternext(iter);
+        PACK_PTR(cur, *(ref + i));
+    }
+    
+    DUMP_END();
 }
+
 
 STATIC mp_uint_t persister_dump_common_obj(mp_obj_persister_t *persister, mp_obj_t obj) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
@@ -578,10 +631,6 @@ STATIC mp_uint_t persister_dump_common_obj(mp_obj_persister_t *persister, mp_obj
     void *start = MP_STATE_MEM(gc_pool_start);
     void *end = MP_STATE_MEM(gc_pool_end);
 
-    if (!(start <= obj && obj < end)) {
-        return PACK_ERROR("failed to find original object");
-    }
-    
     PACK_START();
     
     if (0) {
@@ -589,10 +638,16 @@ STATIC mp_uint_t persister_dump_common_obj(mp_obj_persister_t *persister, mp_obj
         PACK(str, obj);
     } else if (MP_OBJ_IS_TYPE(obj, &mp_type_bytes)) {
         PACK(bytes, obj);
-    } else if (MP_OBJ_IS_FUN(obj)) {
-        PACK_ERROR("failed to persist function");
+    } else if (MP_OBJ_IS_TYPE(obj, &mp_type_int)) {
+        PACK(int, obj);
+    } else if (MP_OBJ_IS_TYPE(obj, &mp_type_tuple)) {
+        PACK(tuple, obj);
+    // } else if (MP_OBJ_IS_FUN(obj)) {
+    //    PACK_ERROR("failed to persi");
+    } else if (!(start <= obj && obj < end)) {
+        PACK_ERROR("failed to find original object");
     } else {
-        PACK_ERROR("failed to find pointer");
+        PACK_ERROR("failed to find persist function");
     }
     
     PACK_END();
@@ -632,7 +687,7 @@ STATIC mp_uint_t persister_dump_obj(mp_obj_persister_t *persister, mp_obj_t obj)
         WRITE_INT8('C');
         WRITE_INT8('E');
     } else {
-        // common 
+        // common object
         return PACK(common_obj, obj);
     }
     
@@ -711,14 +766,10 @@ STATIC mp_obj_t mod_persist_test(mp_obj_t persister_obj, mp_obj_t obj) {
     PACK_PTR(obj, PACK_ANY(obj));
     
     (void)persister_dump_microthread;
-    (void)persister_dump_obj;
     (void)persister_dump_baseptr;
-    (void)persister_dump_any;
     (void)persister_dump_code_state;
     (void)persister_dump_stack;
     (void)persister_dump_vm_state;
-    (void)persister_dump_qstr;  
-    (void)persister_dump_small_int;
     (void)persister_dump_mp_int_t;
     (void)persister_dump_mp_uint_t;
 

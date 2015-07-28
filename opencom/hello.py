@@ -1,7 +1,7 @@
 import upersist
 persister = upersist.Persister()
 
-obj = b"hello"
+obj = (b"world", b"hello", ())
 
 
 result = upersist.test(persister, obj)
