@@ -1,17 +1,22 @@
-import upersist
-persister = upersist.Persister()
+import sys
 
-obj = (b"world", b"hello", ())
-
-
-result = upersist.test(persister, obj)
-print("object:", obj)
-
-assert result.startswith(b"MP\x80\x01"), result[:4]
-magic, header, content = result.split(b"\n", 2)
-assert magic == b"MP\x80\x01"
-assert header == b'micropython persist v0.1'
-print(content)
+try:
+    import upersist
+    persister = upersist.Persister()
+    
+    obj = [b"world", b"hello", ()]
+    
+    result = upersist.test(persister, obj)
+    print("object:", obj)
+    
+    assert result.startswith(b"MP\x80\x01"), result[:4]
+    magic, header, content = result.split(b"\n", 2)
+    assert magic == b"MP\x80\x01"
+    assert header == b'micropython persist v0.1'
+    print(content)
+except Exception as e:
+    sys.print_exception(e)
+    sys.exit(1)
 
 SEEK_SET = 2
 
@@ -146,6 +151,13 @@ class Parser():
             result.append(self.load())
         return tuple(result)
         
+    def load_l(self):
+        size = self.load_size()
+        result = []
+        for i in range(size):
+            result.append(self.load())
+        return result
+        
     def load_M(self):
         "Main object"
         obj = self.load()
@@ -154,7 +166,6 @@ class Parser():
 
 parser = Parser(ReadIO(result))
 
-import sys
 
 try:
     obj = parser.parse()
