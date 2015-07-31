@@ -137,6 +137,7 @@ inline mp_uint_t _modpersist_uint_first_(mp_uint_t first, mp_uint_t last) {
 // 3-way tagging
 
 #define PACK(type, obj) persister_dump_##type(persister, (obj))
+#define SUBPACK(type, obj) _ref = PACK(type, obj);
 #define PACK_ANY(obj) PACK(any, (obj))
 #define PACK_PTR(obj, ref) persister_dump_ptr(persister, (obj), (ref))
 
@@ -635,13 +636,13 @@ STATIC mp_uint_t persister_dump_common_obj(mp_obj_persister_t *persister, mp_obj
     
     if (0) {
     } else if (MP_OBJ_IS_STR(obj)) {
-        PACK(str, obj);
+        SUBPACK(str, obj);
     } else if (MP_OBJ_IS_TYPE(obj, &mp_type_bytes)) {
-        PACK(bytes, obj);
+        SUBPACK(bytes, obj);
     } else if (MP_OBJ_IS_TYPE(obj, &mp_type_int)) {
-        PACK(int, obj);
+        SUBPACK(int, obj);
     } else if (MP_OBJ_IS_TYPE(obj, &mp_type_tuple)) {
-        PACK(tuple, obj);
+        SUBPACK(tuple, obj);
     // } else if (MP_OBJ_IS_FUN(obj)) {
     //    PACK_ERROR("failed to persi");
     } else if (!(start <= obj && obj < end)) {
@@ -750,6 +751,14 @@ STATIC void persister_dump_ptr(mp_obj_persister_t *persister, mp_obj_t obj, mp_u
     }
 }
 
+STATIC void persister_dump_main(mp_obj_persister_t *persister, mp_obj_t obj) {
+    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
+
+    mp_uint_t ref = PACK_ANY(obj);
+    WRITE_INT8('M');
+    PACK_PTR(obj, ref);
+}
+
 const mp_obj_type_t mp_type_persister = {
     { &mp_type_type },
     .name = MP_QSTR_Persister,
@@ -763,7 +772,7 @@ STATIC mp_obj_t mod_persist_test(mp_obj_t persister_obj, mp_obj_t obj) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
     WRITE_STR(MP_PERSIST_MAGIC "\n" "micropython persist v0.1\n");
-    PACK_PTR(obj, PACK_ANY(obj));
+    PACK(main, obj);
     
     (void)persister_dump_microthread;
     (void)persister_dump_baseptr;
