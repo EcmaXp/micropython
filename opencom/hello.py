@@ -1,10 +1,19 @@
 import sys
 
+total = {}
+
+import jnupy
+for name, module in jnupy.builtin_modules.items():
+    for key in dir(module):
+        value = getattr(module, key)
+        if callable(value):
+            total[id(value)] = value, "{}.{}".format(name, key)
+
 try:
     import upersist
     persister = upersist.Persister()
     
-    obj = [b"world", b"hello", ()]
+    obj = [b"world", b"hello", (), jnupy.input]
     
     result = upersist.test(persister, obj)
     print("object:", obj)
@@ -56,6 +65,17 @@ class ReadIO():
     def tell(self):
         return self.pos
 
+class FakeFunction():
+    def __init__(self, name):
+        assert name.endswith("_obj")
+        self.name = name[:-len("_obj")]
+        
+    def __repr__(self):
+        return "<function {}>".format(self.name)
+
+class ParseError(RuntimeError):
+    pass
+
 class Parser():
     def __init__(self, fp):
         self.fp = fp
@@ -83,11 +103,17 @@ class Parser():
         tag = fp.read(1)
         if not tag:
             return False
-            
+        
         obj = getattr(self, "load_" + tag.decode())()
         self.data[pos] = obj
         
-        print(pos, ':', fp.content[pos:fp.tell()], '->', obj)
+        buf = fp.content[pos:fp.tell()]
+        if tag not in b"oO":
+            print('#{}: {} -> {!r}'.format(pos, buf, obj))
+        else:
+            ref = self.decode_int(buf[1:])
+            print('#{}: {} -> #{}'.format(pos, buf, ref))
+        
         return obj
 
     def decode_int(self, encoded_size):
@@ -113,7 +139,12 @@ class Parser():
         "bytes"
         size = self.load_size()
         return self.fp.read(size)
-        
+
+    def load_s(self):
+        "str"
+        size = self.load_size()
+        return self.fp.read(size).decode()
+   
     def load_o(self):
         "object (with 2 bytes encoded)"
         encoded_pos = self.fp.read(2)
@@ -121,6 +152,20 @@ class Parser():
         if pos not in self.data:
             print(encoded_pos, pos)
         return self.data[pos]
+    
+    def load_E(self):
+        "error (only debugging)"
+        size = self.fp.read(1)
+        assert size == b":"
+
+        pos = self.fp.tell()
+        encoded_message = self.fp.read(1024)
+        encoded_message = encoded_message.partition(b'\0')[0]
+        self.fp.seek(pos + len(encoded_message) + 1, SEEK_SET)
+
+        message = encoded_message.decode()
+
+        return ParseError(message)
     
     def load_O(self):
         "Object (with 4 bytes encoded)"
@@ -150,7 +195,11 @@ class Parser():
         for i in range(size):
             result.append(self.load())
         return tuple(result)
-        
+    
+    def load_F(self):
+        funcname = self.load()
+        return FakeFunction(funcname)
+    
     def load_l(self):
         size = self.load_size()
         result = []
