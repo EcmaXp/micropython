@@ -445,8 +445,10 @@ typedef struct _mp_obj_persister_t {
     mp_uint_t regmap_size;
     #endif
 
-    mp_map_t *objmap;    
+    mp_map_t *objmap;
     mp_obj_system_buf_t *sysbuf;
+
+    mp_obj_t userfunc;
 } mp_obj_persister_t;
 
 const mp_obj_type_t mp_type_persister;
@@ -491,7 +493,11 @@ STATIC mp_obj_t persister_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t
     // TODO: make map that targeting pointers?
     // TODO: registered type can persist by calling some?
 
-    mp_arg_check_num(n_args, n_kw, 0, 0, false);
+    mp_obj_t user_persist_func = MP_OBJ_NULL;
+    mp_arg_check_num(n_args, n_kw, 0, 1, false);
+    if (1 <= n_args) {
+        user_persist_func = args[0];
+    }
     
     #if MP_PERSIST_USE_REGMAP
     mp_uint_t memsize = ((mp_uint_t)MP_STATE_MEM(gc_pool_end) - (mp_uint_t)MP_STATE_MEM(gc_pool_start));
@@ -517,6 +523,7 @@ STATIC mp_obj_t persister_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t
     #endif
     persister->sysbuf = system_buf_new();
     persister->objmap = mp_map_new(16);
+    persister->userfunc = user_persist_func;
 
     return persister;
 }
@@ -759,21 +766,22 @@ STATIC mp_uint_t persister_dump_dict(mp_obj_persister_t *persister, mp_obj_t obj
     DUMP_END();
 }
 
-STATIC mp_uint_t persister_dump_builtin(mp_obj_persister_t *persister, mp_obj_t obj) {
+STATIC mp_uint_t persister_dump_user(mp_obj_persister_t *persister, mp_obj_t obj) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
-
-    return 0;
 
     DUMP_START();
     
-    const char *name = "builtin test";
-    mp_uint_t name_len = strlen(name);
+    mp_buffer_info_t retbuf;
+    
+    // TODO: persister's user function can access PACK_PTR and PACK_ANY for internal usage?
+    mp_obj_t result = mp_call_function_1(persister->userfunc, obj);
 
-    WRITE_INT8('B');
-    WRITE_INT8('s'); // string type
-    WRITE_SIZE(name_len);
-    WRITE_STRN(name, name_len);
-
+    mp_get_buffer_raise(result, &retbuf, MP_BUFFER_READ);
+    
+    WRITE_INT8('U');
+    WRITE_SIZE(retbuf.len);
+    WRITE_STRN(retbuf.buf, retbuf.len);
+    
     DUMP_END();
 }
 
@@ -801,7 +809,7 @@ STATIC mp_uint_t persister_dump_common_obj(mp_obj_persister_t *persister, mp_obj
     // } else if (MP_OBJ_IS_FUN(obj)) {
     //    PACK_ERROR("failed to persi");
     } else {
-        mp_uint_t ref = PACK(builtin, obj);
+        mp_uint_t ref = PACK(user, obj);
         if (ref != 0) {
             SUBPACKED(ref);
         } else if (start <= obj && obj < end) {
@@ -815,43 +823,23 @@ STATIC mp_uint_t persister_dump_common_obj(mp_obj_persister_t *persister, mp_obj
 }
 
 STATIC mp_uint_t persister_dump_obj(mp_obj_persister_t *persister, mp_obj_t obj) {
-    // should check already registerd!
-    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
-
     if (0) {
-    // X tagging is special pointer.
     } else if (obj == MP_OBJ_NULL) {
-        WRITE_INT8('X');
-        WRITE_INT8('N');
     } else if (obj == MP_OBJ_STOP_ITERATION) {
-        WRITE_INT8('X');
-        WRITE_INT8('I');
     } else if (obj == MP_OBJ_SENTINEL) {
-        WRITE_INT8('X');
-        WRITE_INT8('S');
     #if MICROPY_ALLOW_PAUSE_VM
     } else if (obj == MP_OBJ_PAUSE_VM) {
-        WRITE_INT8('X');
-        WRITE_INT8('P');
     #endif
-    // C tagging is const pointer.
     } else if (obj == mp_const_none) {
-        WRITE_INT8('C');
-        WRITE_INT8('N');
     } else if (obj == mp_const_true) {
-        WRITE_INT8('C');
-        WRITE_INT8('T');
     } else if (obj == mp_const_false) {
-        WRITE_INT8('C');
-        WRITE_INT8('F');
     } else if (obj == (mp_obj_t)&mp_const_ellipsis_obj) {
-        WRITE_INT8('C');
-        WRITE_INT8('E');
     } else {
         // common object
         return PACK(common_obj, obj);
     }
     
+    // this is const object
     return 0;
 }
 
@@ -892,9 +880,36 @@ STATIC void persister_dump_ptr(mp_obj_persister_t *persister, mp_obj_t obj, mp_u
         WRITE_INT8('Q');
         WRITE_PTR(ref);
     } else if (MP_OBJ_IS_OBJ(obj)) {
-        if (ref == 0) {
-            // pass
-            // Already const value writed by persister_dump_any.
+        if (0) {
+        } else if (obj == MP_OBJ_NULL) {
+            WRITE_INT8('X');
+            WRITE_INT8('N');
+        } else if (obj == MP_OBJ_STOP_ITERATION) {
+            WRITE_INT8('X');
+            WRITE_INT8('I');
+        } else if (obj == MP_OBJ_SENTINEL) {
+            WRITE_INT8('X');
+            WRITE_INT8('S');
+        #if MICROPY_ALLOW_PAUSE_VM
+        } else if (obj == MP_OBJ_PAUSE_VM) {
+            WRITE_INT8('X');
+            WRITE_INT8('P');
+        #endif
+        // C tagging is const pointer.
+        } else if (obj == mp_const_none) {
+            WRITE_INT8('C');
+            WRITE_INT8('N');
+        } else if (obj == mp_const_true) {
+            WRITE_INT8('C');
+            WRITE_INT8('T');
+        } else if (obj == mp_const_false) {
+            WRITE_INT8('C');
+            WRITE_INT8('F');
+        } else if (obj == (mp_obj_t)&mp_const_ellipsis_obj) {
+            WRITE_INT8('C');
+            WRITE_INT8('E');
+        } else if (ref == 0) {
+            nlr_raise(mp_obj_new_exception_msg(&mp_type_RuntimeError, "unknown builtin const detected"));
         } else if (ref <= 0xFFFF) {
             WRITE_INT8('o');
             WRITE_UINT16(ref);

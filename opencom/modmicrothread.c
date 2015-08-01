@@ -398,8 +398,6 @@ STATIC mp_obj_t microthread_attr_del(mp_obj_t microthread_obj) {
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(microthread_attr_del_obj, microthread_attr_del);
 
 STATIC mp_obj_t mod_microthread_pause(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
-    mp_arg_check_num(n_args, n_kw, 0, 1, false);
-
     if (1 <= n_args) {
         mp_current_microthread->last_result = args[0];
     }
@@ -407,17 +405,7 @@ STATIC mp_obj_t mod_microthread_pause(mp_obj_t self_in, mp_uint_t n_args, mp_uin
     return MP_OBJ_PAUSE_VM;
 }
 
-typedef struct _mp_type_fun_pause_t {
-    mp_obj_base_t base;
-} mp_type_fun_pause_t;
-
-const mp_obj_type_t mp_type_fun_microthread_pause = {
-    { &mp_type_type },
-    .name = MP_QSTR_function,
-    .call = mod_microthread_pause,
-};
-
-STATIC const mp_type_fun_pause_t mod_microthread_pause_obj = {{&mp_type_fun_microthread_pause}};
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_microthread_pause_obj, 0, 1, mod_microthread_pause);
 
 STATIC void microthread_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     mp_obj_microthread_t *self = self_in;

@@ -1,19 +1,54 @@
 import sys
-
-total = {}
-
 import jnupy
+
+func2name = {}
+name2func = {}
+
+def register_func(module_name, func_name, func):
+    if callable(value):
+        try:
+            hash(value)
+        except TypeError:
+            return
+        
+        func2name[value] = k2 = "{}.{}".format(module_name, func_name).encode()
+        name2func[k2] = value
+        
 for name, module in jnupy.builtin_modules.items():
     for key in dir(module):
         value = getattr(module, key)
-        if callable(value):
-            total[id(value)] = value, "{}.{}".format(name, key)
+        register_func(name, key, value)
+
+for name, module in jnupy.get_loaded_modules().items():
+    if name not in ("sys",):
+        continue
+    
+    for key in dir(module):
+        value = getattr(module, key)
+        register_func(name, key, value)
+
+def dumper(obj):
+    try:
+        hash(obj)
+    except TypeError:
+        return b"<FAIL>"
+    
+    if obj in func2name:
+        return func2name[obj]
+    
+    raise RuntimeError("failed to find original")
+
+def loader(parser, buf):
+    if buf in name2func:
+        return name2func[buf]
+    
+    return ParseError("failed to find original object")
 
 try:
     import upersist
-    persister = upersist.Persister()
-    
-    obj = [b"world", b"hello", (), jnupy.input]
+    persister = upersist.Persister(dumper)
+
+    obj = [b"world", b"hello", (), None]
     
     result = upersist.test(persister, obj)
     print("object:", obj)
@@ -188,6 +223,10 @@ class Parser():
             return False
         else:
             assert False, "unexcepted subtag: %r" % (subtag,)
+    
+    def load_U(self):
+        buf = self.load_b()
+        return loader(self, buf)
     
     def load_t(self):
         size = self.load_size()
