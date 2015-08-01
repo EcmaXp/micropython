@@ -48,7 +48,7 @@ try:
     import upersist
     persister = upersist.Persister(dumper)
 
-    obj = [b"world", b"hello", (), None]
+    obj = dict(hello=32, world=31, test=30)
     
     result = upersist.test(persister, obj)
     print("object:", obj)
@@ -140,15 +140,17 @@ class Parser():
             return False
         
         obj = getattr(self, "load_" + tag.decode())()
-        self.data[pos] = obj
+        
+        if tag not in b'CX':
+            self.data[pos] = obj
         
         buf = fp.content[pos:fp.tell()]
-        if tag not in b"oO":
-            print('#{}: {} -> {!r}'.format(pos, buf, obj))
-        else:
+        if tag in b"oO":
             ref = self.decode_int(buf[1:])
             print('#{}: {} -> #{}'.format(pos, buf, ref))
-        
+        else:
+            print('#{}: {} -> {!r}'.format(pos, buf, obj))
+
         return obj
 
     def decode_int(self, encoded_size):
@@ -167,7 +169,7 @@ class Parser():
         
         size = self.decode_int(encoded_size)
 
-        assert size < (self.last - fp.tell()), "too large size"
+        assert size < (self.last - fp.tell()), ("too large size", size, self.last - fp.tell())
         return size
 
     def load_b(self):
@@ -179,15 +181,73 @@ class Parser():
         "str"
         size = self.load_size()
         return self.fp.read(size).decode()
-   
-    def load_o(self):
-        "object (with 2 bytes encoded)"
-        encoded_pos = self.fp.read(2)
+
+    def load_q(self):
+        "qstr"
+        return self.load_s()
+    
+    def load_t(self):
+        "tuple"
+        size = self.load_size()
+        result = []
+        for i in range(size):
+            result.append(self.load())
+        return tuple(result)
+
+    def load_l(self):
+        "list"
+        size = self.load_size()
+        result = []
+        for i in range(size):
+            result.append(self.load())
+        return result
+
+    def load_d(self):
+        "dict"
+        size = self.load_size()
+        result = {}
+        for i in range(size):
+            key = self.load()
+            value = self.load()
+            result[key] = value
+        return result
+    
+    def load_i(self):
+        "int"
+        # TODO: signed int?
+
+        fp = self.fp
+        encoded_size_length = fp.read(1)
+        assert encoded_size_length in b'1248'
+
+        num_length = int(encoded_size_length.decode())
+        encoded_num = fp.read(num_length)
+        
+        num = self.decode_int(encoded_num)
+        return num
+    
+    def load_S(self):
+        "small int (with 4 bytes encoded)"
+        encoded_num = self.fp.read(4)
+        num = self.decode_int(encoded_num)
+        return num
+    
+    def load_object(self, size):
+        assert 1 <= size <= 4
+        encoded_pos = self.fp.read(size)
         pos = self.decode_int(encoded_pos)
         if pos not in self.data:
             print(encoded_pos, pos)
-        return self.data[pos]
+        return self.data[pos] 
     
+    def load_O(self):
+        "#object (with 2 bytes encoded)"
+        return self.load_object(2)
+
+    def load_Q(self):
+        "#object (with 4 bytes encoded)"
+        return self.load_object(4)
+        
     def load_E(self):
         "error (only debugging)"
         size = self.fp.read(1)
@@ -201,14 +261,6 @@ class Parser():
         message = encoded_message.decode()
 
         return ParseError(message)
-    
-    def load_O(self):
-        "Object (with 4 bytes encoded)"
-        encoded_pos = self.fp.read(4)
-        pos = self.decode_int(encoded_pos)
-        if pos not in self.data:
-            print(encoded_pos, pos)
-        return self.data[pos]
     
     def load_X(self):
         raise NotImplementedError
@@ -228,24 +280,6 @@ class Parser():
         buf = self.load_b()
         return loader(self, buf)
     
-    def load_t(self):
-        size = self.load_size()
-        result = []
-        for i in range(size):
-            result.append(self.load())
-        return tuple(result)
-    
-    def load_F(self):
-        funcname = self.load()
-        return FakeFunction(funcname)
-    
-    def load_l(self):
-        size = self.load_size()
-        result = []
-        for i in range(size):
-            result.append(self.load())
-        return result
-        
     def load_M(self):
         "Main object"
         obj = self.load()
@@ -253,7 +287,6 @@ class Parser():
         return obj
 
 parser = Parser(ReadIO(result))
-
 
 try:
     obj = parser.parse()

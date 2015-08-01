@@ -169,8 +169,8 @@ STATIC mp_map_elem_t *modpersist_mp_map_lookup(mp_map_t *map, mp_obj_t index) {
 
 #define WRITE_SIZE(size) system_buf_write_size(sysbuf, (size))
 
-#define WRITE_INT8(data) system_buf_write_int(sysbuf, (data), (1))
-#define WRITE_UINT8(data) system_buf_write_uint(sysbuf, (data), (1))
+#define WRITE_INT8(data) system_buf_write_int8(sysbuf, (data))
+#define WRITE_UINT8(data) system_buf_write_int8(sysbuf, (data))
 
 #define WRITE_INT16(data) system_buf_write_int(sysbuf, (data), (2))
 #define WRITE_UINT16(data) system_buf_write_uint(sysbuf, (data), (2))
@@ -184,9 +184,12 @@ STATIC mp_map_elem_t *modpersist_mp_map_lookup(mp_map_t *map, mp_obj_t index) {
 #define WRITE_PTR(data) WRITE_UINT32(data)
 
 #define DUMP_START() \
-    mp_uint_t _ref = sysbuf->len;
-
+    mp_uint_t _ref = sysbuf->len; \
+    if (modpersist_starting_dump(persister, obj, &_ref)) {
+        /* body */
+        
 #define DUMP_END() \
+    } \
     return _ref;
 
 #define PACK_START() \
@@ -241,18 +244,22 @@ STATIC mp_obj_system_buf_t *system_buf_new() {
 }
 
 STATIC mp_uint_t system_buf_write(mp_obj_system_buf_t *system_buf, const char *str, unsigned int size) {
+    bool is_overflow = false;
     mp_uint_t new_alloc = system_buf->alloc;
     while (new_alloc < system_buf->len + size) {
         new_alloc = sizeof(byte) * new_alloc * 3 + 1;    
+        is_overflow = true;
     }
 
-    byte *new_buf = realloc(system_buf->buf, new_alloc);
-    assert(new_buf != NULL);
+    if (is_overflow) {
+        byte *new_buf = realloc(system_buf->buf, new_alloc);
+        assert(new_buf != NULL);
+        
+        memset(new_buf + system_buf->len, 0, new_alloc - system_buf->len);
+        system_buf->buf = new_buf;
+        system_buf->alloc = new_alloc;
+    }
     
-    memset(new_buf + system_buf->len, 0, new_alloc - system_buf->len);
-    system_buf->buf = new_buf;
-    system_buf->alloc = new_alloc;
-
     memcpy(system_buf->buf + system_buf->len, str, size);
     
     mp_uint_t last_len = system_buf->len;
@@ -278,6 +285,10 @@ typedef union _persist_union_int_t {
     pui.c[a] = pui.c[b]; \
     pui.c[b] = tmp; \
 } while(0)
+
+inline STATIC mp_uint_t system_buf_write_int8(mp_obj_system_buf_t *sysbuf, char num) {
+    return system_buf_write(sysbuf, &num, 1);
+}
 
 STATIC mp_uint_t system_buf_write_int(mp_obj_system_buf_t *sysbuf, long long num, unsigned int size) {
     // TODO: should test this function working well
@@ -457,11 +468,22 @@ STATIC bool modpersist_starting_pack(mp_obj_persister_t *persister, mp_obj_t obj
     mp_map_elem_t *persist_reg = modpersist_mp_map_lookup(persister->objmap, obj);
 
     bool require_packing = (persist_reg->value == MP_OBJ_NULL);
+    if (!require_packing) {
+        *ref = (mp_uint_t)persist_reg->value;
+    }
+    
+    return require_packing;
+}
+
+STATIC bool modpersist_starting_dump(mp_obj_persister_t *persister, mp_obj_t obj, mp_uint_t *ref) {
+    mp_map_elem_t *persist_reg = modpersist_mp_map_lookup(persister->objmap, obj);
+
+    bool require_packing = (persist_reg->value == MP_OBJ_NULL);
     if (require_packing) {
         persist_reg->value = (mp_obj_t)(persister->sysbuf->len);
     }
     
-    *ref = (mp_uint_t)persist_reg->value;   
+    *ref = (mp_uint_t)persist_reg->value;
     return require_packing;
 }
 
@@ -750,7 +772,7 @@ STATIC mp_uint_t persister_dump_dict(mp_obj_persister_t *persister, mp_obj_t obj
     WRITE_INT8('d');
     WRITE_SIZE(size);
     
-    iter = mp_getiter(obj);
+    iter = mp_getiter(mp_call_function_0(mp_load_attr(obj, MP_QSTR_items)));
     for (mp_int_t i = 0; i < size; i++){
         mp_obj_t cur = mp_iternext(iter);
         mp_uint_t csize = 0;
@@ -823,18 +845,17 @@ STATIC mp_uint_t persister_dump_common_obj(mp_obj_persister_t *persister, mp_obj
 }
 
 STATIC mp_uint_t persister_dump_obj(mp_obj_persister_t *persister, mp_obj_t obj) {
-    if (0) {
-    } else if (obj == MP_OBJ_NULL) {
-    } else if (obj == MP_OBJ_STOP_ITERATION) {
-    } else if (obj == MP_OBJ_SENTINEL) {
+    if (!(
+        obj == MP_OBJ_NULL ||
+        obj == MP_OBJ_STOP_ITERATION ||
+        obj == MP_OBJ_SENTINEL ||
     #if MICROPY_ALLOW_PAUSE_VM
-    } else if (obj == MP_OBJ_PAUSE_VM) {
+        obj == MP_OBJ_PAUSE_VM ||
     #endif
-    } else if (obj == mp_const_none) {
-    } else if (obj == mp_const_true) {
-    } else if (obj == mp_const_false) {
-    } else if (obj == (mp_obj_t)&mp_const_ellipsis_obj) {
-    } else {
+        obj == mp_const_none || 
+        obj == mp_const_true || 
+        obj == mp_const_false ||
+    false)) {
         // common object
         return PACK(common_obj, obj);
     }
@@ -868,18 +889,10 @@ STATIC void persister_dump_ptr(mp_obj_persister_t *persister, mp_obj_t obj, mp_u
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
     if (0) {
-    } else if (MP_OBJ_IS_SMALL_INT(obj)) {
-        if (ref != 0) {
-            WRITE_INT8('I');
-            WRITE_PTR(ref);
-        } else {
-            WRITE_INT8('S');
-            WRITE_PTR(MP_OBJ_SMALL_INT_VALUE(obj));
-        }
-    } else if (MP_OBJ_IS_QSTR(obj)) {
-        WRITE_INT8('Q');
-        WRITE_PTR(ref);
-    } else if (MP_OBJ_IS_OBJ(obj)) {
+    } else if (MP_OBJ_IS_SMALL_INT(obj) && ref == 0) {
+        WRITE_INT8('S');
+        WRITE_PTR(MP_OBJ_SMALL_INT_VALUE(obj));
+    } else {
         if (0) {
         } else if (obj == MP_OBJ_NULL) {
             WRITE_INT8('X');
@@ -905,24 +918,20 @@ STATIC void persister_dump_ptr(mp_obj_persister_t *persister, mp_obj_t obj, mp_u
         } else if (obj == mp_const_false) {
             WRITE_INT8('C');
             WRITE_INT8('F');
-        } else if (obj == (mp_obj_t)&mp_const_ellipsis_obj) {
-            WRITE_INT8('C');
-            WRITE_INT8('E');
-        } else if (ref == 0) {
-            nlr_raise(mp_obj_new_exception_msg(&mp_type_RuntimeError, "unknown builtin const detected"));
-        } else if (ref <= 0xFFFF) {
-            WRITE_INT8('o');
-            WRITE_UINT16(ref);
-        } else if (ref <= 0XFFFFFFFF) {
-            WRITE_INT8('O');
-            WRITE_UINT32(ref);
         } else {
-            // XXX WOW?
-            nlr_raise(mp_obj_new_exception_msg(&mp_type_RuntimeError, "too large refernce index"));
+            if (ref == 0) {
+                nlr_raise(mp_obj_new_exception_msg(&mp_type_RuntimeError, "unknown refernce detected"));
+            } else if (ref <= 0xFFFF) {
+                WRITE_INT8('O');
+                WRITE_UINT16(ref);
+            } else if (ref <= 0XFFFFFFFF) {
+                WRITE_INT8('Q');
+                WRITE_UINT32(ref);
+            } else {
+                // XXX WOW?
+                nlr_raise(mp_obj_new_exception_msg(&mp_type_RuntimeError, "too large refernce index"));
+            }
         }
-    } else {
-        WRITE_INT8('E');
-        WRITE_PTR(ref);
     }
 }
 
