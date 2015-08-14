@@ -46,6 +46,7 @@
 #define MICROPY_LIMIT_CPU           (1)
 #define MICROPY_GCREGS_SETJMP       (1)
 #define MICROPY_PY_COMPILE_SINGLE_WITH_REPL (1)
+#define MICROPY_EMIT_BC_WITH_SIZE   (1) // for copy bytecode.
 
 // options to control how Micro Python is built
 #define MICROPY_COMP_MODULE_CONST   (1)

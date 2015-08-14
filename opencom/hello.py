@@ -4,6 +4,19 @@ import jnupy
 func2name = {}
 name2func = {}
 
+x = {"a":32}
+func = exec("""def register_func(module_name, func_name, func):
+    if callable(value):
+        try:
+            hash(value)
+        except TypeError:
+            return
+        
+        func2name[value] = k2 = "{}.{}".format(module_name, func_name).encode()
+        name2func[k2] = value""", x, x)
+
+obj = (dict(hello=32, world=31, test=30, func=x), "EOF")
+
 def register_func(module_name, func_name, func):
     if callable(value):
         try:
@@ -48,8 +61,6 @@ try:
     import upersist
     persister = upersist.Persister(dumper)
 
-    obj = dict(hello=32, world=31, test=30)
-    
     result = upersist.test(persister, obj)
     print("object:", obj)
     
@@ -100,13 +111,24 @@ class ReadIO():
     def tell(self):
         return self.pos
 
-class FakeFunction():
+class _FakeFunction():
     def __init__(self, name):
         assert name.endswith("_obj")
         self.name = name[:-len("_obj")]
         
     def __repr__(self):
         return "<function {}>".format(self.name)
+
+class _FakeRefernce():
+    def __init__(self, ref):
+        self.ref = ref
+        
+    def __repr__(self):
+        return "<refernce #{}>".format(self.ref)
+
+class _FakeBytecode():
+    def __init__(self):
+        pass
 
 class ParseError(RuntimeError):
     pass
@@ -131,21 +153,49 @@ class Parser():
             self.load()
         
         return self.main_obj
-        
+    
     def load(self):
+        # TODO: while unpersisting object
+        #       if object are nested then can't unpersist
+        
         fp = self.fp
         pos = fp.tell()
-        tag = fp.read(1)
+        tag = fp.read(1).decode()
         if not tag:
             return False
         
-        obj = getattr(self, "load_" + tag.decode())()
+        default_type = getattr(self, "default_" + tag, None)
+
+        fakeref = obj = None
+        if tag not in ('C', 'X'):
+            if default_type is None:
+                self.data[pos] = fakeref = _FakeRefernce(pos)
+            else:
+                self.data[pos] = obj = default_type()
         
-        if tag not in b'CX':
+        try:
+            if default_type is None:
+                obj = getattr(self, "load_" + tag)()
+            else:
+                obj = getattr(self, "load_" + tag)(obj)
+        except Exception:
+            buf = fp.content[pos:pos + 32]
+            print('#ERR {}: {}...'.format(pos, buf))
+            raise
+        
+        if tag not in ('C', 'X'):
             self.data[pos] = obj
+            if fakeref is not None:
+                fakeref.obj = obj
+        
+        # TODO: remove cycle reference. (and use own safe repr library?)
+        try:
+            repr(obj)
+        except Exception:
+            obj = _FakeRefernce("{}!".format(pos))
         
         buf = fp.content[pos:fp.tell()]
-        if tag in b"oO":
+        if tag in ('o', 'O'):
             ref = self.decode_int(buf[1:])
             print('#{}: {} -> #{}'.format(pos, buf, ref))
         else:
@@ -161,15 +211,12 @@ class Parser():
 
     def load_size(self):
         fp = self.fp
-        encoded_size_length = fp.read(1)
-        assert encoded_size_length in b'1248'
+        size = self.load_i()
 
-        size_length = int(encoded_size_length.decode())
-        encoded_size = fp.read(size_length)
-        
-        size = self.decode_int(encoded_size)
+        # TODO: check by typed?
+        typesize = 1
+        assert size * typesize < (self.last - fp.tell()), ("too large size", size, self.last - fp.tell())
 
-        assert size < (self.last - fp.tell()), ("too large size", size, self.last - fp.tell())
         return size
 
     def load_b(self):
@@ -202,10 +249,10 @@ class Parser():
             result.append(self.load())
         return result
 
-    def load_d(self):
+    default_d = dict
+    def load_d(self, result):
         "dict"
         size = self.load_size()
-        result = {}
         for i in range(size):
             key = self.load()
             value = self.load()
@@ -231,6 +278,52 @@ class Parser():
         encoded_num = self.fp.read(4)
         num = self.decode_int(encoded_num)
         return num
+    
+    def load_F(self):
+        "function (fun_bc)"
+        load_int = lambda n: self.decode_int(self.fp.read(n // 8))
+        
+        global_dict = self.load()
+        n_pos_args = load_int(8)
+        n_kwonly_args = load_int(8)
+        n_def_args = load_int(8)
+        flags = load_int(8)
+        code_info_size = load_int(32)
+        code_info = load_int(32)
+        extra_args = load_int(32)
+        print("function info")
+        print(global_dict, n_pos_args, n_kwonly_args, n_def_args, flags, code_info_size, code_info, extra_args)
+        print("code_info:", self.load_b())
+        
+        return "fake function!"
+        
+    def load_bytecode(self):
+        "bytecode (will used for fun_bc)"
+        load_int = lambda n: self.decode_int(self.fp.read(n // 8))
+        skip = lambda n: self.read(n) and None
+        version = self.fp.read(1)
+        assert version == b'0'
+        block_name = self.load()
+        source_file = self.load()
+
+        arg_names_len = self.load_size()
+        for i in range(arg_names_len):
+            self.load()
+        
+        n_state = load_int(16)
+        n_exc_stack = load_int(16)
+        
+        local_num_len = self.load_size()
+        for i in range(local_num_len):
+            local_num = load_int(32)
+            
+        lineno_info_len = self.load_size()
+        for i in range(lineno_info_len):
+            lineno_info = load_int(8)
+            
+        bytecode_body = self.load_b()
+        print(bytecode_body)
+        return "<BYTECODE>"
     
     def load_object(self, size):
         assert 1 <= size <= 4
@@ -279,6 +372,18 @@ class Parser():
     def load_U(self):
         buf = self.load_b()
         return loader(self, buf)
+    
+    def load_E(self):
+        "extended object"
+        pos = self.fp.tell()
+        encoded_tag = self.fp.read(64)
+        encoded_tag = encoded_tag.partition(b'\0')[0]
+        self.fp.seek(pos + len(encoded_tag) + 1, SEEK_SET)
+        
+        tag = encoded_tag.decode()
+        assert len(tag) > 1
+        obj = getattr(self, "load_" + tag)()
+        return obj
     
     def load_M(self):
         "Main object"

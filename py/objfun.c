@@ -362,7 +362,7 @@ mp_obj_t mp_obj_new_fun_bc(mp_uint_t scope_flags, mp_uint_t n_pos_args, mp_uint_
     o->takes_var_args = (scope_flags & MP_SCOPE_FLAG_VARARGS) != 0;
     o->takes_kw_args = (scope_flags & MP_SCOPE_FLAG_VARKEYWORDS) != 0;
     #if MICROPY_EMIT_BC_WITH_SIZE
-    o->bytecode_size = size;
+    o->bytecode_size = codesize;
     #endif
     o->bytecode = code;
     if (def_args != MP_OBJ_NULL) {
