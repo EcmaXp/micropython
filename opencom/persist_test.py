@@ -11,7 +11,7 @@ if jnupy:
     
     x = {"a":32}
     exec("""
-def hello(module_name, func_name, func=31, *args, **wargs, helo=32, help):
+def hello():
     if callable(value):
         try:
             hash(value)
@@ -281,7 +281,10 @@ class Parser():
 
         fp = self.fp
         encoded_size_length = fp.read(1)
-        assert encoded_size_length in b'1248'
+        assert encoded_size_length in b'01248'
+
+        if encoded_size_length == b'0':
+            return 0
 
         num_length = int(encoded_size_length.decode())
         encoded_num = fp.read(num_length)

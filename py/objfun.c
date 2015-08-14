@@ -182,6 +182,7 @@ mp_code_state *mp_obj_fun_bc_prepare_codestate(mp_obj_t self_in, mp_uint_t n_arg
         #endif
     }
 
+    code_state->fun = self_in;
     code_state->n_state = n_state;
     code_state->code_info = 0; // offset to code-info
     code_state->ip = (byte*)(ip - self->bytecode); // offset to prelude
@@ -233,6 +234,7 @@ STATIC mp_obj_t fun_bc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, 
         state_size = 0; // indicate that we allocated using alloca
     }
 
+    code_state->fun = self_in;
     code_state->n_state = n_state;
     code_state->code_info = 0; // offset to code-info
     code_state->ip = (byte*)(ip - self->bytecode); // offset to prelude

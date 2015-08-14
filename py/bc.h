@@ -40,6 +40,11 @@ typedef struct _mp_exc_stack {
 } mp_exc_stack_t;
 
 typedef struct _mp_code_state {
+    #if MICROPY_CODE_STATE_HAS_FUN
+    // modpersist: owner function will require for persist
+    mp_obj_t fun;
+    #endif
+    
     const byte *code_info;
     const byte *ip;
     mp_obj_t *sp;

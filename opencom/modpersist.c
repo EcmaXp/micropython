@@ -157,7 +157,7 @@ STATIC mp_map_elem_t *modpersist_mp_map_lookup(mp_map_t *map, mp_obj_t index) {
 #define SUBPACKED(ref) _ref = (ref);
 #define PACK_ANY(obj) PACK(any, (obj))
 #define PACK_PTR(obj, ref) persister_dump_ptr(persister, (obj), (ref))
-#define PACK_REF(ref) PACK(ref, (ref))
+#define PACK_REF(ref_val) PACK(ref, (ref_val))
 #define PACK_QSTR(qstr_val) PACK(qstr, MP_OBJ_NEW_QSTR(qstr_val))
 
 // TODO: BASEPTR should accept ?
@@ -341,7 +341,9 @@ STATIC mp_uint_t system_buf_write_uint(mp_obj_system_buf_t *sysbuf, unsigned lon
 STATIC mp_int_t system_buf_write_size(mp_obj_system_buf_t *sysbuf, mp_uint_t size) {
     mp_uint_t start = sysbuf->len;
 
-    if (size <= 0xFF) {
+    if (size == 0) {
+        WRITE_INT8('0');
+    } else if (size <= 0xFF) {
         WRITE_INT8('1');
         WRITE_UINT8(size);
     } else if (size <= 0xFFFF) {
@@ -502,7 +504,7 @@ STATIC mp_obj_t persister_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t
 }
 
 // 3 functions are used for persist anything.
-STATIC mp_uint_t persister_dump_any(mp_obj_persister_t *persister, mp_obj_t o);
+STATIC mp_ref_t persister_dump_any(mp_obj_persister_t *persister, mp_obj_t o);
 STATIC void persister_dump_ptr(mp_obj_persister_t *persister, mp_obj_t obj, mp_ref_t ref);
 STATIC void persister_dump_ref(mp_obj_persister_t *persister, mp_ref_t ref);
 
@@ -622,41 +624,12 @@ STATIC mp_persist_bytecode_t *persister_parse_bytecode_from_fun_bc(mp_obj_t obj)
     return bc;
 }
 
-STATIC mp_uint_t persister_dump_code_state(mp_obj_persister_t *persister, mp_obj_t obj) {
-
-/*
-typedef struct _mp_code_state {
-    const byte *code_info;
-    const byte *ip;
-    mp_obj_t *sp;
-    // bit 0 is saved currently_in_except_block value
-    mp_exc_stack_t *exc_sp;
-    mp_obj_dict_t *old_globals;
-    #if MICROPY_STACKLESS
-    struct _mp_code_state *prev;
-    #endif
-    #if MICROPY_KEEP_LAST_CODE_STATE
-    struct _mp_code_state *current;
-    #endif
-    mp_uint_t n_state;
-    // Variable-length
-    mp_obj_t state[0];
-    // Variable-length, never accessed by name, only as (void*)(state + n_state)
-    //mp_exc_stack_t exc_state[0];
-} mp_code_state;
-*/
-    
-    return -1;
-}
-
-STATIC mp_uint_t persister_dump_fun_bc(mp_obj_persister_t *persister, mp_obj_t obj) {
+STATIC mp_ref_t persister_dump_bytecode(mp_obj_persister_t *persister, mp_persist_bytecode_t *bc) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
-    assert(MP_OBJ_IS_TYPE(obj, &mp_type_fun_bc));
-    
-    mp_obj_fun_bc_t *fun_bc = obj;
-    mp_persist_bytecode_t *bc = persister_parse_bytecode_from_fun_bc(fun_bc);
+    // NOTE: mp_persist_bytecode_t is are part of fun_bc.
 
+    // bytecode pre-dump
     mp_obj_t block_name_obj = MP_OBJ_NEW_QSTR(bc->block_name);
     mp_ref_t block_name_ref = PACK_ANY(block_name_obj);
 
@@ -670,20 +643,8 @@ STATIC mp_uint_t persister_dump_fun_bc(mp_obj_persister_t *persister, mp_obj_t o
         arg_names_ref[i] = PACK_ANY(arg_names_obj[i]);
     }
     
-    DUMP_START();
-    mp_ref_t ref_globals = PACK_ANY(fun_bc->globals);
-    
-    DUMP_REMARK();
-    WRITE_INT8('F');
-    
-    PACK_PTR(fun_bc->globals, ref_globals);
-    WRITE_INT8(fun_bc->n_pos_args);
-    WRITE_INT8(fun_bc->n_kwonly_args);
-    WRITE_INT8(fun_bc->n_def_args);
-    WRITE_INT8(fun_bc->has_def_kw_args || fun_bc->takes_var_args << 2 || fun_bc->takes_kw_args << 3);
-    WRITE_INT32(0);
-    
-    // starting bytecode dump
+    // bytecode dump
+    mp_ref_t bytecode_ref = DUMP_SUBREF();
     {
         WRITE_INT8('E');
         WRITE_STR0("bytecode");
@@ -714,12 +675,71 @@ STATIC mp_uint_t persister_dump_fun_bc(mp_obj_persister_t *persister, mp_obj_t o
         WRITE_STRN((const char *)bc->bytecode_body, bc->bytecode_body_size);
     }
     
+    return bytecode_ref;
+}
+
+STATIC mp_ref_t persister_dump_code_state(mp_obj_persister_t *persister, mp_obj_t obj) {
+
+/*
+typedef struct _mp_code_state {
+    mp_obj_t fun;
+    const byte *code_info;
+    const byte *ip;
+    mp_obj_t *sp;
+    // bit 0 is saved currently_in_except_block value
+    mp_exc_stack_t *exc_sp;
+    mp_obj_dict_t *old_globals;
+    #if MICROPY_STACKLESS
+    struct _mp_code_state *prev;
+    #endif
+    #if MICROPY_KEEP_LAST_CODE_STATE
+    struct _mp_code_state *current;
+    #endif
+    mp_uint_t n_state;
+    // Variable-length
+    mp_obj_t state[0];
+    // Variable-length, never accessed by name, only as (void*)(state + n_state)
+    //mp_exc_stack_t exc_state[0];
+} mp_code_state;
+*/
+    
+    return -1;
+}
+
+STATIC mp_ref_t persister_dump_fun_bc(mp_obj_persister_t *persister, mp_obj_t obj) {
+    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
+
+    assert(MP_OBJ_IS_TYPE(obj, &mp_type_fun_bc));
+    
+    mp_obj_fun_bc_t *fun_bc = obj;
+    mp_persist_bytecode_t *bc = persister_parse_bytecode_from_fun_bc(fun_bc);
+
+    DUMP_START();
+    
+    // function pre-dump
+    mp_ref_t globals_ref = PACK_ANY(fun_bc->globals);
+    mp_ref_t bytecode_ref = persister_dump_bytecode(persister, bc);
+    
+    // function dump
+    DUMP_REMARK();
+    {
+        WRITE_INT8('F');
+        
+        PACK_PTR(fun_bc->globals, globals_ref);
+        WRITE_INT8(fun_bc->n_pos_args);
+        WRITE_INT8(fun_bc->n_kwonly_args);
+        WRITE_INT8(fun_bc->n_def_args);
+        WRITE_INT8(fun_bc->has_def_kw_args || fun_bc->takes_var_args << 2 || fun_bc->takes_kw_args << 3);
+        WRITE_INT32(0);
+        PACK_REF(bytecode_ref);
+    }
+    
     DUMP_END();
     
     return 0;
 }
 
-STATIC mp_uint_t persister_dump_microthread(mp_obj_persister_t *persister, mp_obj_t obj) {
+STATIC mp_ref_t persister_dump_microthread(mp_obj_persister_t *persister, mp_obj_t obj) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
     assert(MP_OBJ_IS_TYPE(obj, &mp_type_microthread));
@@ -727,60 +747,66 @@ STATIC mp_uint_t persister_dump_microthread(mp_obj_persister_t *persister, mp_ob
     mp_obj_microthread_t *thread = obj;
     
     DUMP_START();
-    mp_ref_t ref_name = PACK_ANY(thread->name);
-    mp_ref_t ref_fun = PACK_ANY(thread->fun);
-    mp_ref_t ref_last_result = PACK_ANY(thread->last_result);
-    mp_ref_t ref_prev_thread = PACK_ANY(thread->prev_thread);
-    mp_ref_t ref_code_state = PACK(code_state, thread->code_state);
     
-    mp_ref_t ref_status = DUMP_SUBREF();
-    WRITE_INT8('U');
-    WRITE_STR0("microthread_status");
-    WRITE_INT8('0'); // version: 0
+    // microthread pre-dump
+    mp_ref_t name_ref = PACK_ANY(thread->name);
+    mp_ref_t fun_ref = PACK_ANY(thread->fun);
+    mp_ref_t last_result_ref = PACK_ANY(thread->last_result);
+    mp_ref_t prev_thread_ref = PACK_ANY(thread->prev_thread);
+    mp_ref_t code_state_ref = PACK(code_state, thread->code_state);
     
-    mp_ref_t ref_context = DUMP_SUBREF();
-    WRITE_INT8('U');
-    WRITE_STR0("microthread_context");
-    WRITE_INT8('0'); // version: 0
+    // status dump
+    mp_ref_t status_ref = DUMP_SUBREF();
+    {
+        WRITE_INT8('E');
+        WRITE_STR0("microthread_status");
+        WRITE_INT8('0'); // version: 0
+    }
+
+    // context dump    
+    mp_ref_t context_ref = DUMP_SUBREF();
+    {
+        WRITE_INT8('E');
+        WRITE_STR0("microthread_context");
+        WRITE_INT8('0'); // version: 0
+    }
     
+    // microthread dump
     DUMP_REMARK();
-    WRITE_INT8('U');
-    WRITE_STR0("microthread");
-    WRITE_INT8('0'); // version: 0
+    {
+        WRITE_INT8('E');
+        WRITE_STR0("microthread");
+        WRITE_INT8('0'); // version: 0
     
-    PACK_PTR(thread->name, ref_name);
-    PACK_PTR(thread->fun, ref_fun);
-    PACK_PTR(thread->last_result, ref_last_result);
-    PACK_PTR(thread->prev_thread, ref_prev_thread);
-    PACK_PTR(thread->code_state, ref_code_state);
-    PACK_PTR(thread->prev_thread, ref_prev_thread);
-    PACK_PTR(thread->code_state, ref_code_state);
-    PACK(ref, ref_status);
-    PACK(ref, ref_context);
-    
-    // PACK(array, 1);
-    // PACK_PTR();
-    // PACK_BASEPTR();
-    // PACK(int64, 32);
+        PACK_PTR(thread->name, name_ref);
+        PACK_PTR(thread->fun, fun_ref);
+        PACK_PTR(thread->last_result, last_result_ref);
+        PACK_PTR(thread->prev_thread, prev_thread_ref);
+        PACK_PTR(thread->code_state, code_state_ref);
+        PACK_PTR(thread->prev_thread, prev_thread_ref);
+        PACK_PTR(thread->code_state, code_state_ref);
+        PACK(ref, status_ref);
+        PACK(ref, context_ref);
+    }
 
     DUMP_END();
     
     return 0;
 }
 
-STATIC mp_uint_t persister_dump_stack(mp_obj_persister_t *persister) {
+STATIC mp_ref_t persister_dump_stack(mp_obj_persister_t *persister) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
     (void)sysbuf;
     return 0;
 }
 
-STATIC mp_uint_t persister_dump_vm_state(mp_obj_persister_t *persister) {
+STATIC mp_ref_t persister_dump_vm_state(mp_obj_persister_t *persister) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
     (void)sysbuf;
     return 0;
 }
 
-STATIC mp_uint_t persister_dump_str(mp_obj_persister_t *persister, mp_obj_t obj) {
+STATIC mp_ref_t persister_dump_str(mp_obj_persister_t *persister, mp_obj_t obj) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
     assert(MP_OBJ_IS_STR(obj));
@@ -796,7 +822,7 @@ STATIC mp_uint_t persister_dump_str(mp_obj_persister_t *persister, mp_obj_t obj)
     DUMP_END();
 }
 
-STATIC mp_uint_t persister_dump_bytes(mp_obj_persister_t *persister, mp_obj_t obj) {
+STATIC mp_ref_t persister_dump_bytes(mp_obj_persister_t *persister, mp_obj_t obj) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
     assert(MP_OBJ_IS_TYPE(obj, &mp_type_bytes));
@@ -812,7 +838,7 @@ STATIC mp_uint_t persister_dump_bytes(mp_obj_persister_t *persister, mp_obj_t ob
     DUMP_END();
 }
 
-STATIC mp_uint_t persister_dump_qstr(mp_obj_persister_t *persister, mp_obj_t obj) {
+STATIC mp_ref_t persister_dump_qstr(mp_obj_persister_t *persister, mp_obj_t obj) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
     assert(MP_OBJ_IS_QSTR(obj));
@@ -828,7 +854,7 @@ STATIC mp_uint_t persister_dump_qstr(mp_obj_persister_t *persister, mp_obj_t obj
     DUMP_END();
 }
 
-STATIC mp_uint_t persister_dump_small_int(mp_obj_persister_t *persister, mp_obj_t obj) {
+STATIC mp_ref_t persister_dump_small_int(mp_obj_persister_t *persister, mp_obj_t obj) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
     assert(MP_OBJ_IS_SMALL_INT(obj));
@@ -849,7 +875,7 @@ STATIC mp_uint_t persister_dump_small_int(mp_obj_persister_t *persister, mp_obj_
     }
 }
 
-STATIC mp_uint_t persister_dump_int(mp_obj_persister_t *persister, mp_obj_t obj) {
+STATIC mp_ref_t persister_dump_int(mp_obj_persister_t *persister, mp_obj_t obj) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
     assert(MP_OBJ_IS_TYPE(obj, &mp_type_int));
@@ -867,19 +893,19 @@ STATIC mp_uint_t persister_dump_int(mp_obj_persister_t *persister, mp_obj_t obj)
     DUMP_END();
 }
 
-STATIC mp_uint_t persister_dump_tuple(mp_obj_persister_t *persister, mp_obj_t obj) {
+STATIC mp_ref_t persister_dump_tuple(mp_obj_persister_t *persister, mp_obj_t obj) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
     assert(MP_OBJ_IS_TYPE(obj, &mp_type_tuple));
     
     mp_obj_t iter = mp_getiter(obj);
     mp_int_t size = mp_obj_get_int(mp_obj_len(obj));
-    mp_ref_t *ref = m_new0(mp_uint_t, size);
+    mp_ref_t *items_ref = m_new0(mp_uint_t, size);
 
     DUMP_START();
     for (mp_int_t i = 0; i < size; i++){
         mp_obj_t cur = mp_iternext(iter);
-        *(ref + i) = PACK_ANY(cur);
+        items_ref[i] = PACK_ANY(cur);
     }
     
     DUMP_REMARK();
@@ -889,24 +915,24 @@ STATIC mp_uint_t persister_dump_tuple(mp_obj_persister_t *persister, mp_obj_t ob
     iter = mp_getiter(obj);
     for (mp_int_t i = 0; i < size; i++){
         mp_obj_t cur = mp_iternext(iter);
-        PACK_PTR(cur, *(ref + i));
+        PACK_PTR(cur, items_ref[i]);
     }
     
     DUMP_END();
 }
 
-STATIC mp_uint_t persister_dump_list(mp_obj_persister_t *persister, mp_obj_t obj) {
+STATIC mp_ref_t persister_dump_list(mp_obj_persister_t *persister, mp_obj_t obj) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
     assert(MP_OBJ_IS_TYPE(obj, &mp_type_list));
 
     mp_obj_t iter = mp_getiter(obj);
     mp_int_t size = mp_obj_get_int(mp_obj_len(obj));
-    mp_ref_t *ref = m_new0(mp_uint_t, size);
+    mp_ref_t *items_ref = m_new0(mp_uint_t, size);
 
     for (mp_int_t i = 0; i < size; i++){
         mp_obj_t cur = mp_iternext(iter);
-        *(ref + i) = PACK_ANY(cur);
+        items_ref[i] = PACK_ANY(cur);
     }
     
     DUMP_START();
@@ -917,13 +943,13 @@ STATIC mp_uint_t persister_dump_list(mp_obj_persister_t *persister, mp_obj_t obj
     iter = mp_getiter(obj);
     for (mp_int_t i = 0; i < size; i++){
         mp_obj_t cur = mp_iternext(iter);
-        PACK_PTR(cur, *(ref + i));
+        PACK_PTR(cur, items_ref[i]);
     }
     
     DUMP_END();
 }
 
-STATIC mp_uint_t persister_dump_dict(mp_obj_persister_t *persister, mp_obj_t obj) {
+STATIC mp_ref_t persister_dump_dict(mp_obj_persister_t *persister, mp_obj_t obj) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
     assert(MP_OBJ_IS_TYPE(obj, &mp_type_list));
@@ -966,7 +992,7 @@ STATIC mp_uint_t persister_dump_dict(mp_obj_persister_t *persister, mp_obj_t obj
     DUMP_END();
 }
 
-STATIC mp_uint_t persister_dump_user(mp_obj_persister_t *persister, mp_obj_t obj) {
+STATIC mp_ref_t persister_dump_user(mp_obj_persister_t *persister, mp_obj_t obj) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
     DUMP_START();
@@ -985,7 +1011,7 @@ STATIC mp_uint_t persister_dump_user(mp_obj_persister_t *persister, mp_obj_t obj
     DUMP_END();
 }
 
-STATIC mp_uint_t persister_dump_common_obj(mp_obj_persister_t *persister, mp_obj_t obj) {
+STATIC mp_ref_t persister_dump_common_obj(mp_obj_persister_t *persister, mp_obj_t obj) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
     void *start = MP_STATE_MEM(gc_pool_start);
@@ -1024,7 +1050,7 @@ STATIC mp_uint_t persister_dump_common_obj(mp_obj_persister_t *persister, mp_obj
     PACK_END();
 }
 
-STATIC mp_uint_t persister_dump_obj(mp_obj_persister_t *persister, mp_obj_t obj) {
+STATIC mp_ref_t persister_dump_obj(mp_obj_persister_t *persister, mp_obj_t obj) {
     if (!(
         obj == MP_OBJ_NULL ||
         obj == MP_OBJ_STOP_ITERATION ||
@@ -1051,7 +1077,7 @@ STATIC void persister_dump_baseptr(mp_obj_t baseptr, char *ptr, mp_uint_t size) 
     (void)offset;
 }
 
-STATIC mp_uint_t persister_dump_any(mp_obj_persister_t *persister, mp_obj_t o) {
+STATIC mp_ref_t persister_dump_any(mp_obj_persister_t *persister, mp_obj_t o) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
     if (MP_OBJ_IS_SMALL_INT(o)) {

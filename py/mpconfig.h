@@ -175,6 +175,11 @@
 #define MICROPY_STACKLESS_EXTRA (0)
 #endif
 
+// If you need parent function while execute bytecode. (eg. persist state)
+#ifndef MICROPY_CODE_STATE_HAS_FUN
+#define MICROPY_CODE_STATE_HAS_FUN (0)
+#endif
+
 /*****************************************************************************/
 /* Micro Python emitters                                                     */
 
