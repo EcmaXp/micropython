@@ -24,66 +24,6 @@
  * THE SOFTWARE.
  */
 
-/* TODO: ?
-
-like the gc. find all that relative from thing.
-
-x86 vs x64:
-    - size_t
-    - mp_int_t
-    - mp_uint_t
-    - pointer (but size are limited by 16MB)
-    - check eris how persist that (https://github.com/fnuecke/eris)
-
-microthread:
-    - ?
-
-code_state:
-    - check mp_setup_code_state() on bc.c
-    - any thing.
-
-stack:
-    - All object is mp_obj_t
-    - Exclude GOTO slab? (but it aim to code_state's bytecode thing.)
-
-MP_OBJ_*:
-    - just persist as that type
-    - problem is MP_OBJ_STOP_ITERATION. (debug=4, ndebug=0)
-
-obj:
-    - pointer used. check memory pool from gc.
-    - pointer map will check that object are persisted?
-    - use gc_start pointer for zero based pointer?
-      (ext format requied, even if on x64 == x32)
-      ptr size are limited to 48 Bit? maximum size is 16 MB (mpool: 128 KB)
-    - builtin object can persist (in obj.h)
-    - function object can persist
-    - registered object can persist
-      (like builtin)
-    - instnace object can persist
-    - other thing can't persist
-
-qstr:
-    - qstr pool required?
-    - make qstr map and check that qstr are persisted?
-
-vstr:
-    - store as buffer? (with ext)
-
-small_int:
-    - store as int.
-    - if can't unpersist (by overflow) then just unpersist as int object?
-    
-function pointer (maybe builtin thing):
-    - no way?
-    - expensive way requied. (big dict requied...)
-    - so getting all function pointer are required.
-
-after pickled.
-
-bitmap: 1 KB can handle 128 KB on 64 Bit System.
-*/
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -95,6 +35,8 @@ bitmap: 1 KB can handle 128 KB on 64 Bit System.
 #endif
 
 #define MP_PERSIST_MAGIC "MP\x80\x01"
+
+typedef mp_uint_t mp_ref_t;
 
 /******************************************************************************/
 // mp_map cloneed.
@@ -186,7 +128,7 @@ STATIC mp_map_elem_t *modpersist_mp_map_lookup(mp_map_t *map, mp_obj_t index) {
 #define WRITE_PTR(data) WRITE_UINT32(data)
 
 #define DUMP_START() \
-    mp_uint_t _ref = sysbuf->len; \
+    mp_ref_t _ref = sysbuf->len; \
     if (modpersist_starting_dump(persister, obj, &_ref)) {
         /* body */
 
@@ -200,7 +142,7 @@ STATIC mp_map_elem_t *modpersist_mp_map_lookup(mp_map_t *map, mp_obj_t index) {
     return _ref;
 
 #define PACK_START() \
-    mp_uint_t _ref = 0; \
+    mp_ref_t _ref = 0; \
     if (modpersist_starting_pack(persister, obj, &_ref)) {
         /* body */
 
@@ -210,7 +152,6 @@ STATIC mp_map_elem_t *modpersist_mp_map_lookup(mp_map_t *map, mp_obj_t index) {
 
 // 3-way tagging
 
-typedef mp_uint_t mp_ref_t; // persist ref
 #define PACK(type, obj) persister_dump_##type(persister, (obj))
 #define SUBPACK(type, obj) _ref = PACK(type, obj);
 #define SUBPACKED(ref) _ref = (ref);
@@ -609,7 +550,8 @@ STATIC mp_persist_bytecode_t *persister_parse_bytecode_from_fun_bc(mp_obj_t obj)
     mp_obj_fun_bc_t *fun_bc = obj;
     const byte *ip = fun_bc->bytecode;
     mp_uint_t len = fun_bc->bytecode_size;
-    mp_bytecode_print(fun_bc, fun_bc->n_pos_args + fun_bc->n_kwonly_args, fun_bc->bytecode, fun_bc->bytecode_size);
+    
+    // mp_bytecode_print(fun_bc, fun_bc->n_pos_args + fun_bc->n_kwonly_args, fun_bc->bytecode, fun_bc->bytecode_size);
 
     mp_persist_bytecode_t *bc = m_new_obj(mp_persist_bytecode_t);
     const byte *ci = ip;
@@ -629,6 +571,7 @@ STATIC mp_persist_bytecode_t *persister_parse_bytecode_from_fun_bc(mp_obj_t obj)
     // bytecode prelude: arg names (as qstr objects)
     mp_uint_t n_total_args = fun_bc->n_pos_args + fun_bc->n_kwonly_args;
     bc->arg_names = m_new0(qstr, n_total_args);
+    bc->arg_names_len = n_total_args;
     for (mp_uint_t i = 0; i < n_total_args; i++) {
         bc->arg_names[i] = MP_OBJ_QSTR_VALUE(*(mp_obj_t*)ip);
         ip += sizeof(mp_obj_t);
@@ -640,13 +583,12 @@ STATIC mp_persist_bytecode_t *persister_parse_bytecode_from_fun_bc(mp_obj_t obj)
 
     // bytecode prelude: initialise closed over variables
     {
-        mp_uint_t local_num_len = 0;
         for (const byte* c = ip; *c++ != 255;) {
-            local_num_len++;
+            bc->local_num_len++;
         }
 
-        bc->local_num = m_new0(uint, local_num_len);
-        for (mp_uint_t i = 0; i < local_num_len; i++) {
+        bc->local_num = m_new0(uint, bc->local_num_len);
+        for (mp_uint_t i = 0; i < bc->local_num_len; i++) {
             bc->local_num[i] = *ip++;
         }
         
@@ -657,20 +599,19 @@ STATIC mp_persist_bytecode_t *persister_parse_bytecode_from_fun_bc(mp_obj_t obj)
 
     // print out line number info
     {
-        mp_uint_t lineno_info_len = 0;
         for (const byte* c = ci; *c;) {
             if ((ci[0] & 0x80) == 0) {
-                lineno_info_len += 1;
+                bc->lineno_info_len += 1;
                 c += 1;
             } else {
-                lineno_info_len += 2;                
+                bc->lineno_info_len += 2;                
                 c += 2;
             }
         }
     
-        bc->lineno_info = m_new0(byte, lineno_info_len);
+        bc->lineno_info = m_new0(byte, bc->lineno_info_len);
         const byte* c = ci;
-        for (mp_uint_t i = 0; i < lineno_info_len; i++) {
+        for (mp_uint_t i = 0; i < bc->lineno_info_len; i++) {
             bc->lineno_info[i] = *c++;
         }
     }
@@ -740,17 +681,7 @@ STATIC mp_uint_t persister_dump_fun_bc(mp_obj_persister_t *persister, mp_obj_t o
     WRITE_INT8(fun_bc->n_kwonly_args);
     WRITE_INT8(fun_bc->n_def_args);
     WRITE_INT8(fun_bc->has_def_kw_args || fun_bc->takes_var_args << 2 || fun_bc->takes_kw_args << 3);
-    #if MICROPY_EMIT_BC_WITH_SIZE
-    WRITE_PTR((mp_uint_t)fun_bc->bytecode_size);
-    #else
-    WRITE_PTR(0);
-    #endif
-    WRITE_PTR((mp_uint_t)fun_bc->bytecode);
-    WRITE_PTR(0);
-    
-    // debug only!
-    WRITE_SIZE(fun_bc->bytecode_size);
-    WRITE_STRN((const char *)fun_bc->bytecode, fun_bc->bytecode_size);
+    WRITE_INT32(0);
     
     // starting bytecode dump
     {
@@ -999,8 +930,8 @@ STATIC mp_uint_t persister_dump_dict(mp_obj_persister_t *persister, mp_obj_t obj
 
     mp_obj_t iter = mp_getiter(mp_call_function_0(mp_load_attr(obj, MP_QSTR_items)));
     mp_int_t size = mp_obj_get_int(mp_obj_len(obj));
-    mp_ref_t *ref_key = m_new0(mp_uint_t, size);
-    mp_ref_t *ref_value = m_new0(mp_uint_t, size);
+    mp_ref_t *keys_ref = m_new0(mp_uint_t, size);
+    mp_ref_t *values_ref = m_new0(mp_uint_t, size);
 
     for (mp_int_t i = 0; i < size; i++){
         mp_obj_t cur = mp_iternext(iter);
@@ -1010,8 +941,8 @@ STATIC mp_uint_t persister_dump_dict(mp_obj_persister_t *persister, mp_obj_t obj
         mp_obj_tuple_get(cur, &csize, &items);
         assert(csize == 2);
         
-        *(ref_key + i) = PACK_ANY(items[0]);
-        *(ref_value + i) = PACK_ANY(items[1]);
+        keys_ref[i] = PACK_ANY(items[0]);
+        values_ref[i] = PACK_ANY(items[1]);
     }
     
     DUMP_START();
@@ -1028,8 +959,8 @@ STATIC mp_uint_t persister_dump_dict(mp_obj_persister_t *persister, mp_obj_t obj
         mp_obj_tuple_get(cur, &csize, &items);
         assert(csize == 2);
         
-        PACK_PTR(items[0], *(ref_key + i));
-        PACK_PTR(items[1], *(ref_value + i));
+        PACK_PTR(items[0], keys_ref[i]);
+        PACK_PTR(items[1], values_ref[i]);
     }
     
     DUMP_END();

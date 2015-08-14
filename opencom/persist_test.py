@@ -1,23 +1,17 @@
 import sys
-import jnupy
 
-func2name = {}
-name2func = {}
+try:
+    import jnupy
+except ImportError:
+    jnupy = None
 
-x = {"a":32}
-func = exec("""def register_func(module_name, func_name, func):
-    if callable(value):
-        try:
-            hash(value)
-        except TypeError:
-            return
-        
-        func2name[value] = k2 = "{}.{}".format(module_name, func_name).encode()
-        name2func[k2] = value""", x, x)
-
-obj = (dict(hello=32, world=31, test=30, func=x), "EOF")
-
-def register_func(module_name, func_name, func):
+if jnupy:
+    func2name = {}
+    name2func = {}
+    
+    x = {"a":32}
+    exec("""
+def hello(module_name, func_name, func=31, *args, **wargs, helo=32, help):
     if callable(value):
         try:
             hash(value)
@@ -26,52 +20,71 @@ def register_func(module_name, func_name, func):
         
         func2name[value] = k2 = "{}.{}".format(module_name, func_name).encode()
         name2func[k2] = value
+    """, x, x)
+    func = x.pop('hello')
+    
+    obj = (func, "EOF")
+    
+    def register_func(module_name, func_name, func):
+        if callable(value):
+            try:
+                hash(value)
+            except TypeError:
+                return
+            
+            func2name[value] = k2 = "{}.{}".format(module_name, func_name).encode()
+            name2func[k2] = value
+            
+    for name, module in jnupy.builtin_modules.items():
+        for key in dir(module):
+            value = getattr(module, key)
+            register_func(name, key, value)
+    
+    for name, module in jnupy.get_loaded_modules().items():
+        if name not in ("sys",):
+            continue
         
-for name, module in jnupy.builtin_modules.items():
-    for key in dir(module):
-        value = getattr(module, key)
-        register_func(name, key, value)
-
-for name, module in jnupy.get_loaded_modules().items():
-    if name not in ("sys",):
-        continue
+        for key in dir(module):
+            value = getattr(module, key)
+            register_func(name, key, value)
     
-    for key in dir(module):
-        value = getattr(module, key)
-        register_func(name, key, value)
-
-def dumper(obj):
+    def dumper(obj):
+        try:
+            hash(obj)
+        except TypeError:
+            return b"<FAIL>"
+        
+        if obj in func2name:
+            return func2name[obj]
+        
+        raise RuntimeError("failed to find original")
+    
+    def loader(parser, buf):
+        if buf in name2func:
+            return name2func[buf]
+        
+        return ParseError("failed to find original object")
+    
     try:
-        hash(obj)
-    except TypeError:
-        return b"<FAIL>"
-    
-    if obj in func2name:
-        return func2name[obj]
-    
-    raise RuntimeError("failed to find original")
+        import upersist
+        persister = upersist.Persister(dumper)
+        
+        result = upersist.test(persister, obj)
+        print("object:", obj)
+        
+        assert result.startswith(b"MP\x80\x01"), result[:4]
+        magic, header, content = result.split(b"\n", 2)
+        assert magic == b"MP\x80\x01"
+        assert header == b'micropython persist v0.1'
+        print(content)
+    except Exception as e:
+        sys.print_exception(e)
+        sys.exit(1)
+else:
+    def loader(parser, buf):
+        return ParseError("failed to find original object (not jnupy)")
 
-def loader(parser, buf):
-    if buf in name2func:
-        return name2func[buf]
-    
-    return ParseError("failed to find original object")
-
-try:
-    import upersist
-    persister = upersist.Persister(dumper)
-
-    result = upersist.test(persister, obj)
-    print("object:", obj)
-    
-    assert result.startswith(b"MP\x80\x01"), result[:4]
-    magic, header, content = result.split(b"\n", 2)
-    assert magic == b"MP\x80\x01"
-    assert header == b'micropython persist v0.1'
-    print(content)
-except Exception as e:
-    sys.print_exception(e)
-    sys.exit(1)
+    result = b'MP\x80\x01\nmicropython persist v0.1\nq1\x05helloq1\x08<string>q1\x01ad1\x01O\x001S\x00\x00\x00 FO\x005\x03\x00\x00\x00\x00\x00\x00\x81\xc4\x04\xfe`\x00\x00\x00\x001\x81\x10\x84$\x824[,#ZG:\x00\x00\x00\x00\x00\xa2\x08\x00\x00\x00\x00\x00\x00\xa6\x08\x00\x00\x00\x00\x00\x00\xc6\x06\x00\x00\x00\x00\x00\x00\x0c\x01\xff\x1dp\x00\x1d\x81*\x00d\x017H\x80?\x0f\x00\x1d\x81\x05\x00\x1d\x81*\x00d\x012D5\x12\x800\x1dV\x00\xf77\t\x80222\x11[E5\x01\x80A\x16\x84+\x1f\x81M\xb0\xb1f\x02\x1f\x826f\x000\x1d\x84!\x00\x1d\x81*\x00\'\xc3\x1d\x81*\x00\x1d\x84"\x00\xb3\'\x11[Ebytecode\x000O\x00\x1eO\x00&1\x00\x00\x0c\x00\x011\x001\x001V\x1dp\x00\x1d\x81*\x00d\x017H\x80?\x0f\x00\x1d\x81\x05\x00\x1d\x81*\x00d\x012D5\x12\x800\x1dV\x00\xf77\t\x80222\x11[E5\x01\x80A\x16\x84+\x1f\x81M\xb0\xb1f\x02\x1f\x826f\x000\x1d\x84!\x00\x1d\x81*\x00\'\xc3\x1d\x81*\x00\x1d\x84"\x00\xb3\'\x11[q1\x03EOFt1\x02O\x00@O\x01JMO\x01P'
 
 SEEK_SET = 2
 
@@ -207,7 +220,10 @@ class Parser():
         # TODO: support endian!
         # TODO: fast method (currently slow)
         encoded_size = bytes(list(encoded_size)[::-1])
-        return int.from_bytes(encoded_size)
+        if jnupy:
+            return int.from_bytes(encoded_size)
+        else:
+            return int.from_bytes(encoded_size, "little")
 
     def load_size(self):
         fp = self.fp
@@ -288,14 +304,26 @@ class Parser():
         n_kwonly_args = load_int(8)
         n_def_args = load_int(8)
         flags = load_int(8)
-        code_info_size = load_int(32)
-        code_info = load_int(32)
         extra_args = load_int(32)
-        print("function info")
-        print(global_dict, n_pos_args, n_kwonly_args, n_def_args, flags, code_info_size, code_info, extra_args)
-        print("code_info:", self.load_b())
+        bytecode = self.load()
         
-        return "fake function!"
+        print("== func ==")
+        print("n_pos_args", n_pos_args)
+        print("n_kwonly_args", n_kwonly_args)
+        print("n_def_args", n_def_args)
+        print("flags", flags)
+        print("extra_args", extra_args)
+        print("block_name", bytecode.block_name)
+        print("source_file", bytecode.source_file)
+        print("arg_names", bytecode.arg_names)
+        print("n_state", bytecode.n_state)
+        print("n_exc_stack", bytecode.n_exc_stack)
+        print("local_nums", bytecode.local_nums)
+        print("lineno_info", bytecode.lineno_info)
+        print("body", bytecode.body)
+        print("==")
+        
+        return "fake function with bytecode {}"
         
     def load_bytecode(self):
         "bytecode (will used for fun_bc)"
@@ -303,27 +331,26 @@ class Parser():
         skip = lambda n: self.read(n) and None
         version = self.fp.read(1)
         assert version == b'0'
-        block_name = self.load()
-        source_file = self.load()
+        
+        bc = _FakeBytecode()
+        bc.block_name = self.load()
+        bc.source_file = self.load()
 
-        arg_names_len = self.load_size()
-        for i in range(arg_names_len):
-            self.load()
+        bc.arg_names = arg_names = []
+        for i in range(self.load_size()):
+            arg_names.append(self.load())
         
-        n_state = load_int(16)
-        n_exc_stack = load_int(16)
+        bc.n_state = load_int(16)
+        bc.n_exc_stack = load_int(16)
+
+        bc.local_nums = local_nums = []
+        for i in range(self.load_size()):
+            local_nums.append(load_int(32))
         
-        local_num_len = self.load_size()
-        for i in range(local_num_len):
-            local_num = load_int(32)
-            
-        lineno_info_len = self.load_size()
-        for i in range(lineno_info_len):
-            lineno_info = load_int(8)
-            
-        bytecode_body = self.load_b()
-        print(bytecode_body)
-        return "<BYTECODE>"
+        bc.lineno_info = self.load_b()
+        bc.body = self.load_b()
+        
+        return bc
     
     def load_object(self, size):
         assert 1 <= size <= 4
@@ -391,11 +418,20 @@ class Parser():
         self.main_obj = obj
         return obj
 
+try:
+    import time
+except ImportError:
+    import utime as time
+
 parser = Parser(ReadIO(result))
 
 try:
     obj = parser.parse()
 except Exception as e:
-    sys.print_exception(e)
+    try:
+        sys.print_exception(e)
+    except AttributeError:
+        raise e
 else:
+    print("persist object length:", len(result), 'bytes')
     print("object (restored):", obj)

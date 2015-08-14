@@ -66,6 +66,7 @@ JAVACFLAGS += -g
 COPT = -O0
 else
 COPT = -Os -DNDEBUG
+# COPT = -Ofast -DNDEBUG
 endif
 
 # On OSX, 'gcc' is a symlink to clang unless a real gcc is installed.
