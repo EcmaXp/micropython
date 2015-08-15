@@ -139,9 +139,20 @@ class _FakeRefernce():
     def __repr__(self):
         return "<refernce #{}>".format(self.ref)
 
+class FunBC():
+    "fun_bc"
+    """
+    def __init__(self, n_pos_args, n_kwonly_args, n_def_args, flags, extra_args):
+        self.n_pos_args =
+        self.n_kwonly_args =
+        self.n_def_args =
+        self.flags =
+        self.extra_args =
+        self.bytecode = 
+    """
+
 class _FakeBytecode():
-    def __init__(self):
-        pass
+    pass
 
 class ParseError(RuntimeError):
     pass
@@ -231,7 +242,7 @@ class Parser():
 
         # TODO: check by typed?
         typesize = 1
-        assert size * typesize < (self.last - fp.tell()), ("too large size", size, self.last - fp.tell())
+        assert size * typesize <= (self.last - fp.tell()), ("too large size", size, self.last - fp.tell())
 
         return size
 

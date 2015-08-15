@@ -36,7 +36,7 @@
 
 #define MP_PERSIST_MAGIC "MP\x80\x01"
 
-typedef mp_uint_t mp_ref_t;
+typedef mp_uint_t mp_ref_t; // TODO: remove ref
 
 /******************************************************************************/
 // mp_map cloneed.
@@ -125,6 +125,12 @@ STATIC mp_map_elem_t *modpersist_mp_map_lookup(mp_map_t *map, mp_obj_t index) {
 #define WRITE_INT64(data) system_buf_write_int(sysbuf, (data), (8))
 #define WRITE_UINT64(data) system_buf_write_uint(sysbuf, (data), (8))
 
+#define WRITE_TYPE(data) system_buf_write_int8(sysbuf, (data))
+#define WRITE_SIZETYPE(data, size) ( \
+    system_buf_write_int8(sysbuf, (data)), \
+    system_buf_write_size(sysbuf, (size)), \
+    (void)0)
+
 #define WRITE_PTR(data) WRITE_UINT32(data)
 
 #define DUMP_START() \
@@ -133,9 +139,6 @@ STATIC mp_map_elem_t *modpersist_mp_map_lookup(mp_map_t *map, mp_obj_t index) {
         /* body */
 
 #define DUMP_SUBREF() (sysbuf->len)
-
-#define DUMP_REMARK() \
-    _ref = sysbuf->len;
 
 #define DUMP_END() \
     } \
@@ -156,7 +159,6 @@ STATIC mp_map_elem_t *modpersist_mp_map_lookup(mp_map_t *map, mp_obj_t index) {
 #define SUBPACK(type, obj) _ref = PACK(type, obj);
 #define SUBPACKED(ref) _ref = (ref);
 #define PACK_ANY(obj) PACK(any, (obj))
-#define PACK_PTR(obj, ref) persister_dump_ptr(persister, (obj), (ref))
 #define PACK_REF(ref_val) PACK(ref, (ref_val))
 #define PACK_QSTR(qstr_val) PACK(qstr, MP_OBJ_NEW_QSTR(qstr_val))
 
@@ -417,6 +419,10 @@ typedef struct _mp_obj_persister_t {
 
 const mp_obj_type_t mp_type_persister;
 
+// 2 functions are used for persist anything.
+STATIC mp_ref_t persister_dump_any(mp_obj_persister_t *persister, mp_obj_t o);
+STATIC void persister_dump_ref(mp_obj_persister_t *persister, mp_ref_t ref);
+
 STATIC bool modpersist_starting_pack(mp_obj_persister_t *persister, mp_obj_t obj, mp_ref_t *ref) {
     mp_map_elem_t *persist_reg = modpersist_mp_map_lookup(persister->objmap, obj);
 
@@ -434,9 +440,12 @@ STATIC bool modpersist_starting_dump(mp_obj_persister_t *persister, mp_obj_t obj
     bool require_packing = (persist_reg->value == MP_OBJ_NULL);
     if (require_packing) {
         persist_reg->value = (mp_obj_t)(persister->sysbuf->len);
+        *ref = (mp_ref_t)persist_reg->value;
+    } else {
+        *ref = (mp_ref_t)persist_reg->value;
+        PACK_REF((mp_ref_t)persist_reg->value);
     }
     
-    *ref = (mp_uint_t)persist_reg->value;
     return require_packing;
 }
 
@@ -502,11 +511,6 @@ STATIC mp_obj_t persister_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t
 
     return persister;
 }
-
-// 3 functions are used for persist anything.
-STATIC mp_ref_t persister_dump_any(mp_obj_persister_t *persister, mp_obj_t o);
-STATIC void persister_dump_ptr(mp_obj_persister_t *persister, mp_obj_t obj, mp_ref_t ref);
-STATIC void persister_dump_ref(mp_obj_persister_t *persister, mp_ref_t ref);
 
 STATIC void persister_dump_mp_int_t(mp_obj_persister_t *persister, mp_int_t num) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
@@ -629,32 +633,18 @@ STATIC mp_ref_t persister_dump_bytecode(mp_obj_persister_t *persister, mp_persis
 
     // NOTE: mp_persist_bytecode_t is are part of fun_bc.
 
-    // bytecode pre-dump
-    mp_obj_t block_name_obj = MP_OBJ_NEW_QSTR(bc->block_name);
-    mp_ref_t block_name_ref = PACK_ANY(block_name_obj);
-
-    mp_obj_t source_file_obj = MP_OBJ_NEW_QSTR(bc->source_file);
-    mp_ref_t source_file_ref = PACK_ANY(source_file_obj);
-
-    mp_obj_t arg_names_obj[bc->arg_names_len];
-    mp_ref_t arg_names_ref[bc->arg_names_len];
-    for (mp_uint_t i = 0; i < bc->arg_names_len; i++) {
-        arg_names_obj[i] = MP_OBJ_NEW_QSTR(bc->arg_names[i]);
-        arg_names_ref[i] = PACK_ANY(arg_names_obj[i]);
-    }
-    
     // bytecode dump
     mp_ref_t bytecode_ref = DUMP_SUBREF();
     {
-        WRITE_INT8('E');
+        WRITE_TYPE('E');
         WRITE_STR0("bytecode");
         WRITE_INT8('0'); // version: 0
-        PACK_PTR(block_name_obj, block_name_ref);
-        PACK_PTR(source_file_obj, source_file_ref);
+        PACK_ANY(MP_OBJ_NEW_QSTR(bc->block_name));
+        PACK_ANY(MP_OBJ_NEW_QSTR(bc->source_file));
     
         WRITE_SIZE(bc->arg_names_len);
         for (mp_uint_t i = 0; i < bc->arg_names_len; i++) {
-            PACK_PTR(arg_names_obj[i], arg_names_ref[i]);
+            PACK_ANY(MP_OBJ_NEW_QSTR(bc->arg_names[i]));
         }
     
         WRITE_INT16(bc->n_state);
@@ -714,24 +704,21 @@ STATIC mp_ref_t persister_dump_fun_bc(mp_obj_persister_t *persister, mp_obj_t ob
     mp_obj_fun_bc_t *fun_bc = obj;
     mp_persist_bytecode_t *bc = persister_parse_bytecode_from_fun_bc(fun_bc);
 
-    DUMP_START();
-    
-    // function pre-dump
-    mp_ref_t globals_ref = PACK_ANY(fun_bc->globals);
-    mp_ref_t bytecode_ref = persister_dump_bytecode(persister, bc);
-    
     // function dump
-    DUMP_REMARK();
+    DUMP_START();
     {
-        WRITE_INT8('F');
+        WRITE_TYPE('F');
         
-        PACK_PTR(fun_bc->globals, globals_ref);
+        // PACK_PTR(fun_bc->globals, globals_ref);
+        PACK_ANY(fun_bc->globals);
+        
         WRITE_INT8(fun_bc->n_pos_args);
         WRITE_INT8(fun_bc->n_kwonly_args);
         WRITE_INT8(fun_bc->n_def_args);
         WRITE_INT8(fun_bc->has_def_kw_args || fun_bc->takes_var_args << 2 || fun_bc->takes_kw_args << 3);
         WRITE_INT32(0);
-        PACK_REF(bytecode_ref);
+        
+        persister_dump_bytecode(persister, bc);
     }
     
     DUMP_END();
@@ -748,45 +735,31 @@ STATIC mp_ref_t persister_dump_microthread(mp_obj_persister_t *persister, mp_obj
     
     DUMP_START();
     
-    // microthread pre-dump
-    mp_ref_t name_ref = PACK_ANY(thread->name);
-    mp_ref_t fun_ref = PACK_ANY(thread->fun);
-    mp_ref_t last_result_ref = PACK_ANY(thread->last_result);
-    mp_ref_t prev_thread_ref = PACK_ANY(thread->prev_thread);
-    mp_ref_t code_state_ref = PACK(code_state, thread->code_state);
-    
-    // status dump
-    mp_ref_t status_ref = DUMP_SUBREF();
-    {
-        WRITE_INT8('E');
-        WRITE_STR0("microthread_status");
-        WRITE_INT8('0'); // version: 0
-    }
-
-    // context dump    
-    mp_ref_t context_ref = DUMP_SUBREF();
-    {
-        WRITE_INT8('E');
-        WRITE_STR0("microthread_context");
-        WRITE_INT8('0'); // version: 0
-    }
-    
     // microthread dump
-    DUMP_REMARK();
     {
-        WRITE_INT8('E');
+        WRITE_TYPE('E');
         WRITE_STR0("microthread");
         WRITE_INT8('0'); // version: 0
     
-        PACK_PTR(thread->name, name_ref);
-        PACK_PTR(thread->fun, fun_ref);
-        PACK_PTR(thread->last_result, last_result_ref);
-        PACK_PTR(thread->prev_thread, prev_thread_ref);
-        PACK_PTR(thread->code_state, code_state_ref);
-        PACK_PTR(thread->prev_thread, prev_thread_ref);
-        PACK_PTR(thread->code_state, code_state_ref);
-        PACK(ref, status_ref);
-        PACK(ref, context_ref);
+        PACK_ANY(thread->name);
+        PACK_ANY(thread->fun);
+        PACK_ANY(thread->last_result);
+        PACK_ANY(thread->prev_thread);
+        PACK(code_state, thread->code_state);
+        
+        // status dump
+        {
+            WRITE_TYPE('E');
+            WRITE_STR0("microthread_status");
+            WRITE_INT8('0'); // version: 0
+        }
+    
+        // context dump
+        {
+            WRITE_TYPE('E');
+            WRITE_STR0("microthread_context");
+            WRITE_INT8('0'); // version: 0
+        }
     }
 
     DUMP_END();
@@ -815,7 +788,7 @@ STATIC mp_ref_t persister_dump_str(mp_obj_persister_t *persister, mp_obj_t obj) 
     mp_uint_t len = 0;
     const char* str = mp_obj_str_get_data(obj, &len);
     
-    WRITE_INT8('s');
+    WRITE_TYPE('s');
     WRITE_SIZE(len);
     WRITE_STRN(str, len);
     
@@ -831,8 +804,7 @@ STATIC mp_ref_t persister_dump_bytes(mp_obj_persister_t *persister, mp_obj_t obj
     mp_buffer_info_t objbuf;
     mp_get_buffer_raise(obj, &objbuf, MP_BUFFER_READ);
     
-    WRITE_INT8('b');
-    WRITE_SIZE(objbuf.len);
+    WRITE_SIZETYPE('b', objbuf.len);
     WRITE_STRN(objbuf.buf, objbuf.len);
     
     DUMP_END();
@@ -847,8 +819,7 @@ STATIC mp_ref_t persister_dump_qstr(mp_obj_persister_t *persister, mp_obj_t obj)
     mp_uint_t len = 0;
     const byte* str = qstr_data(MP_OBJ_QSTR_VALUE(obj), &len);
     
-    WRITE_INT8('q');
-    WRITE_SIZE(len);
+    WRITE_SIZETYPE('q', len);
     WRITE_STRN((const char*)str, len);
     
     DUMP_END();
@@ -862,16 +833,18 @@ STATIC mp_ref_t persister_dump_small_int(mp_obj_persister_t *persister, mp_obj_t
     mp_int_t value = MP_OBJ_SMALL_INT_VALUE(obj);
     persist_union_int_t pui = {.int32 = value};
 
-    if (pui.int32 != value) {
+    if (pui.int32 == value) {
+        WRITE_TYPE('S');
+        WRITE_PTR(MP_OBJ_SMALL_INT_VALUE(obj));
+        return 0;
+    } else {
         DUMP_START();
         
-        WRITE_INT8('i');
+        WRITE_TYPE('i');
         WRITE_INT8('8');
         WRITE_INT64(value);
         
         DUMP_END();
-    } else {
-        return 0;
     }
 }
 
@@ -886,7 +859,7 @@ STATIC mp_ref_t persister_dump_int(mp_obj_persister_t *persister, mp_obj_t obj) 
     DUMP_START();
     
     // XXX only works with small int...
-    WRITE_INT8('i');
+    WRITE_TYPE('i');
     WRITE_INT8('8');
     WRITE_INT64(value);
     
@@ -897,25 +870,16 @@ STATIC mp_ref_t persister_dump_tuple(mp_obj_persister_t *persister, mp_obj_t obj
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
     assert(MP_OBJ_IS_TYPE(obj, &mp_type_tuple));
-    
+   
+    DUMP_START();
+
     mp_obj_t iter = mp_getiter(obj);
     mp_int_t size = mp_obj_get_int(mp_obj_len(obj));
-    mp_ref_t *items_ref = m_new0(mp_uint_t, size);
-
-    DUMP_START();
+ 
+    WRITE_SIZETYPE('t', size);
     for (mp_int_t i = 0; i < size; i++){
         mp_obj_t cur = mp_iternext(iter);
-        items_ref[i] = PACK_ANY(cur);
-    }
-    
-    DUMP_REMARK();
-    WRITE_INT8('t');
-    WRITE_SIZE(size);
-    
-    iter = mp_getiter(obj);
-    for (mp_int_t i = 0; i < size; i++){
-        mp_obj_t cur = mp_iternext(iter);
-        PACK_PTR(cur, items_ref[i]);
+        PACK_ANY(cur);
     }
     
     DUMP_END();
@@ -926,24 +890,15 @@ STATIC mp_ref_t persister_dump_list(mp_obj_persister_t *persister, mp_obj_t obj)
 
     assert(MP_OBJ_IS_TYPE(obj, &mp_type_list));
 
-    mp_obj_t iter = mp_getiter(obj);
-    mp_int_t size = mp_obj_get_int(mp_obj_len(obj));
-    mp_ref_t *items_ref = m_new0(mp_uint_t, size);
-
-    for (mp_int_t i = 0; i < size; i++){
-        mp_obj_t cur = mp_iternext(iter);
-        items_ref[i] = PACK_ANY(cur);
-    }
-    
     DUMP_START();
     
-    WRITE_INT8('l');
-    WRITE_SIZE(size);
+    mp_obj_t iter = mp_getiter(obj);
+    mp_int_t size = mp_obj_get_int(mp_obj_len(obj));
     
-    iter = mp_getiter(obj);
+    WRITE_SIZETYPE('l', size);
     for (mp_int_t i = 0; i < size; i++){
         mp_obj_t cur = mp_iternext(iter);
-        PACK_PTR(cur, items_ref[i]);
+        PACK_ANY(cur);
     }
     
     DUMP_END();
@@ -954,11 +909,12 @@ STATIC mp_ref_t persister_dump_dict(mp_obj_persister_t *persister, mp_obj_t obj)
 
     assert(MP_OBJ_IS_TYPE(obj, &mp_type_list));
 
+    DUMP_START();
+
     mp_obj_t iter = mp_getiter(mp_call_function_0(mp_load_attr(obj, MP_QSTR_items)));
     mp_int_t size = mp_obj_get_int(mp_obj_len(obj));
-    mp_ref_t *keys_ref = m_new0(mp_uint_t, size);
-    mp_ref_t *values_ref = m_new0(mp_uint_t, size);
-
+    
+    WRITE_SIZETYPE('d', size);
     for (mp_int_t i = 0; i < size; i++){
         mp_obj_t cur = mp_iternext(iter);
         mp_uint_t csize = 0;
@@ -967,26 +923,8 @@ STATIC mp_ref_t persister_dump_dict(mp_obj_persister_t *persister, mp_obj_t obj)
         mp_obj_tuple_get(cur, &csize, &items);
         assert(csize == 2);
         
-        keys_ref[i] = PACK_ANY(items[0]);
-        values_ref[i] = PACK_ANY(items[1]);
-    }
-    
-    DUMP_START();
-    
-    WRITE_INT8('d');
-    WRITE_SIZE(size);
-    
-    iter = mp_getiter(mp_call_function_0(mp_load_attr(obj, MP_QSTR_items)));
-    for (mp_int_t i = 0; i < size; i++){
-        mp_obj_t cur = mp_iternext(iter);
-        mp_uint_t csize = 0;
-
-        mp_obj_t *items = NULL;
-        mp_obj_tuple_get(cur, &csize, &items);
-        assert(csize == 2);
-        
-        PACK_PTR(items[0], keys_ref[i]);
-        PACK_PTR(items[1], values_ref[i]);
+        PACK_ANY(items[0]);
+        PACK_ANY(items[1]);
     }
     
     DUMP_END();
@@ -1004,8 +942,7 @@ STATIC mp_ref_t persister_dump_user(mp_obj_persister_t *persister, mp_obj_t obj)
 
     mp_get_buffer_raise(result, &retbuf, MP_BUFFER_READ);
     
-    WRITE_INT8('U');
-    WRITE_SIZE(retbuf.len);
+    WRITE_SIZETYPE('U', retbuf.len);
     WRITE_STRN(retbuf.buf, retbuf.len);
     
     DUMP_END();
@@ -1077,18 +1014,47 @@ STATIC void persister_dump_baseptr(mp_obj_t baseptr, char *ptr, mp_uint_t size) 
     (void)offset;
 }
 
-STATIC mp_ref_t persister_dump_any(mp_obj_persister_t *persister, mp_obj_t o) {
+STATIC mp_ref_t persister_dump_any(mp_obj_persister_t *persister, mp_obj_t obj) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
-    if (MP_OBJ_IS_SMALL_INT(o)) {
-        return PACK(small_int, o);
-    } else if (MP_OBJ_IS_QSTR(o)) {
-        return PACK(qstr, o);
-    } else if (MP_OBJ_IS_OBJ(o)) {
-        return PACK(obj, o);
+    mp_ref_t ref = sysbuf->len;
+
+    if (0) {
+    } else if (obj == MP_OBJ_NULL) {
+        WRITE_TYPE('C');
+        WRITE_INT8('0');
+    } else if (obj == MP_OBJ_STOP_ITERATION) {
+        WRITE_TYPE('C');
+        WRITE_INT8('4');
+    } else if (obj == MP_OBJ_SENTINEL) {
+        WRITE_TYPE('C');
+        WRITE_INT8('8');
+    #if MICROPY_ALLOW_PAUSE_VM
+    } else if (obj == MP_OBJ_PAUSE_VM) {
+        WRITE_TYPE('C');
+        WRITE_INT8('P');
+    #endif
+    // C tagging is const pointer.
+    } else if (obj == mp_const_none) {
+        WRITE_TYPE('C');
+        WRITE_INT8('N');
+    } else if (obj == mp_const_true) {
+        WRITE_TYPE('C');
+        WRITE_INT8('T');
+    } else if (obj == mp_const_false) {
+        WRITE_TYPE('C');
+        WRITE_INT8('F');
+    } else if (MP_OBJ_IS_SMALL_INT(obj)) {
+        return PACK(small_int, obj);
+    } else if (MP_OBJ_IS_QSTR(obj)) {
+        return PACK(qstr, obj);
+    } else if (MP_OBJ_IS_OBJ(obj)) {
+        return PACK(obj, obj);
     } else {
         return PACK_ERROR("unknown type");
     }
+    
+    return ref;
 }
 
 STATIC void persister_dump_ref(mp_obj_persister_t *persister, mp_ref_t ref) {
@@ -1108,51 +1074,11 @@ STATIC void persister_dump_ref(mp_obj_persister_t *persister, mp_ref_t ref) {
     }
 }
 
-STATIC void persister_dump_ptr(mp_obj_persister_t *persister, mp_obj_t obj, mp_ref_t ref) {
-    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
-
-    if (0) {
-    } else if (MP_OBJ_IS_SMALL_INT(obj) && ref == 0) {
-        WRITE_INT8('S');
-        WRITE_PTR(MP_OBJ_SMALL_INT_VALUE(obj));
-    } else {
-        if (0) {
-        } else if (obj == MP_OBJ_NULL) {
-            WRITE_INT8('X');
-            WRITE_INT8('N');
-        } else if (obj == MP_OBJ_STOP_ITERATION) {
-            WRITE_INT8('X');
-            WRITE_INT8('I');
-        } else if (obj == MP_OBJ_SENTINEL) {
-            WRITE_INT8('X');
-            WRITE_INT8('S');
-        #if MICROPY_ALLOW_PAUSE_VM
-        } else if (obj == MP_OBJ_PAUSE_VM) {
-            WRITE_INT8('X');
-            WRITE_INT8('P');
-        #endif
-        // C tagging is const pointer.
-        } else if (obj == mp_const_none) {
-            WRITE_INT8('C');
-            WRITE_INT8('N');
-        } else if (obj == mp_const_true) {
-            WRITE_INT8('C');
-            WRITE_INT8('T');
-        } else if (obj == mp_const_false) {
-            WRITE_INT8('C');
-            WRITE_INT8('F');
-        } else {
-            PACK(ref, ref);
-        }
-    }
-}
-
 STATIC void persister_dump_main(mp_obj_persister_t *persister, mp_obj_t obj) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
-    mp_ref_t ref = PACK_ANY(obj);
     WRITE_INT8('M');
-    PACK_PTR(obj, ref);
+    PACK_ANY(obj);
 }
 
 const mp_obj_type_t mp_type_persister = {
