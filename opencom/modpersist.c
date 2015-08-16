@@ -131,26 +131,15 @@ STATIC mp_map_elem_t *modpersist_mp_map_lookup(mp_map_t *map, mp_obj_t index) {
 
 #define WRITE_PTR(data) WRITE_UINT32(data)
 
-#define DO_DUMP() \
-    modpersist_starting_dump(persister, obj)
-
-#define DUMP_START() \
-    if (DO_DUMP()) {
+#define PACKING \
+    mp_obj_system_buf_t *sysbuf = persister->sysbuf; \
+    if (modpersist_starting_dump(persister, obj))
         /* body */
-
-#define DUMP_SUBREF() (sysbuf->len)
-
-#define DUMP_END() \
-    } \
-    return;
 
 // 3-way tagging
 
-#define PACK(type, obj) persister_dump_##type(persister, (obj))
-#define SUBPACK(type, obj) _ref = PACK(type, obj);
-#define SUBPACKED(ref) _ref = (ref);
+#define PACK(type, obj) persister_pack_##type(persister, (obj))
 #define PACK_ANY(obj) PACK(any, (obj))
-#define PACK_REF(ref_val) PACK(ref, (ref_val))
 #define PACK_QSTR(qstr_val) PACK(qstr, MP_OBJ_NEW_QSTR(qstr_val))
 
 // TODO: BASEPTR should accept ?
@@ -405,8 +394,9 @@ typedef struct _mp_obj_persister_t {
 
 const mp_obj_type_t mp_type_persister;
 
-// persister_dump_any function are used for persist anything.
-STATIC void persister_dump_any(mp_obj_persister_t *persister, mp_obj_t o);
+// 2 functions are used for persist anything.
+STATIC void persister_pack_any(mp_obj_persister_t *persister, mp_obj_t o);
+STATIC void persister_pack_qstr(mp_obj_persister_t *persister, mp_obj_t obj);
 
 STATIC bool modpersist_starting_dump(mp_obj_persister_t *persister, mp_obj_t obj) {
     mp_map_elem_t *persist_reg = modpersist_mp_map_lookup(persister->objmap, obj);
@@ -439,7 +429,7 @@ STATIC mp_obj_t persister_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t
     */
     // TODO: make map that targeting pointers?
     // TODO: registered type can persist by calling some?
-
+    
     mp_obj_t user_persist_func = MP_OBJ_NULL;
     mp_arg_check_num(n_args, n_kw, 0, 1, false);
     if (1 <= n_args) {
@@ -451,6 +441,9 @@ STATIC mp_obj_t persister_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t
     persister->sysbuf = system_buf_new();
     persister->objmap = mp_map_new(16);
     persister->userfunc = user_persist_func;
+
+    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
+    WRITE_STR(MP_PERSIST_MAGIC);
 
     return persister;
 }
@@ -559,7 +552,7 @@ STATIC mp_persist_bytecode_t *persister_parse_bytecode_from_fun_bc(mp_obj_t obj)
     return bc;
 }
 
-STATIC void persister_dump_bytecode(mp_obj_persister_t *persister, mp_persist_bytecode_t *bc) {
+STATIC void persister_pack_bytecode(mp_obj_persister_t *persister, mp_persist_bytecode_t *bc) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
     // NOTE: mp_persist_bytecode_t is are part of fun_bc.
@@ -567,12 +560,12 @@ STATIC void persister_dump_bytecode(mp_obj_persister_t *persister, mp_persist_by
     WRITE_TYPE('E');
     WRITE_STR0("bytecode");
     WRITE_INT8('0'); // version: 0
-    PACK_ANY(MP_OBJ_NEW_QSTR(bc->block_name));
-    PACK_ANY(MP_OBJ_NEW_QSTR(bc->source_file));
+    PACK_QSTR(bc->block_name);
+    PACK_QSTR(bc->source_file);
 
     WRITE_SIZE(bc->arg_names_len);
     for (mp_uint_t i = 0; i < bc->arg_names_len; i++) {
-        PACK_ANY(MP_OBJ_NEW_QSTR(bc->arg_names[i]));
+        PACK_QSTR(bc->arg_names[i]);
     }
 
     WRITE_INT16(bc->n_state);
@@ -593,7 +586,7 @@ STATIC void persister_dump_bytecode(mp_obj_persister_t *persister, mp_persist_by
     WRITE_STRN((const char *)bc->bytecode_body, bc->bytecode_body_size);
 }
 
-STATIC void persister_dump_code_state(mp_obj_persister_t *persister, mp_obj_t obj) {
+STATIC void persister_pack_code_state(mp_obj_persister_t *persister, mp_obj_t obj) {
 
 /*
 typedef struct _mp_code_state {
@@ -619,17 +612,14 @@ typedef struct _mp_code_state {
 */
 }
 
-STATIC void persister_dump_fun_bc(mp_obj_persister_t *persister, mp_obj_t obj) {
-    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
-
+STATIC void persister_pack_fun_bc(mp_obj_persister_t *persister, mp_obj_t obj) {
     assert(MP_OBJ_IS_TYPE(obj, &mp_type_fun_bc));
     
     mp_obj_fun_bc_t *fun_bc = obj;
     mp_persist_bytecode_t *bc = persister_parse_bytecode_from_fun_bc(fun_bc);
 
     // function dump
-    DUMP_START();
-    {
+    PACKING {
         WRITE_TYPE('F');
         
         // PACK_PTR(fun_bc->globals, globals_ref);
@@ -641,23 +631,17 @@ STATIC void persister_dump_fun_bc(mp_obj_persister_t *persister, mp_obj_t obj) {
         WRITE_INT8(fun_bc->has_def_kw_args || fun_bc->takes_var_args << 2 || fun_bc->takes_kw_args << 3);
         WRITE_INT32(0);
         
-        persister_dump_bytecode(persister, bc);
+        persister_pack_bytecode(persister, bc);
     }
-    
-    DUMP_END();
 }
 
-STATIC void persister_dump_microthread(mp_obj_persister_t *persister, mp_obj_t obj) {
-    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
-
+STATIC void persister_pack_microthread(mp_obj_persister_t *persister, mp_obj_t obj) {
     assert(MP_OBJ_IS_TYPE(obj, &mp_type_microthread));
 
     mp_obj_microthread_t *thread = obj;
     
-    DUMP_START();
-    
     // microthread dump
-    {
+    PACKING {
         WRITE_TYPE('E');
         WRITE_STR0("microthread");
         WRITE_INT8('0'); // version: 0
@@ -682,175 +666,139 @@ STATIC void persister_dump_microthread(mp_obj_persister_t *persister, mp_obj_t o
             WRITE_INT8('0'); // version: 0
         }
     }
-
-    DUMP_END();
 }
 
-STATIC void persister_dump_stack(mp_obj_persister_t *persister) {
-    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
-    (void)sysbuf;
+STATIC void persister_pack_stack(mp_obj_persister_t *persister) {
+
 }
 
-STATIC void persister_dump_vm_state(mp_obj_persister_t *persister) {
-    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
-    (void)sysbuf;
+STATIC void persister_pack_vm_state(mp_obj_persister_t *persister) {
+
 }
 
-STATIC void persister_dump_str(mp_obj_persister_t *persister, mp_obj_t obj) {
-    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
-
+STATIC void persister_pack_str(mp_obj_persister_t *persister, mp_obj_t obj) {
     assert(MP_OBJ_IS_STR(obj));
-    DUMP_START();
-    
-    mp_uint_t len = 0;
-    const char* str = mp_obj_str_get_data(obj, &len);
-    
-    WRITE_TYPE('s');
-    WRITE_SIZE(len);
-    WRITE_STRN(str, len);
-    
-    DUMP_END();
+    PACKING {
+        mp_uint_t len = 0;
+        const char* str = mp_obj_str_get_data(obj, &len);
+        
+        WRITE_TYPE('s');
+        WRITE_SIZE(len);
+        WRITE_STRN(str, len);
+    }
 }
 
-STATIC void persister_dump_bytes(mp_obj_persister_t *persister, mp_obj_t obj) {
-    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
-
+STATIC void persister_pack_bytes(mp_obj_persister_t *persister, mp_obj_t obj) {
     assert(MP_OBJ_IS_TYPE(obj, &mp_type_bytes));
-    DUMP_START();
     
-    mp_buffer_info_t objbuf;
-    mp_get_buffer_raise(obj, &objbuf, MP_BUFFER_READ);
-    
-    WRITE_SIZETYPE('b', objbuf.len);
-    WRITE_STRN(objbuf.buf, objbuf.len);
-    
-    DUMP_END();
+    PACKING {
+        mp_buffer_info_t objbuf;
+        mp_get_buffer_raise(obj, &objbuf, MP_BUFFER_READ);
+        
+        WRITE_SIZETYPE('b', objbuf.len);
+        WRITE_STRN(objbuf.buf, objbuf.len);
+    }
 }
 
-STATIC void persister_dump_qstr(mp_obj_persister_t *persister, mp_obj_t obj) {
-    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
-
+STATIC void persister_pack_qstr(mp_obj_persister_t *persister, mp_obj_t obj) {
     assert(MP_OBJ_IS_QSTR(obj));
-    DUMP_START();
-    
-    mp_uint_t len = 0;
-    const byte* str = qstr_data(MP_OBJ_QSTR_VALUE(obj), &len);
-    
-    WRITE_SIZETYPE('q', len);
-    WRITE_STRN((const char*)str, len);
-    
-    DUMP_END();
+
+    PACKING {
+        mp_uint_t len = 0;
+        const byte* str = qstr_data(MP_OBJ_QSTR_VALUE(obj), &len);
+        
+        WRITE_SIZETYPE('q', len);
+        WRITE_STRN((const char*)str, len);
+    }
 }
 
-STATIC void persister_dump_small_int(mp_obj_persister_t *persister, mp_obj_t obj) {
-    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
-
+STATIC void persister_pack_small_int(mp_obj_persister_t *persister, mp_obj_t obj) {
     assert(MP_OBJ_IS_SMALL_INT(obj));
 
     mp_int_t value = MP_OBJ_SMALL_INT_VALUE(obj);
     persist_union_int_t pui = {.int32 = value};
 
     if (pui.int32 == value) {
+        mp_obj_system_buf_t *sysbuf = persister->sysbuf;
         WRITE_TYPE('S');
         WRITE_PTR(MP_OBJ_SMALL_INT_VALUE(obj));
     } else {
-        DUMP_START();
+        PACKING {
+            WRITE_TYPE('i');
+            WRITE_INT8('8');
+            WRITE_INT64(value);
+        }
+    }
+}
+
+STATIC void persister_pack_int(mp_obj_persister_t *persister, mp_obj_t obj) {
+    assert(MP_OBJ_IS_TYPE(obj, &mp_type_int));
+
+    PACKING {
+        // TODO: how to persist large int?
+        mp_int_t value = mp_obj_int_get_truncated(obj);
         
+        // XXX only works with small int...
         WRITE_TYPE('i');
         WRITE_INT8('8');
         WRITE_INT64(value);
-        
-        DUMP_END();
     }
 }
 
-STATIC void persister_dump_int(mp_obj_persister_t *persister, mp_obj_t obj) {
-    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
-
-    assert(MP_OBJ_IS_TYPE(obj, &mp_type_int));
-
-    // TODO: how to persist large int?
-    mp_int_t value = mp_obj_int_get_truncated(obj);
-    
-    DUMP_START();
-    
-    // XXX only works with small int...
-    WRITE_TYPE('i');
-    WRITE_INT8('8');
-    WRITE_INT64(value);
-    
-    DUMP_END();
-}
-
-STATIC void persister_dump_tuple(mp_obj_persister_t *persister, mp_obj_t obj) {
-    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
-
+STATIC void persister_pack_tuple(mp_obj_persister_t *persister, mp_obj_t obj) {
     assert(MP_OBJ_IS_TYPE(obj, &mp_type_tuple));
    
-    DUMP_START();
-
-    mp_obj_t iter = mp_getiter(obj);
-    mp_int_t size = mp_obj_get_int(mp_obj_len(obj));
- 
-    WRITE_SIZETYPE('t', size);
-    for (mp_int_t i = 0; i < size; i++){
-        mp_obj_t cur = mp_iternext(iter);
-        PACK_ANY(cur);
+    PACKING {
+        mp_obj_t iter = mp_getiter(obj);
+        mp_int_t size = mp_obj_get_int(mp_obj_len(obj));
+     
+        WRITE_SIZETYPE('t', size);
+        for (mp_int_t i = 0; i < size; i++){
+            mp_obj_t cur = mp_iternext(iter);
+            PACK_ANY(cur);
+        }
     }
-    
-    DUMP_END();
 }
 
-STATIC void persister_dump_list(mp_obj_persister_t *persister, mp_obj_t obj) {
-    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
-
+STATIC void persister_pack_list(mp_obj_persister_t *persister, mp_obj_t obj) {
     assert(MP_OBJ_IS_TYPE(obj, &mp_type_list));
 
-    DUMP_START();
-    
-    mp_obj_t iter = mp_getiter(obj);
-    mp_int_t size = mp_obj_get_int(mp_obj_len(obj));
-    
-    WRITE_SIZETYPE('l', size);
-    for (mp_int_t i = 0; i < size; i++){
-        mp_obj_t cur = mp_iternext(iter);
-        PACK_ANY(cur);
-    }
-    
-    DUMP_END();
-}
-
-STATIC void persister_dump_dict(mp_obj_persister_t *persister, mp_obj_t obj) {
-    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
-
-    assert(MP_OBJ_IS_TYPE(obj, &mp_type_list));
-
-    DUMP_START();
-
-    mp_obj_t iter = mp_getiter(mp_call_function_0(mp_load_attr(obj, MP_QSTR_items)));
-    mp_int_t size = mp_obj_get_int(mp_obj_len(obj));
-    
-    WRITE_SIZETYPE('d', size);
-    for (mp_int_t i = 0; i < size; i++){
-        mp_obj_t cur = mp_iternext(iter);
-        mp_uint_t csize = 0;
-
-        mp_obj_t *items = NULL;
-        mp_obj_tuple_get(cur, &csize, &items);
-        assert(csize == 2);
+    PACKING {
+        mp_obj_t iter = mp_getiter(obj);
+        mp_int_t size = mp_obj_get_int(mp_obj_len(obj));
         
-        PACK_ANY(items[0]);
-        PACK_ANY(items[1]);
+        WRITE_SIZETYPE('l', size);
+        for (mp_int_t i = 0; i < size; i++){
+            mp_obj_t cur = mp_iternext(iter);
+            PACK_ANY(cur);
+        }
     }
-    
-    DUMP_END();
 }
 
-STATIC bool persister_dump_user(mp_obj_persister_t *persister, mp_obj_t obj) {
-    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
+STATIC void persister_pack_dict(mp_obj_persister_t *persister, mp_obj_t obj) {
+    assert(MP_OBJ_IS_TYPE(obj, &mp_type_list));
 
-    // TODO: DO_DUMP is correct?
-    if (DO_DUMP()) {
+    PACKING {
+        mp_obj_t iter = mp_getiter(mp_call_function_0(mp_load_attr(obj, MP_QSTR_items)));
+        mp_int_t size = mp_obj_get_int(mp_obj_len(obj));
+        
+        WRITE_SIZETYPE('d', size);
+        for (mp_int_t i = 0; i < size; i++){
+            mp_obj_t cur = mp_iternext(iter);
+            mp_uint_t csize = 0;
+    
+            mp_obj_t *items = NULL;
+            mp_obj_tuple_get(cur, &csize, &items);
+            assert(csize == 2);
+            
+            PACK_ANY(items[0]);
+            PACK_ANY(items[1]);
+        }
+    }
+}
+
+STATIC bool persister_pack_user(mp_obj_persister_t *persister, mp_obj_t obj) {
+    PACKING {
         mp_buffer_info_t retbuf;
         
         // TODO: persister's user function can access PACK_ANY for internal usage?
@@ -871,7 +819,7 @@ STATIC bool persister_dump_user(mp_obj_persister_t *persister, mp_obj_t obj) {
 
 }
 
-STATIC void persister_dump_common_obj(mp_obj_persister_t *persister, mp_obj_t obj) {
+STATIC void persister_pack_common_obj(mp_obj_persister_t *persister, mp_obj_t obj) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
     void *start = MP_STATE_MEM(gc_pool_start);
@@ -906,7 +854,7 @@ STATIC void persister_dump_common_obj(mp_obj_persister_t *persister, mp_obj_t ob
     }
 }
 
-STATIC void persister_dump_obj(mp_obj_persister_t *persister, mp_obj_t obj) {
+STATIC void persister_pack_obj(mp_obj_persister_t *persister, mp_obj_t obj) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
     if (0) {
@@ -926,14 +874,14 @@ STATIC void persister_dump_obj(mp_obj_persister_t *persister, mp_obj_t obj) {
     }
 }
 
-STATIC void persister_dump_baseptr(mp_obj_t baseptr, char *ptr, mp_uint_t size) {
+STATIC void persister_pack_baseptr(mp_obj_t baseptr, char *ptr, mp_uint_t size) {
     mp_uint_t offset = (mp_uint_t)baseptr - (mp_uint_t)ptr;
     assert(offset < 0 || size <= offset);
 
     (void)offset;
 }
 
-STATIC void persister_dump_any(mp_obj_persister_t *persister, mp_obj_t obj) {
+STATIC void persister_pack_any(mp_obj_persister_t *persister, mp_obj_t obj) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
     if (0) {
@@ -974,26 +922,34 @@ STATIC mp_obj_t mod_persist_test(mp_obj_t persister_obj, mp_obj_t obj) {
     assert(MP_OBJ_IS_TYPE(persister_obj, &mp_type_persister));
     
     mp_obj_persister_t *persister = persister_obj;
-    mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
-    WRITE_STR(MP_PERSIST_MAGIC "\n" "micropython persist v0.1\n");
     PACK_ANY(obj);
     
-    (void)persister_dump_microthread;
-    (void)persister_dump_baseptr;
-    (void)persister_dump_code_state;
-    (void)persister_dump_stack;
-    (void)persister_dump_vm_state;
+    (void)persister_pack_microthread;
+    (void)persister_pack_baseptr;
+    (void)persister_pack_code_state;
+    (void)persister_pack_stack;
+    (void)persister_pack_vm_state;
 
     return mp_obj_new_bytes(persister->sysbuf->buf, persister->sysbuf->len);
 }
 
 MP_DEFINE_CONST_FUN_OBJ_2(mod_persist_test_obj, mod_persist_test);
 
+STATIC mp_obj_t mod_persist_dumps(mp_obj_t obj) {
+    mp_obj_t persister_obj = persister_make_new((mp_obj_t)&mp_type_persister, 0, 0, NULL);
+    mp_obj_persister_t *persister = persister_obj;
+
+    PACK_ANY(obj);
+
+    return mp_obj_new_bytes(persister->sysbuf->buf, persister->sysbuf->len);
+}
+
+MP_DEFINE_CONST_FUN_OBJ_1(mod_persist_dumps_obj, mod_persist_dumps);
 
 STATIC const mp_map_elem_t mp_module_persist_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_upersist) },
-//    { MP_OBJ_NEW_QSTR(MP_QSTR_dumps), (mp_obj_t)&mod_persist_dumps_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_dumps), (mp_obj_t)&mod_persist_dumps_obj },
 //    { MP_OBJ_NEW_QSTR(MP_QSTR_loads), (mp_obj_t)&mod_persist_loads_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_test2), (mp_obj_t)&mp_identity_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_Persister), (mp_obj_t)&mp_type_persister },

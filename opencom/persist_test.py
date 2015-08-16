@@ -72,10 +72,11 @@ def hello():
         result = upersist.test(persister, obj)
         print("object:", obj)
         
+        assert result == upersist.dumps(obj), "user dump is used?"
+        
         assert result.startswith(b"MP\x80\x01"), result[:4]
-        magic, header, content = result.split(b"\n", 2)
+        magic, content = result[:4], result[4:]
         assert magic == b"MP\x80\x01"
-        assert header == b'micropython persist v0.1'
         print(content)
     except Exception as e:
         sys.print_exception(e)
@@ -168,10 +169,7 @@ class Parser():
         fp = self.fp
         header = fp.read(4)
         if header != b"MP\x80\x01":
-            return False
-        
-        fp.readline() # extra info 0 \n
-        fp.readline() # extra info 1 \n
+            raise ParseError("invaild header: {!r}".format(header))
         
         return self.load()
 
