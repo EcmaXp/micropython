@@ -21,9 +21,9 @@ def hello():
         func2name[value] = k2 = "{}.{}".format(module_name, func_name).encode()
         name2func[k2] = value
     """, x, x)
-    func = x.pop('hello')
+    #func = x.pop('hello')
     
-    obj = (func, "EOF")
+    obj = (x, "EOF")
     
     def register_func(module_name, func_name, func):
         if callable(value):
@@ -173,15 +173,9 @@ class Parser():
         fp.readline() # extra info 0 \n
         fp.readline() # extra info 1 \n
         
-        while fp.tell() < self.last:
-            self.load()
-        
-        return self.main_obj
-    
+        return self.load()
+
     def load(self):
-        # TODO: while unpersisting object
-        #       if object are nested then can't unpersist
-        
         fp = self.fp
         pos = fp.tell()
         tag = fp.read(1).decode()
@@ -424,12 +418,6 @@ class Parser():
         tag = encoded_tag.decode()
         assert len(tag) > 1
         obj = getattr(self, "load_" + tag)()
-        return obj
-    
-    def load_M(self):
-        "Main object"
-        obj = self.load()
-        self.main_obj = obj
         return obj
 
 try:
