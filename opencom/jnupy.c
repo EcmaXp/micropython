@@ -247,11 +247,13 @@ void nlr_gk_pop_raw(nlr_gk_buf_t *gk_buf) {
 }
 
 NORETURN void nlr_gk_jump_raw(void *val) {
-    JNUPY_NLR_GK_TOP->is_working = false;
-
-    nlr_gk_set_buf(JNUPY_NLR_GK_TOP);
-    JNUPY_NLR_GK_TOP = JNUPY_NLR_GK_TOP->prev;
-
+    if (JNUPY_NLR_GK_TOP != NULL) {
+        JNUPY_NLR_GK_TOP->is_working = false;
+    
+        nlr_gk_set_buf(JNUPY_NLR_GK_TOP);
+        JNUPY_NLR_GK_TOP = JNUPY_NLR_GK_TOP->prev;
+    }
+    
     nlr_jump(val);
 }
 

@@ -29,6 +29,8 @@
 #include <string.h>
 #include "opencom/modmicrothread.h"
 #include "py/objfun.h"
+#include "py/objclosure.h"
+#include "py/objboundmeth.h"
 
 #if !MICROPY_ENABLE_GC
 #error Persist module require gc. (really?)
@@ -143,7 +145,7 @@ STATIC mp_map_elem_t *modpersist_mp_map_lookup(mp_map_t *map, mp_obj_t index) {
 #define PACK_QSTR(qstr_val) PACK(qstr, MP_OBJ_NEW_QSTR(qstr_val))
 
 // TODO: BASEPTR should accept ?
-#define PACK_BASEPTR(baseptr, ptr, size) persister_dump_baseptr(persister, (baseptr), (char *)(ptr), size)
+#define PACK_BASEPTR(baseptr, ptr, size) persister_dump_baseptr(persister, (baseptr), (void *)(ptr), size)
 #define PACK_ERROR(message) (WRITE_STR("E:"), (WRITE_STR(message), WRITE_INT8(0)))
 
 typedef struct _mp_obj_system_buf_t {
@@ -376,11 +378,13 @@ STATIC const mp_map_elem_t system_buf_locals_dict_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___del__), (mp_obj_t)&system_buf_del_obj },
 };
 
+STATIC MP_DEFINE_CONST_DICT(system_buf_locals_dict, system_buf_locals_dict_table);
+
 const mp_obj_type_t mp_type_system_buf = {
     { &mp_type_type },
     .name = MP_QSTR_SystemBuffer,
     .buffer_p = { .get_buffer = system_buf_get_buffer },
-    .locals_dict = (mp_obj_t)&system_buf_locals_dict_table,
+    .locals_dict = (mp_obj_t)&system_buf_locals_dict,
 };
 
 typedef struct _mp_obj_persister_t {
@@ -477,6 +481,8 @@ typedef struct _mp_persist_bytecode_t {
 } mp_persist_bytecode_t;
 
 STATIC mp_persist_bytecode_t *persister_parse_bytecode_from_fun_bc(mp_obj_t obj) {
+    assert(MP_OBJ_IS_TYPE(obj, &mp_type_fun_bc));
+
     mp_obj_fun_bc_t *fun_bc = obj;
     const byte *ip = fun_bc->bytecode;
     mp_uint_t len = fun_bc->bytecode_size;
@@ -557,7 +563,7 @@ STATIC void persister_pack_bytecode(mp_obj_persister_t *persister, mp_persist_by
 
     // NOTE: mp_persist_bytecode_t is are part of fun_bc.
 
-    WRITE_TYPE('E');
+    WRITE_TYPE('X');
     WRITE_STR0("bytecode");
     WRITE_INT8('0'); // version: 0
     PACK_QSTR(bc->block_name);
@@ -588,6 +594,41 @@ STATIC void persister_pack_bytecode(mp_obj_persister_t *persister, mp_persist_by
 
 STATIC void persister_pack_code_state(mp_obj_persister_t *persister, mp_obj_t obj) {
 
+    mp_code_state *code_state = obj;
+    mp_persist_bytecode_t *bc = persister_parse_bytecode_from_fun_bc(code_state->fun);
+    
+    assert(bc->code_info == code_state->code_info);
+    
+    PACKING {
+        WRITE_TYPE('X');
+        WRITE_STR0("code_state");
+        WRITE_INT8('0'); // version: 0
+        
+        PACK_ANY(code_state->fun);
+        PACK_ANY(code_state->old_globals);
+        
+        #if MICROPY_STACKLESS
+        PACK(code_state, code_state->prev);
+        #else
+        PACK_ANY(NULL);
+        #endif
+
+        #if MICROPY_KEEP_LAST_CODE_STATE
+        PACK(code_state, code_state->current);
+        #else
+        PACK_ANY(NULL);
+        #endif
+
+        
+        
+        // GET_ORIGINAL_DUMP();
+
+        // sp
+        // ip
+        // code_info
+        
+        
+    }
 /*
 typedef struct _mp_code_state {
     mp_obj_t fun;
@@ -612,7 +653,40 @@ typedef struct _mp_code_state {
 */
 }
 
+STATIC mp_obj_fun_bc_t *persister_find_root_fun_bc(mp_obj_t obj) {
+    mp_obj_t last_obj = NULL;
+    while (last_obj != obj) {
+        // escape from cycle reference...
+        last_obj = obj;
+
+        if (!MP_OBJ_IS_OBJ(obj)) {
+            // TODO: should raise error?
+            break;
+        } else if (MP_OBJ_IS_TYPE(obj, &mp_type_fun_bc)) {
+            return obj;
+        } else if (MP_OBJ_IS_TYPE(obj, &mp_type_closure)) {
+            mp_obj_closure_t *o = obj;
+            obj = o->fun;
+        } else if (MP_OBJ_IS_TYPE(obj, &mp_type_bound_meth)) {
+            mp_obj_bound_meth_t *o = obj;
+            obj = o->meth;
+        } else {
+            // TODO: should raise error?
+            break;
+        }
+    }
+    
+    return NULL;
+}
+
 STATIC void persister_pack_fun_bc(mp_obj_persister_t *persister, mp_obj_t obj) {
+    obj = persister_find_root_fun_bc(obj);
+    if (obj == NULL) {
+        mp_obj_system_buf_t *sysbuf = persister->sysbuf;
+        PACK_ERROR("invaild function (not fun_bc)");
+        return;
+    }
+    
     assert(MP_OBJ_IS_TYPE(obj, &mp_type_fun_bc));
     
     mp_obj_fun_bc_t *fun_bc = obj;
@@ -642,7 +716,7 @@ STATIC void persister_pack_microthread(mp_obj_persister_t *persister, mp_obj_t o
     
     // microthread dump
     PACKING {
-        WRITE_TYPE('E');
+        WRITE_TYPE('X');
         WRITE_STR0("microthread");
         WRITE_INT8('0'); // version: 0
     
@@ -654,14 +728,14 @@ STATIC void persister_pack_microthread(mp_obj_persister_t *persister, mp_obj_t o
         
         // status dump
         {
-            WRITE_TYPE('E');
+            WRITE_TYPE('X');
             WRITE_STR0("microthread_status");
             WRITE_INT8('0'); // version: 0
         }
     
         // context dump
         {
-            WRITE_TYPE('E');
+            WRITE_TYPE('X');
             WRITE_STR0("microthread_context");
             WRITE_INT8('0'); // version: 0
         }
@@ -776,7 +850,7 @@ STATIC void persister_pack_list(mp_obj_persister_t *persister, mp_obj_t obj) {
 }
 
 STATIC void persister_pack_dict(mp_obj_persister_t *persister, mp_obj_t obj) {
-    assert(MP_OBJ_IS_TYPE(obj, &mp_type_list));
+    assert(MP_OBJ_IS_TYPE(obj, &mp_type_dict));
 
     PACKING {
         mp_obj_t iter = mp_getiter(mp_call_function_0(mp_load_attr(obj, MP_QSTR_items)));

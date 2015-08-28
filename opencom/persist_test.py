@@ -406,7 +406,7 @@ class Parser():
         buf = self.load_b()
         return loader(self, buf)
     
-    def load_E(self):
+    def load_X(self):
         "extended object"
         pos = self.fp.tell()
         encoded_tag = self.fp.read(64)
@@ -435,3 +435,5 @@ except Exception as e:
 else:
     print("persist object length:", len(result), 'bytes')
     print("object (restored):", obj)
+
+sys.exit(0)
