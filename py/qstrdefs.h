@@ -215,7 +215,9 @@ Q(exec)
 #if MICROPY_PY_BUILTINS_EXECFILE
 Q(execfile)
 #endif
+#if MICROPY_PY_BUILTINS_FILTER
 Q(filter)
+#endif
 #if MICROPY_PY_BUILTINS_FLOAT
 Q(float)
 #endif
