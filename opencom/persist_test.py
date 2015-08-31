@@ -164,6 +164,7 @@ class Parser():
         self.last = len(fp.content)
         self.data = {}
         self.main_obj = None
+        self.load_level = 0
         
     def parse(self):
         fp = self.fp
@@ -174,9 +175,21 @@ class Parser():
         return self.load()
 
     def load(self):
+        self.load_level += 1
+        
+        try:
+            return self.load_raw()
+        finally:
+            self.load_level -= 1
+
+    def load_raw(self):
         fp = self.fp
         pos = fp.tell()
         tag = fp.read(1).decode()
+
+        indent = "  " * (self.load_level - 1)
+        print('{}#{}'.format(indent, pos))
+        
         if not tag:
             return False
         
@@ -196,7 +209,7 @@ class Parser():
                 obj = getattr(self, "load_" + tag)(obj)
         except Exception:
             buf = fp.content[pos:pos + 32]
-            print('#ERR {}: {}...'.format(pos, buf))
+            print('{}#ERR {}: {}...'.format(indent, pos, buf))
             raise
         
         if tag not in ('C', 'X'):
@@ -213,9 +226,9 @@ class Parser():
         buf = fp.content[pos:fp.tell()]
         if tag in ('o', 'O'):
             ref = self.decode_int(buf[1:])
-            print('#{}: {} -> #{}'.format(pos, buf, ref))
+            print('{}#{}: {} -> #{}'.format(indent, pos, buf, ref))
         else:
-            print('#{}: {} -> {!r}'.format(pos, buf, obj))
+            print('{}#{}: {} -> {!r}'.format(indent, pos, buf, obj))
 
         return obj
 
@@ -328,6 +341,23 @@ class Parser():
         print("lineno_info", bytecode.lineno_info)
         print("body", bytecode.body)
         print("==")
+        
+        upersist.function(
+            global_dict,
+            n_pos_args,
+            n_kwonly_args,
+            n_def_args,
+            flags,
+            extra_args,
+            bytecode.block_name,
+            bytecode.source_file,
+            bytecode.arg_names,
+            bytecode.n_state,
+            bytecode.n_exc_stack,
+            bytecode.local_nums,
+            bytecode.lineno_info,
+            bytecode.body,
+        )
         
         return "fake function with bytecode {}"
         

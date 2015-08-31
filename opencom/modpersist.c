@@ -1021,12 +1021,123 @@ STATIC mp_obj_t mod_persist_dumps(mp_obj_t obj) {
 
 MP_DEFINE_CONST_FUN_OBJ_1(mod_persist_dumps_obj, mod_persist_dumps);
 
+STATIC void system_buf_write_mp_emit_uint(system_buf *sysbuf, mp_uint_t val) {
+    // emitbc.c: emit_write_code_info_uint function
+    
+    byte buf[BYTES_FOR_INT];
+    byte *p = buf + sizeof(buf);
+    
+    do {
+        *--p = val & 0x7f;
+        val >>= 7;
+    } while (val != 0);
+    
+    mp_uint_t len = buf + sizeof(buf) - p;
+    byte c[len];
+    
+    while (p != buf + sizeof(buf) - 1) {
+        *c++ = *p++ | 0x80;
+    }
+    *c = *p;
+    
+    system_buf_write(sysbuf, &c, len);
+}
+
+STATIC void system_buf_write_mp_emit_qstr(system_buf *sysbuf, qstr val) {
+    system_buf_write_mp_emit_uint(sysbuf, (mp_uint_t)val);   
+}
+
+STATIC mp_obj_t mod_persist_function(mp_uint_t n_args, const mp_obj_t *args) {
+    if (n_args != 14) {
+        return mp_const_none;    
+    }
+    
+    mp_uint_t arg_idx = 0; 
+    mp_obj_t global_dict = args[arg_idx++];
+    mp_uint_t n_pos_args = mp_obj_get_int(args[arg_idx++]);
+    mp_uint_t n_kwonly_args = mp_obj_get_int(args[arg_idx++]);
+    mp_uint_t n_def_args = mp_obj_get_int(args[arg_idx++]);
+    mp_uint_t flags = mp_obj_get_int(args[arg_idx++]);
+    mp_uint_t extra_args = mp_obj_get_int(args[arg_idx++]);
+    qstr block_name = mp_obj_str_get_qstr(args[arg_idx++]);
+    qstr source_file = mp_obj_str_get_qstr(args[arg_idx++]);
+    
+    qstr *arg_names = NULL;
+    {
+        mp_obj_t arg_names_obj = args[arg_idx++];
+        mp_uint_t len = 0;
+        mp_obj_t *items = NULL;
+        
+        mp_obj_list_get(arg_names_obj, &len, &items);
+        arg_names = m_new(qstr, len);
+
+        for (mp_uint_t i = 0; i < len; i++) {
+            arg_names[i] = mp_obj_str_get_qstr(items[i]);
+        }
+    }
+    
+    mp_uint_t n_state = mp_obj_get_int(args[arg_idx++]);
+    mp_uint_t n_exc_stack = mp_obj_get_int(args[arg_idx++]);
+    
+    mp_uint_t *local_nums = NULL;
+    {
+        mp_obj_t local_nums_obj = args[arg_idx++];
+        mp_uint_t len = 0;
+        mp_obj_t *items = NULL;
+        
+        mp_obj_list_get(local_nums_obj, &len, &items);
+        local_nums = m_new(mp_uint_t, len);
+
+        for (mp_uint_t i = 0; i < len; i++) {
+            local_nums[i] = mp_obj_get_int(items[i]);
+        }
+    }
+    
+    mp_buffer_info_t lineno_info_buf;
+    {
+        mp_obj_t lineno_info_obj = args[arg_idx++];
+        mp_get_buffer_raise(lineno_info_obj, &lineno_info_buf, MP_BUFFER_READ);
+    }
+    
+    mp_buffer_info_t body_buf;
+    {
+        mp_obj_t lineno_info_obj = args[arg_idx++];
+        mp_get_buffer_raise(lineno_info_obj, &body_buf, MP_BUFFER_READ);
+    }
+    
+    (void)global_dict;
+    (void)n_pos_args;
+    (void)n_kwonly_args;
+    (void)n_def_args;
+    (void)flags;
+    (void)extra_args;
+    (void)block_name;
+    (void)source_file;
+    (void)arg_names;
+    (void)n_state;
+    (void)n_exc_stack;
+    (void)local_nums;
+    (void)lineno_info_buf;
+    (void)body_buf;
+    
+    mp_obj_system_buf_t *bc_sysbuf = system_buf_new();
+    system_buf_write_mp_emit_qstr(bc_sysbuf, );
+    
+    
+    assert(arg_idx == 14);
+    
+    return mp_const_none;
+}
+
+MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_persist_function_obj, 14, 14, mod_persist_function);
+
 STATIC const mp_map_elem_t mp_module_persist_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_upersist) },
     { MP_OBJ_NEW_QSTR(MP_QSTR_dumps), (mp_obj_t)&mod_persist_dumps_obj },
 //    { MP_OBJ_NEW_QSTR(MP_QSTR_loads), (mp_obj_t)&mod_persist_loads_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_test2), (mp_obj_t)&mp_identity_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_Persister), (mp_obj_t)&mp_type_persister },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_function), (mp_obj_t)&mod_persist_function_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_SystemBuffer), (mp_obj_t)&mp_type_system_buf },
     { MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&mod_persist_test_obj },
 };
