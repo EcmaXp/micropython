@@ -188,12 +188,6 @@
 #define MICROPY_EMIT_BC_WITH_SIZE (0)
 #endif
 
-// Whether to emit CPython byte codes (for debugging/testing)
-// Enabling this overrides all other emitters
-#ifndef MICROPY_EMIT_CPYTHON
-#define MICROPY_EMIT_CPYTHON (0)
-#endif
-
 // Whether to emit x64 native code
 #ifndef MICROPY_EMIT_X64
 #define MICROPY_EMIT_X64 (0)
@@ -573,6 +567,11 @@ endif
 // Whether to support the Python 2 execfile function
 #ifndef MICROPY_PY_BUILTINS_EXECFILE
 #define MICROPY_PY_BUILTINS_EXECFILE (0)
+#endif
+
+// Whether to support filter function(type)
+#ifndef MICROPY_PY_BUILTINS_FILTER
+#define MICROPY_PY_BUILTINS_FILTER (1)
 #endif
 
 // Whether to support reversed function(type)

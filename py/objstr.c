@@ -851,7 +851,7 @@ mp_obj_t mp_obj_str_format(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwa
         if (*str == '}') {
             str++;
             if (str < top && *str == '}') {
-                vstr_add_char(&vstr, '}');
+                vstr_add_byte(&vstr, '}');
                 continue;
             }
             if (MICROPY_ERROR_REPORTING == MICROPY_ERROR_REPORTING_TERSE) {
@@ -862,13 +862,13 @@ mp_obj_t mp_obj_str_format(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwa
             }
         }
         if (*str != '{') {
-            vstr_add_char(&vstr, *str);
+            vstr_add_byte(&vstr, *str);
             continue;
         }
 
         str++;
         if (str < top && *str == '{') {
-            vstr_add_char(&vstr, '{');
+            vstr_add_byte(&vstr, '{');
             continue;
         }
 
@@ -881,7 +881,7 @@ mp_obj_t mp_obj_str_format(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwa
         if (str < top && *str != '}' && *str != '!' && *str != ':') {
             field_name = vstr_new();
             while (str < top && *str != '}' && *str != '!' && *str != ':') {
-                vstr_add_char(field_name, *str++);
+                vstr_add_byte(field_name, *str++);
             }
         }
 
@@ -894,9 +894,17 @@ mp_obj_t mp_obj_str_format(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwa
             } else {
                 if (MICROPY_ERROR_REPORTING == MICROPY_ERROR_REPORTING_TERSE) {
                     terse_str_format_value_error();
-                } else {
+                } else if (MICROPY_ERROR_REPORTING == MICROPY_ERROR_REPORTING_NORMAL) {
                     nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError,
-                        "end of format while looking for conversion specifier"));
+                        "bad conversion specifier"));
+                } else {
+                    if (str >= top) {
+                        nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError,
+                            "end of format while looking for conversion specifier"));
+                    } else {
+                        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
+                            "unknown conversion specifier %c", *str));
+                    }
                 }
             }
         }
@@ -911,7 +919,7 @@ mp_obj_t mp_obj_str_format(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwa
             if (*str != '}') {
                 format_spec = vstr_new();
                 while (str < top && *str != '}') {
-                    vstr_add_char(format_spec, *str++);
+                    vstr_add_byte(format_spec, *str++);
                 }
             }
         }
@@ -989,15 +997,9 @@ mp_obj_t mp_obj_str_format(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwa
             mp_print_kind_t print_kind;
             if (conversion == 's') {
                 print_kind = PRINT_STR;
-            } else if (conversion == 'r') {
-                print_kind = PRINT_REPR;
             } else {
-                if (MICROPY_ERROR_REPORTING == MICROPY_ERROR_REPORTING_TERSE) {
-                    terse_str_format_value_error();
-                } else {
-                    nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
-                        "unknown conversion specifier %c", conversion));
-                }
+                assert(conversion == 'r');
+                print_kind = PRINT_REPR;
             }
             vstr_t arg_vstr;
             mp_print_t arg_print;
@@ -1065,7 +1067,12 @@ mp_obj_t mp_obj_str_format(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwa
                 type = *s++;
             }
             if (*s) {
-                nlr_raise(mp_obj_new_exception_msg(&mp_type_KeyError, "Invalid conversion specification"));
+                if (MICROPY_ERROR_REPORTING == MICROPY_ERROR_REPORTING_TERSE) {
+                    terse_str_format_value_error();
+                } else {
+                    nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError,
+                        "invalid format specifier"));
+                }
             }
             vstr_free(format_spec);
             format_spec = NULL;
@@ -1290,14 +1297,14 @@ STATIC mp_obj_t str_modulo_format(mp_obj_t pattern, mp_uint_t n_args, const mp_o
     for (const byte *top = str + len; str < top; str++) {
         mp_obj_t arg = MP_OBJ_NULL;
         if (*str != '%') {
-            vstr_add_char(&vstr, *str);
+            vstr_add_byte(&vstr, *str);
             continue;
         }
         if (++str >= top) {
-            break;
+            goto incomplete_format;
         }
         if (*str == '%') {
-            vstr_add_char(&vstr, '%');
+            vstr_add_byte(&vstr, '%');
             continue;
         }
 
@@ -1364,6 +1371,7 @@ STATIC mp_obj_t str_modulo_format(mp_obj_t pattern, mp_uint_t n_args, const mp_o
         }
 
         if (str >= top) {
+incomplete_format:
             if (MICROPY_ERROR_REPORTING == MICROPY_ERROR_REPORTING_TERSE) {
                 terse_str_format_value_error();
             } else {
