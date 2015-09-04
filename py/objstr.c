@@ -116,8 +116,12 @@ STATIC void str_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t
         return;
     }
     #endif
+    #if !MICROPY_PY_BUILTINS_STR_UNICODE
     bool is_bytes = MP_OBJ_IS_TYPE(self_in, &mp_type_bytes);
-    if (kind == PRINT_STR && !is_bytes) {
+    #else
+    bool is_bytes = true;
+    #endif
+    if (!MICROPY_PY_BUILTINS_STR_UNICODE && kind == PRINT_STR && !is_bytes) {
         mp_printf(print, "%.*s", str_len, str_data);
     } else {
         if (is_bytes) {
@@ -387,8 +391,7 @@ STATIC mp_obj_t bytes_subscr(mp_obj_t self_in, mp_obj_t index, mp_obj_t value) {
         if (MP_OBJ_IS_TYPE(index, &mp_type_slice)) {
             mp_bound_slice_t slice;
             if (!mp_seq_get_fast_slice_indexes(self_len, index, &slice)) {
-                nlr_raise(mp_obj_new_exception_msg(&mp_type_NotImplementedError,
-                    "only slices with step=1 (aka None) are supported"));
+                mp_not_implemented("only slices with step=1 (aka None) are supported");
             }
             return mp_obj_new_str_of_type(type, self_data + slice.start, slice.stop - slice.start);
         }
@@ -578,7 +581,7 @@ STATIC mp_obj_t str_rsplit(mp_uint_t n_args, const mp_obj_t *args) {
     mp_int_t idx = splits;
 
     if (sep == mp_const_none) {
-        assert(!"TODO: rsplit(None,n) not implemented");
+        mp_not_implemented("rsplit(None,n)");
     } else {
         mp_uint_t sep_len;
         const char *sep_str = mp_obj_str_get_data(sep, &sep_len);
@@ -971,7 +974,7 @@ mp_obj_t mp_obj_str_format(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwa
                 arg = key_elem->value;
             }
             if (*lookup) {
-                nlr_raise(mp_obj_new_exception_msg(&mp_type_NotImplementedError, "attributes not supported yet"));
+                mp_not_implemented("attributes not supported yet");
             }
             vstr_free(field_name);
             field_name = NULL;
@@ -1993,16 +1996,6 @@ STATIC void bad_implicit_conversion(mp_obj_t self_in) {
         nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError,
             "can't convert '%s' object to str implicitly",
             mp_obj_get_type_str(self_in)));
-    }
-}
-
-mp_uint_t mp_obj_str_get_len(mp_obj_t self_in) {
-    // TODO This has a double check for the type, one in obj.c and one here
-    if (MP_OBJ_IS_STR_OR_BYTES(self_in)) {
-        GET_STR_LEN(self_in, l);
-        return l;
-    } else {
-        bad_implicit_conversion(self_in);
     }
 }
 

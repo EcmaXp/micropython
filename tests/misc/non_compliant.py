@@ -39,3 +39,27 @@ try:
     print('{a[0]}'.format(a=[1, 2]))
 except NotImplementedError:
     print('NotImplementedError')
+
+# str(...) with keywords not implemented
+try:
+    str(b'abc', encoding='utf8')
+except NotImplementedError:
+    print('NotImplementedError')
+
+# str.rsplit(None, n) not implemented
+try:
+    'a a a'.rsplit(None, 1)
+except NotImplementedError:
+    print('NotImplementedError')
+
+# bytes(...) with keywords not implemented
+try:
+    bytes('abc', encoding='utf8')
+except NotImplementedError:
+    print('NotImplementedError')
+
+# bytes subscr with step!=1 not implemented
+try:
+    b'123'[0:3:2]
+except NotImplementedError:
+    print('NotImplementedError')
