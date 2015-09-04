@@ -342,7 +342,7 @@ class Parser():
         print("body", bytecode.body)
         print("==")
         
-        upersist.function(
+        func = upersist.function(
             global_dict,
             n_pos_args,
             n_kwonly_args,
@@ -359,7 +359,7 @@ class Parser():
             bytecode.body,
         )
         
-        return "fake function with bytecode {}"
+        return "fake function with bytecode {!r}".format(func)
         
     def load_bytecode(self):
         "bytecode (will used for fun_bc)"

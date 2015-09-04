@@ -31,6 +31,10 @@
 #include "py/objfun.h"
 #include "py/objclosure.h"
 #include "py/objboundmeth.h"
+#include "py/compile.h"
+#include "py/scope.h"
+#include "py/emit.h"
+#include "py/emitbc.h"
 
 #if !MICROPY_ENABLE_GC
 #error Persist module require gc. (really?)
@@ -595,9 +599,8 @@ STATIC void persister_pack_bytecode(mp_obj_persister_t *persister, mp_persist_by
 STATIC void persister_pack_code_state(mp_obj_persister_t *persister, mp_obj_t obj) {
 
     mp_code_state *code_state = obj;
-    mp_persist_bytecode_t *bc = persister_parse_bytecode_from_fun_bc(code_state->fun);
-    
-    assert(bc->code_info == code_state->code_info);
+
+    assert(persister_parse_bytecode_from_fun_bc(code_state->fun)->code_info == code_state->code_info);
     
     PACKING {
         WRITE_TYPE('X');
@@ -1021,8 +1024,9 @@ STATIC mp_obj_t mod_persist_dumps(mp_obj_t obj) {
 
 MP_DEFINE_CONST_FUN_OBJ_1(mod_persist_dumps_obj, mod_persist_dumps);
 
-STATIC void system_buf_write_mp_emit_uint(system_buf *sysbuf, mp_uint_t val) {
+STATIC void system_buf_write_mp_emit_uint(mp_obj_system_buf_t *sysbuf, mp_uint_t val) {
     // emitbc.c: emit_write_code_info_uint function
+    mp_uint_t BYTES_FOR_INT = sizeof(mp_uint_t) * 8;
     
     byte buf[BYTES_FOR_INT];
     byte *p = buf + sizeof(buf);
@@ -1033,17 +1037,18 @@ STATIC void system_buf_write_mp_emit_uint(system_buf *sysbuf, mp_uint_t val) {
     } while (val != 0);
     
     mp_uint_t len = buf + sizeof(buf) - p;
-    byte c[len];
+    byte cbuf[len];
+    byte *c = &cbuf[0];
     
     while (p != buf + sizeof(buf) - 1) {
         *c++ = *p++ | 0x80;
     }
     *c = *p;
     
-    system_buf_write(sysbuf, &c, len);
+    system_buf_write(sysbuf, (char *)&cbuf, len);
 }
 
-STATIC void system_buf_write_mp_emit_qstr(system_buf *sysbuf, qstr val) {
+STATIC void system_buf_write_mp_emit_qstr(mp_obj_system_buf_t *sysbuf, qstr val) {
     system_buf_write_mp_emit_uint(sysbuf, (mp_uint_t)val);   
 }
 
@@ -1119,14 +1124,43 @@ STATIC mp_obj_t mod_persist_function(mp_uint_t n_args, const mp_obj_t *args) {
     (void)local_nums;
     (void)lineno_info_buf;
     (void)body_buf;
+
+    // check compile.c's mp_compile function
+
+    emit_t *bc_emit = emit_bc_new();
+    scope_t *fun_scope = scope_new(SCOPE_MODULE, NULL /* not for common usage; so there is no node. */, source_file, 0 /* emit opt? */);
     
-    mp_obj_system_buf_t *bc_sysbuf = system_buf_new();
-    system_buf_write_mp_emit_qstr(bc_sysbuf, );
+    // not working yet.
     
+    mp_emit_bc_start_pass(bc_emit, MP_PASS_SCOPE, fun_scope);
+    /* do something */
+    mp_emit_bc_start_pass(bc_emit, MP_PASS_SCOPE, fun_scope);
+    
+    mp_emit_bc_start_pass(bc_emit, MP_PASS_STACK_SIZE, fun_scope);
+    /* do something */
+    mp_emit_bc_start_pass(bc_emit, MP_PASS_STACK_SIZE, fun_scope);
+
+    mp_emit_bc_start_pass(bc_emit, MP_PASS_CODE_SIZE, fun_scope);
+    /* do something */
+    mp_emit_bc_start_pass(bc_emit, MP_PASS_CODE_SIZE, fun_scope);
+
+    mp_emit_bc_start_pass(bc_emit, MP_PASS_EMIT, fun_scope);
+    /* do something */
+    mp_emit_bc_start_pass(bc_emit, MP_PASS_EMIT, fun_scope);
+    
+    mp_obj_system_buf_t *ci_sysbuf = system_buf_new();
+    mp_obj_system_buf_t *code_sysbuf = system_buf_new();
+    
+    system_buf_write_mp_emit_qstr(ci_sysbuf, block_name);
+    system_buf_write_mp_emit_qstr(ci_sysbuf, source_file);
+    
+    system_buf_write_mp_emit_uint(code_sysbuf, 0xbeef);
+    system_buf_write(code_sysbuf, (char *)ci_sysbuf->buf, ci_sysbuf->len);
+    system_buf_write_mp_emit_uint(code_sysbuf, 0xefbe);
+    system_buf_write(code_sysbuf, "hello", strlen("hello"));
     
     assert(arg_idx == 14);
-    
-    return mp_const_none;
+    return mp_obj_new_bytes(code_sysbuf->buf, code_sysbuf->len);
 }
 
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_persist_function_obj, 14, 14, mod_persist_function);
