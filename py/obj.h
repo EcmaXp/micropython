@@ -489,7 +489,6 @@ extern const struct _mp_obj_exception_t mp_const_GeneratorExit_obj;
 extern const struct _mp_obj_dict_t mp_builtin_module_dict;
 
 // General API for objects
-
 mp_obj_t mp_obj_new_type(qstr name, mp_obj_t bases_tuple, mp_obj_t locals_dict);
 mp_obj_t mp_obj_new_none(void);
 mp_obj_t mp_obj_new_bool(bool value);
@@ -514,8 +513,9 @@ mp_obj_t mp_obj_new_exception_arg1(const mp_obj_type_t *exc_type, mp_obj_t arg);
 mp_obj_t mp_obj_new_exception_args(const mp_obj_type_t *exc_type, mp_uint_t n_args, const mp_obj_t *args);
 mp_obj_t mp_obj_new_exception_msg(const mp_obj_type_t *exc_type, const char *msg);
 mp_obj_t mp_obj_new_exception_msg_varg(const mp_obj_type_t *exc_type, const char *fmt, ...); // counts args by number of % symbols in fmt, excluding %%; can only handle void* sizes (ie no float/double!)
-#if MICROPY_EMIT_BC_WITH_SIZE
-mp_obj_t mp_obj_new_fun_bc_with_size(mp_uint_t scope_flags, mp_uint_t n_pos_args, mp_uint_t n_kwonly_args, mp_obj_t def_args_in, mp_obj_t def_kw_args, const byte *code, mp_uint_t codesize);
+#if MICROPY_OBJ_BC_HAVE_RAW_CODE
+typedef struct _mp_raw_code_t mp_raw_code_t;
+mp_obj_t mp_obj_new_fun_bc_with_raw_code(mp_uint_t scope_flags, mp_uint_t n_pos_args, mp_uint_t n_kwonly_args, mp_obj_t def_args_in, mp_obj_t def_kw_args, const byte *code, mp_raw_code_t *raw_code);
 #else
 mp_obj_t mp_obj_new_fun_bc(mp_uint_t scope_flags, mp_uint_t n_pos_args, mp_uint_t n_kwonly_args, mp_obj_t def_args, mp_obj_t def_kw_args, const byte *code);
 #endif

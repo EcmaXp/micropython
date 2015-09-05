@@ -175,6 +175,11 @@
 #define MICROPY_STACKLESS_EXTRA (0)
 #endif
 
+// Whether to store raw_code in obj_bc
+#ifndef MICROPY_OBJ_BC_HAVE_RAW_CODE
+#define MICROPY_OBJ_BC_HAVE_RAW_CODE (0)
+#endif
+
 // If you need parent function while execute bytecode. (eg. persist state)
 #ifndef MICROPY_CODE_STATE_HAS_FUN
 #define MICROPY_CODE_STATE_HAS_FUN (0)
@@ -182,11 +187,6 @@
 
 /*****************************************************************************/
 /* Micro Python emitters                                                     */
-
-// If you need copy bytecode, bc emiter will give bytecode size.
-#ifndef MICROPY_EMIT_BC_WITH_SIZE
-#define MICROPY_EMIT_BC_WITH_SIZE (0)
-#endif
 
 // Whether to emit x64 native code
 #ifndef MICROPY_EMIT_X64
