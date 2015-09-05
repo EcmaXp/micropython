@@ -489,6 +489,241 @@ typedef struct _mp_persist_raw_code_t {
     mp_uint_t lineno_info_len;
 } mp_persist_raw_code_t;
 
+const byte *mp_persist_copy_bytecode(const byte *ip) {
+    // mp_bytecode_print_str
+    
+    mp_uint_t unum;
+    qstr qst;
+
+    switch (*ip++) {
+        case MP_BC_LOAD_CONST_FALSE:
+        case MP_BC_LOAD_CONST_NONE:
+        case MP_BC_LOAD_CONST_TRUE:
+            break;
+        case MP_BC_LOAD_CONST_SMALL_INT: {
+            mp_int_t num = 0;
+            if ((ip[0] & 0x40) != 0) {
+                // Number is negative
+                num--;
+            }
+            do {
+                num = (num << 7) | (*ip & 0x7f);
+            } while ((*ip++ & 0x80) != 0);
+            break;
+        }
+        case MP_BC_LOAD_CONST_STRING:
+            DECODE_QSTR;
+            // qst
+            break;
+        case MP_BC_LOAD_CONST_OBJ:
+            DECODE_PTR;
+            // unum
+            break;
+        case MP_BC_LOAD_NULL:
+            break;
+        case MP_BC_LOAD_FAST_N:
+        case MP_BC_LOAD_DEREF:
+            DECODE_UINT;
+            break;
+        case MP_BC_LOAD_NAME:
+            DECODE_QSTR;
+            // qst
+            if (MICROPY_OPT_CACHE_MAP_LOOKUP_IN_BYTECODE) {
+                *ip++;
+            }
+            break;
+        case MP_BC_LOAD_GLOBAL:
+            DECODE_QSTR;
+            // qst
+            if (MICROPY_OPT_CACHE_MAP_LOOKUP_IN_BYTECODE) {
+                *ip++;
+            }
+            break;
+        case MP_BC_LOAD_ATTR:
+            DECODE_QSTR;
+            // qst
+            if (MICROPY_OPT_CACHE_MAP_LOOKUP_IN_BYTECODE) {
+                *ip++;
+            }
+            break;
+        case MP_BC_LOAD_METHOD:
+            DECODE_QSTR;
+            // qst
+            break;
+        case MP_BC_LOAD_BUILD_CLASS:
+        case MP_BC_LOAD_SUBSCR:
+            break;
+        case MP_BC_STORE_FAST_N:
+            DECODE_UINT;
+            // unum
+            break;
+        case MP_BC_STORE_DEREF:
+            DECODE_UINT;
+            // qst
+            break;
+        case MP_BC_STORE_NAME:
+            DECODE_QSTR;
+            // qst
+            break;
+        case MP_BC_STORE_GLOBAL:
+            DECODE_QSTR;
+            // qst
+            break;
+
+        case MP_BC_STORE_ATTR:
+            DECODE_QSTR;
+            // qst
+            if (MICROPY_OPT_CACHE_MAP_LOOKUP_IN_BYTECODE) {
+                *ip++;
+            }
+            break;
+        case MP_BC_STORE_SUBSCR:
+            break;
+        case MP_BC_DELETE_FAST:
+        case MP_BC_DELETE_DEREF:
+            DECODE_UINT;
+            break;
+        case MP_BC_DELETE_NAME:
+            DECODE_QSTR;
+            // qst
+            break;
+        case MP_BC_DELETE_GLOBAL:
+            DECODE_QSTR;
+            // qst
+            break;
+        case MP_BC_DUP_TOP:
+        case MP_BC_DUP_TOP_TWO:
+        case MP_BC_POP_TOP:
+        case MP_BC_ROT_TWO:
+        case MP_BC_ROT_THREE:
+            break;
+        case MP_BC_JUMP:
+            DECODE_SLABEL;
+            // ip + unum - mp_showbc_code_start
+            break;
+        case MP_BC_POP_JUMP_IF_TRUE:
+            DECODE_SLABEL;
+            // ip + unum - mp_showbc_code_start
+            break;
+        case MP_BC_POP_JUMP_IF_FALSE:
+            DECODE_SLABEL;
+            // ip + unum - mp_showbc_code_start
+            break;
+        case MP_BC_JUMP_IF_TRUE_OR_POP:
+            DECODE_SLABEL;
+            // ip + unum - mp_showbc_code_start
+            break;
+        case MP_BC_JUMP_IF_FALSE_OR_POP:
+            DECODE_SLABEL;
+            // ip + unum - mp_showbc_code_start
+            break;
+        case MP_BC_SETUP_WITH:
+            DECODE_ULABEL;
+            // ip + unum - mp_showbc_code_start
+            break;
+        case MP_BC_WITH_CLEANUP:
+            break;
+        case MP_BC_UNWIND_JUMP:
+            DECODE_SLABEL;
+            // ip + unum - mp_showbc_code_start, *ip
+            ip += 1;
+            break;
+        case MP_BC_SETUP_EXCEPT:
+            DECODE_ULABEL;
+            // ip + unum - mp_showbc_code_start
+            break;
+        case MP_BC_SETUP_FINALLY:
+            DECODE_ULABEL;
+            // ip + unum - mp_showbc_code_start
+            break;
+        case MP_BC_END_FINALLY:
+        case MP_BC_GET_ITER:
+            break;
+        case MP_BC_FOR_ITER:
+            DECODE_ULABEL;
+            // ip + unum - mp_showbc_code_start
+            break;
+        case MP_BC_POP_BLOCK:
+        case MP_BC_POP_EXCEPT:
+        case MP_BC_NOT:
+            break;
+        case MP_BC_BUILD_TUPLE:
+        case MP_BC_BUILD_LIST:
+        case MP_BC_LIST_APPEND:
+        case MP_BC_BUILD_MAP:
+        case MP_BC_STORE_MAP:
+        case MP_BC_MAP_ADD:
+        case MP_BC_BUILD_SET:
+        case MP_BC_SET_ADD:
+#if MICROPY_PY_BUILTINS_SLICE
+        case MP_BC_BUILD_SLICE:
+#endif
+        case MP_BC_UNPACK_SEQUENCE:
+        case MP_BC_UNPACK_EX:
+            DECODE_UINT;
+            break;
+        case MP_BC_MAKE_FUNCTION:
+            DECODE_PTR;
+            // unum
+            break;
+        case MP_BC_MAKE_FUNCTION_DEFARGS:
+            DECODE_PTR;
+            // unum
+            break;
+        case MP_BC_MAKE_CLOSURE: {
+            DECODE_PTR;
+            mp_uint_t n_closed_over = *ip++;
+            // unum, ip
+            break;
+        case MP_BC_MAKE_CLOSURE_DEFARGS: {
+            DECODE_PTR;
+            mp_uint_t n_closed_over = *ip++;
+            // unum, ip
+            break;
+        }
+        case MP_BC_CALL_FUNCTION:
+        case MP_BC_CALL_FUNCTION_VAR_KW:
+        case MP_BC_CALL_METHOD:
+        case MP_BC_CALL_METHOD_VAR_KW:
+            DECODE_UINT;
+            break;
+        case MP_BC_RETURN_VALUE:
+            break;
+        case MP_BC_RAISE_VARARGS:
+            unum = *ip++;
+            // unum
+            break;
+        case MP_BC_YIELD_VALUE:
+        case MP_BC_YIELD_FROM:
+            break;
+        case MP_BC_IMPORT_NAME:
+            DECODE_QSTR;
+            // qst
+            break;
+        case MP_BC_IMPORT_FROM:
+            DECODE_QSTR;
+            // qst
+            break;
+        case MP_BC_IMPORT_STAR:
+            break;
+
+        default:
+            if (ip[-1] < MP_BC_LOAD_CONST_SMALL_INT_MULTI + 64) {
+            } else if (ip[-1] < MP_BC_LOAD_FAST_MULTI + 16) {
+            } else if (ip[-1] < MP_BC_STORE_FAST_MULTI + 16) {
+            } else if (ip[-1] < MP_BC_UNARY_OP_MULTI + 6) {
+            } else if (ip[-1] < MP_BC_BINARY_OP_MULTI + 36) {
+                mp_uint_t op = ip[-1] - MP_BC_BINARY_OP_MULTI;
+            } else {
+                assert(0);
+                return ip;
+            }
+            break;
+    }
+
+    return ip;
+}
+
 STATIC mp_persist_raw_code_t *persister_parse_raw_code(mp_raw_code_t *raw_code) {
     if (raw_code->kind != MP_CODE_BYTECODE) {
         mp_not_implemented("raw_code->kind != MP_CODE_BYTECODE");
@@ -566,17 +801,29 @@ STATIC mp_persist_raw_code_t *persister_parse_raw_code(mp_raw_code_t *raw_code) 
     prc->bytecode_body = ip;
     prc->bytecode_body_size = len;
     
+    mp_bytecode_print2(ip, len);
+    (void)mp_persist_copy_bytecode;
+    
+    // TODO: parse bytecode and find all rawcode and parse again... HELL?
+    //       NO WAY: cycle raw_code? just store in dict...?
+    //       OMG! many qst and raw_code, etc thing in bytecode body!
+    
     return prc;
 }
 
 STATIC void persister_pack_raw_code(mp_obj_persister_t *persister, mp_persist_raw_code_t *prc) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
-    // NOTE: mp_persist_raw_code_t is are part of fun_bc.
-
     WRITE_TYPE('X');
     WRITE_STR0("raw_code");
     WRITE_INT8('0'); // version: 0
+    
+    
+    WRITE_INT8(prc->raw_code->kind); // 3 bit
+    WRITE_INT8(prc->raw_code->scope_flags); // 7 bit
+    WRITE_INT16(prc->raw_code->n_pos_args); // 11 bit
+    WRITE_INT16(prc->raw_code->n_kwonly_args); // 11 bit
+    
     PACK_QSTR(prc->block_name);
     PACK_QSTR(prc->source_file);
 
@@ -610,8 +857,12 @@ STATIC void persister_pack_code_state(mp_obj_persister_t *persister, mp_obj_t ob
 
     assert(MP_OBJ_IS_TYPE(fun_obj, &mp_type_fun_bc));
     mp_obj_fun_bc_t *fun_bc = fun_obj;
+    (void)fun_bc;
 
-    assert(persister_parse_raw_code(fun_bc->raw_code)->code_info == code_state->code_info);
+    if (0) {
+        // because persister_parse_raw_code is heavy calc.
+        assert(persister_parse_raw_code(fun_bc->raw_code)->code_info == code_state->code_info);
+    }
     
     PACKING {
         WRITE_TYPE('X');
