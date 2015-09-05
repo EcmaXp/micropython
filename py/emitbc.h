@@ -31,7 +31,31 @@
 #include "py/emit.h"
 #include "py/bc0.h"
 
-struct _emit_t;
+#define BYTES_FOR_INT ((BYTES_PER_WORD * 8 + 6) / 7)
+#define DUMMY_DATA_SIZE (BYTES_FOR_INT)
+
+typedef struct _emit_t {
+    pass_kind_t pass : 8;
+    mp_uint_t last_emit_was_return_value : 8;
+
+    int stack_size;
+
+    scope_t *scope;
+
+    mp_uint_t last_source_line_offset;
+    mp_uint_t last_source_line;
+
+    mp_uint_t max_num_labels;
+    mp_uint_t *label_offsets;
+
+    mp_uint_t code_info_offset;
+    mp_uint_t code_info_size;
+    mp_uint_t bytecode_offset;
+    mp_uint_t bytecode_size;
+    byte *code_base; // stores both byte code and code info
+    // Accessed as mp_uint_t, so must be aligned as such
+    byte dummy_data[DUMMY_DATA_SIZE];
+} _emitbc_t;
 
 // emit_bc enable by EcmaXp
 #if 1
@@ -40,6 +64,7 @@ struct _emit_t;
 #else
 #define EMIT_BC_STATIC STATIC
 #endif
+
 
 typedef byte *(*emit_allocator_t)(emit_t *emit, int nbytes);
 

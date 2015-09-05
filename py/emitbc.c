@@ -35,32 +35,6 @@
 #include "py/emitbc.h"
 #include "py/bc0.h"
 
-#define BYTES_FOR_INT ((BYTES_PER_WORD * 8 + 6) / 7)
-#define DUMMY_DATA_SIZE (BYTES_FOR_INT)
-
-struct _emit_t {
-    pass_kind_t pass : 8;
-    mp_uint_t last_emit_was_return_value : 8;
-
-    int stack_size;
-
-    scope_t *scope;
-
-    mp_uint_t last_source_line_offset;
-    mp_uint_t last_source_line;
-
-    mp_uint_t max_num_labels;
-    mp_uint_t *label_offsets;
-
-    mp_uint_t code_info_offset;
-    mp_uint_t code_info_size;
-    mp_uint_t bytecode_offset;
-    mp_uint_t bytecode_size;
-    byte *code_base; // stores both byte code and code info
-    // Accessed as mp_uint_t, so must be aligned as such
-    byte dummy_data[DUMMY_DATA_SIZE];
-};
-
 emit_t *emit_bc_new(void) {
     emit_t *emit = m_new0(emit_t, 1);
     return emit;
@@ -274,8 +248,6 @@ EMIT_BC_STATIC void mp_emit_bc_set_native_type(emit_t *emit, mp_uint_t op, mp_ui
     (void)arg2;
 }
 #endif
-
-#include <stdlib.h>
 
 void mp_emit_bc_start_pass(emit_t *emit, pass_kind_t pass, scope_t *scope) {
     emit->pass = pass;

@@ -33,6 +33,7 @@
 #include "py/objboundmeth.h"
 #include "py/compile.h"
 #include "py/scope.h"
+#include "py/parse.h"
 #include "py/emit.h"
 #include "py/emitbc.h"
 
@@ -1026,7 +1027,6 @@ MP_DEFINE_CONST_FUN_OBJ_1(mod_persist_dumps_obj, mod_persist_dumps);
 
 STATIC void system_buf_write_mp_emit_uint(mp_obj_system_buf_t *sysbuf, mp_uint_t val) {
     // emitbc.c: emit_write_code_info_uint function
-    mp_uint_t BYTES_FOR_INT = sizeof(mp_uint_t) * 8;
     
     byte buf[BYTES_FOR_INT];
     byte *p = buf + sizeof(buf);
@@ -1052,6 +1052,7 @@ STATIC void system_buf_write_mp_emit_qstr(mp_obj_system_buf_t *sysbuf, qstr val)
     system_buf_write_mp_emit_uint(sysbuf, (mp_uint_t)val);   
 }
 
+typedef _emitbc_t emitbc_t;
 STATIC mp_obj_t mod_persist_function(mp_uint_t n_args, const mp_obj_t *args) {
     if (n_args != 14) {
         return mp_const_none;    
@@ -1068,15 +1069,15 @@ STATIC mp_obj_t mod_persist_function(mp_uint_t n_args, const mp_obj_t *args) {
     qstr source_file = mp_obj_str_get_qstr(args[arg_idx++]);
     
     qstr *arg_names = NULL;
+    mp_uint_t arg_names_len = 0;
     {
         mp_obj_t arg_names_obj = args[arg_idx++];
-        mp_uint_t len = 0;
         mp_obj_t *items = NULL;
         
-        mp_obj_list_get(arg_names_obj, &len, &items);
-        arg_names = m_new(qstr, len);
+        mp_obj_list_get(arg_names_obj, &arg_names_len, &items);
+        arg_names = m_new(qstr, arg_names_len);
 
-        for (mp_uint_t i = 0; i < len; i++) {
+        for (mp_uint_t i = 0; i < arg_names_len; i++) {
             arg_names[i] = mp_obj_str_get_qstr(items[i]);
         }
     }
@@ -1085,15 +1086,15 @@ STATIC mp_obj_t mod_persist_function(mp_uint_t n_args, const mp_obj_t *args) {
     mp_uint_t n_exc_stack = mp_obj_get_int(args[arg_idx++]);
     
     mp_uint_t *local_nums = NULL;
+    mp_uint_t local_nums_len = 0;
     {
         mp_obj_t local_nums_obj = args[arg_idx++];
-        mp_uint_t len = 0;
         mp_obj_t *items = NULL;
         
-        mp_obj_list_get(local_nums_obj, &len, &items);
-        local_nums = m_new(mp_uint_t, len);
+        mp_obj_list_get(local_nums_obj, &local_nums_len, &items);
+        local_nums = m_new(mp_uint_t, local_nums_len);
 
-        for (mp_uint_t i = 0; i < len; i++) {
+        for (mp_uint_t i = 0; i < local_nums_len; i++) {
             local_nums[i] = mp_obj_get_int(items[i]);
         }
     }
@@ -1111,36 +1112,52 @@ STATIC mp_obj_t mod_persist_function(mp_uint_t n_args, const mp_obj_t *args) {
     }
     
     (void)global_dict;
-    (void)n_pos_args;
-    (void)n_kwonly_args;
     (void)n_def_args;
     (void)flags;
     (void)extra_args;
-    (void)block_name;
-    (void)source_file;
     (void)arg_names;
-    (void)n_state;
-    (void)n_exc_stack;
     (void)local_nums;
     (void)lineno_info_buf;
     (void)body_buf;
 
     // check compile.c's mp_compile function
 
-    emit_t *bc_emit = emit_bc_new();
-    scope_t *fun_scope = scope_new(SCOPE_MODULE, NULL /* not for common usage; so there is no node. */, source_file, 0 /* emit opt? */);
+    emitbc_t *bc_emit = emit_bc_new();
+    scope_t *fun_scope = scope_new(SCOPE_MODULE, MP_PARSE_NODE_NULL, source_file, 0);
+
+    // write the name and source file of this function
+    fun_scope->simple_name = block_name;
+
+    // bytecode prelude: argument names
+    fun_scope->num_pos_args = n_pos_args;
+    fun_scope->num_kwonly_args = n_kwonly_args;
+
+    // TODO: vaild id_info and local_num...
+    assert(n_pos_args + n_kwonly_args <= arg_names_len);
+    for (mp_uint_t i = 0; i < n_pos_args + n_kwonly_args; i++) {
+        // qstr qst = MP_QSTR__star_;
+        bool is_added = false;
+        id_info_t *id_info = scope_find_or_add_id(fun_scope, arg_names[i], &is_added);
+        id_info->flags = ID_FLAG_IS_PARAM;
+        id_info->local_num = i;
+        assert(is_added == true);
+    }
+    
+    // bytecode prelude: local state size and exception stack size
+    fun_scope->num_locals = local_nums_len;
+    fun_scope->stack_size = n_state - local_nums_len;
+    fun_scope->exc_stack_size = n_exc_stack;
     
     // not working yet.
     
     mp_emit_bc_start_pass(bc_emit, MP_PASS_SCOPE, fun_scope);
-    /* do something */
     mp_emit_bc_start_pass(bc_emit, MP_PASS_SCOPE, fun_scope);
     
     mp_emit_bc_start_pass(bc_emit, MP_PASS_STACK_SIZE, fun_scope);
-    /* do something */
     mp_emit_bc_start_pass(bc_emit, MP_PASS_STACK_SIZE, fun_scope);
 
     mp_emit_bc_start_pass(bc_emit, MP_PASS_CODE_SIZE, fun_scope);
+    printf("bc emit off: %d %d\n", (int)bc_emit->code_info_offset, (int)bc_emit->bytecode_offset);
     /* do something */
     mp_emit_bc_start_pass(bc_emit, MP_PASS_CODE_SIZE, fun_scope);
 
@@ -1158,6 +1175,7 @@ STATIC mp_obj_t mod_persist_function(mp_uint_t n_args, const mp_obj_t *args) {
     system_buf_write(code_sysbuf, (char *)ci_sysbuf->buf, ci_sysbuf->len);
     system_buf_write_mp_emit_uint(code_sysbuf, 0xefbe);
     system_buf_write(code_sysbuf, "hello", strlen("hello"));
+    system_buf_write(code_sysbuf, (char *)bc_emit->code_base, bc_emit->code_info_size + bc_emit->bytecode_size);
     
     assert(arg_idx == 14);
     return mp_obj_new_bytes(code_sysbuf->buf, code_sysbuf->len);
