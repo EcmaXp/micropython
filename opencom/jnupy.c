@@ -59,6 +59,7 @@ THE SOFTWARE.
 #include <ctype.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <execinfo.h>
 
 #include "mpconfigport.h"
 
@@ -87,7 +88,7 @@ THE SOFTWARE.
 #endif
 
 #if !MICROPY_OVERRIDE_ASSERT_FAIL
-// #error jnupy require MICROPY_OVERRIDE_ASSERT_FAIL
+#error jnupy require MICROPY_OVERRIDE_ASSERT_FAIL
 #endif
 
 #if !MICROPY_ENABLE_GC
@@ -135,6 +136,10 @@ int DEBUG_printf(const char *fmt, ...) {
 #define DEBUG_printf(...) (void)0
 #define _D(x) (void)0
 #endif
+
+#define DEBUG_BACKTRACE 1
+#define DEBUG_BACKTRACE_SIZE 8
+#define DEBUG_BACKTRACE_FD 2 // stderr
 
 /** JNUPY INTERNAL VALUE **/
 STATIC int initialized = 0;
@@ -846,6 +851,13 @@ NORETURN void mp_assert_fail(const char *assertion, const char *file,
     const char *fmt = "<JNUPY>: %s:%u %s: Assertion '%s' failed.";
     size_t buf_size = strlen(fmt) + strlen(file) + strlen(function) + strlen(assertion) + 16;
     char *buf = malloc(buf_size);
+
+    #if DEBUG_BACKTRACE
+        void *array[DEBUG_BACKTRACE_SIZE];
+        size_t size;
+        size = backtrace(array, DEBUG_BACKTRACE_SIZE);
+        backtrace_symbols_fd(array, size, DEBUG_BACKTRACE_FD);
+    #endif
 
     if (buf != NULL) {
         snprintf(buf, buf_size, fmt, file, line, function, assertion);

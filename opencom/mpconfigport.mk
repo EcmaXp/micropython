@@ -15,4 +15,4 @@ MICROPY_MULTI_STATE_CONTEXT = 1
 
 # Allow override assert for include as library (for stable process)
 # TODO: overrideing assert will raise unknown segfault.
-MICROPY_OVERRIDE_ASSERT_FAIL = 0
+MICROPY_OVERRIDE_ASSERT_FAIL = 1
