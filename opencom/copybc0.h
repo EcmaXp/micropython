@@ -28,4 +28,5 @@
  #define HANDLE_PTR
  #define HANDLE_UINT
  #define HANDLE_QSTR
+ #define HANDLE_OP(x)
  

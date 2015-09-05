@@ -85,6 +85,16 @@ for line in lines:
         sline = "(mp_obj_t)unum;"
         line = indent + sline
         continue
+    elif sline.startswith("case") and ":" in sline:
+        indent = get_indent()
+        result.append(line)
+        result.append(indent + " " * 4 + "HANDLE_OP(ip[-1]);")
+        continue
+    elif sline == "mp_uint_t op = ip[-1] - MP_BC_BINARY_OP_MULTI;":
+        indent = get_indent()
+        result.append(line)
+        result.append(indent + "HANDLE_OP(op);")
+        continue
     elif "//" in line:
         line = line[:line.index("//")]
     
