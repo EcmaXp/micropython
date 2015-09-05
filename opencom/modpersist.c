@@ -490,7 +490,7 @@ STATIC mp_persist_bytecode_t *persister_parse_bytecode_from_fun_bc(mp_obj_t obj)
 
     mp_obj_fun_bc_t *fun_bc = obj;
     const byte *ip = fun_bc->bytecode;
-    mp_uint_t len = fun_bc->bytecode_size;
+    mp_uint_t len = fun_bc->raw_code->data.u_byte.len;
     
     // mp_bytecode_print(fun_bc, fun_bc->n_pos_args + fun_bc->n_kwonly_args, fun_bc->bytecode, fun_bc->bytecode_size);
 
@@ -683,7 +683,26 @@ STATIC mp_obj_fun_bc_t *persister_find_root_fun_bc(mp_obj_t obj) {
     return NULL;
 }
 
+STATIC void persister_pack_raw_code(mp_obj_persister_t *persister, mp_obj_t obj) {
+    // TODO: persist raw code (move code from fun_bc, and fun_bc contains def_args only?)
+    
+    // do not check type.
+    mp_raw_code_t *raw_code = obj;
+    
+    (void)raw_code;
+    
+    // raw_code dump
+    PACKING {
+        WRITE_TYPE('R');
+        
+    }
+}
+
 STATIC void persister_pack_fun_bc(mp_obj_persister_t *persister, mp_obj_t obj) {
+    (void)persister_pack_raw_code;
+    
+    // TODO: chaining function also. (method, closure, etc.)
+    //       do not use persister_find_root_fun_bc!
     obj = persister_find_root_fun_bc(obj);
     if (obj == NULL) {
         mp_obj_system_buf_t *sysbuf = persister->sysbuf;
@@ -707,7 +726,22 @@ STATIC void persister_pack_fun_bc(mp_obj_persister_t *persister, mp_obj_t obj) {
         WRITE_INT8(fun_bc->n_kwonly_args);
         WRITE_INT8(fun_bc->n_def_args);
         WRITE_INT8(fun_bc->has_def_kw_args || fun_bc->takes_var_args << 2 || fun_bc->takes_kw_args << 3);
-        WRITE_INT32(0);
+
+        WRITE_SIZETYPE('t', fun_bc->n_def_args);
+        for (mp_uint_t i = 0; i < fun_bc->n_def_args; i++) {
+            PACK_ANY(fun_bc->extra_args[i]);            
+        }
+        
+        // TODO: parse bytecode and find all mp_raw_code
+        /*
+            in mp_emit_bc_make_function function
+            - [!] write MP_BC_MAKE_FUNCTION op with scope->raw_code
+        
+            so bytecode contains another raw_codes...
+            mean require parse all bytecode and getting raw_code and again..
+        
+            omg hell...
+        */
         
         persister_pack_bytecode(persister, bc);
     }
@@ -1064,7 +1098,22 @@ STATIC mp_obj_t mod_persist_function(mp_uint_t n_args, const mp_obj_t *args) {
     mp_uint_t n_kwonly_args = mp_obj_get_int(args[arg_idx++]);
     mp_uint_t n_def_args = mp_obj_get_int(args[arg_idx++]);
     mp_uint_t flags = mp_obj_get_int(args[arg_idx++]);
-    mp_uint_t extra_args = mp_obj_get_int(args[arg_idx++]);
+
+    mp_obj_t *extra_args = NULL;
+    {
+        mp_obj_t extra_args_obj = args[arg_idx++];
+        mp_uint_t len = 0;
+        mp_obj_t *items = NULL;
+        
+        mp_obj_tuple_get(extra_args_obj, &len, &items);
+        extra_args = m_new(mp_obj_t, len);
+        assert(n_def_args == len);
+
+        for (mp_uint_t i = 0; i < len; i++) {
+            extra_args[i] = items[i];
+        }
+    }
+
     qstr block_name = mp_obj_str_get_qstr(args[arg_idx++]);
     qstr source_file = mp_obj_str_get_qstr(args[arg_idx++]);
     
@@ -1112,10 +1161,7 @@ STATIC mp_obj_t mod_persist_function(mp_uint_t n_args, const mp_obj_t *args) {
     }
     
     (void)global_dict;
-    (void)n_def_args;
     (void)flags;
-    (void)extra_args;
-    (void)arg_names;
     (void)local_nums;
     (void)lineno_info_buf;
     (void)body_buf;

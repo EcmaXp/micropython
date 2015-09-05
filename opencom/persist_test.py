@@ -323,7 +323,7 @@ class Parser():
         n_kwonly_args = load_int(8)
         n_def_args = load_int(8)
         flags = load_int(8)
-        extra_args = load_int(32)
+        extra_args = self.load()
         bytecode = self.load()
         
         print("== func ==")
