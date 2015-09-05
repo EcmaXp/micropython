@@ -41,6 +41,10 @@
 #error Persist module require gc. (really?)
 #endif
 
+#if !MICROPY_OBJ_BC_HAVE_RAW_CODE
+#error Persist module MICROPY_OBJ_BC_HAVE_RAW_CODE.
+#endif
+
 #define MP_PERSIST_MAGIC "MP\x80\x01"
 
 /******************************************************************************/
@@ -457,8 +461,8 @@ STATIC mp_obj_t persister_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t
     return persister;
 }
 
-typedef struct _mp_persist_bytecode_t {
-    mp_obj_fun_bc_t *fun_bc;
+typedef struct _mp_persist_raw_code_t {
+    mp_raw_code_t *raw_code;
 
     const byte *code_info;
     mp_uint_t code_info_size;
@@ -483,54 +487,56 @@ typedef struct _mp_persist_bytecode_t {
 
     byte *lineno_info;
     mp_uint_t lineno_info_len;
-} mp_persist_bytecode_t;
+} mp_persist_raw_code_t;
 
-STATIC mp_persist_bytecode_t *persister_parse_bytecode_from_fun_bc(mp_obj_t obj) {
-    assert(MP_OBJ_IS_TYPE(obj, &mp_type_fun_bc));
+STATIC mp_persist_raw_code_t *persister_parse_raw_code(mp_raw_code_t *raw_code) {
+    if (raw_code->kind != MP_CODE_BYTECODE) {
+        mp_not_implemented("raw_code->kind != MP_CODE_BYTECODE");
+    }
 
-    mp_obj_fun_bc_t *fun_bc = obj;
-    const byte *ip = fun_bc->bytecode;
-    mp_uint_t len = fun_bc->raw_code->data.u_byte.len;
-    
+    const byte *ip = raw_code->data.u_byte.code;
+    mp_uint_t len = raw_code->data.u_byte.len;
+
+    // how to debugging?
     // mp_bytecode_print(fun_bc, fun_bc->n_pos_args + fun_bc->n_kwonly_args, fun_bc->bytecode, fun_bc->bytecode_size);
 
-    mp_persist_bytecode_t *bc = m_new_obj(mp_persist_bytecode_t);
+    mp_persist_raw_code_t *prc = m_new_obj(mp_persist_raw_code_t);
     const byte *ci = ip;
     const byte *mp_showbc_code_start = ip;
     
-    bc->fun_bc = fun_bc;
-    bc->code_info = ci;
-    bc->code_info_size = mp_decode_uint(&ci);
-    ip += bc->code_info_size;
+    prc->raw_code = raw_code;
+    prc->code_info = ci;
+    prc->code_info_size = mp_decode_uint(&ci);
+    ip += prc->code_info_size;
     
-    bc->block_name = mp_decode_uint(&ci);
-    bc->source_file = mp_decode_uint(&ci);
+    prc->block_name = mp_decode_uint(&ci);
+    prc->source_file = mp_decode_uint(&ci);
     
-    bc->bytecode = ip;
-    bc->bytecode_size = len - bc->code_info_size;
+    prc->bytecode = ip;
+    prc->bytecode_size = len - prc->code_info_size;
     
     // bytecode prelude: arg names (as qstr objects)
-    mp_uint_t n_total_args = fun_bc->n_pos_args + fun_bc->n_kwonly_args;
-    bc->arg_names = m_new0(qstr, n_total_args);
-    bc->arg_names_len = n_total_args;
+    mp_uint_t n_total_args = raw_code->n_pos_args + raw_code->n_kwonly_args;
+    prc->arg_names = m_new0(qstr, n_total_args);
+    prc->arg_names_len = n_total_args;
     for (mp_uint_t i = 0; i < n_total_args; i++) {
-        bc->arg_names[i] = MP_OBJ_QSTR_VALUE(*(mp_obj_t*)ip);
+        prc->arg_names[i] = MP_OBJ_QSTR_VALUE(*(mp_obj_t*)ip);
         ip += sizeof(mp_obj_t);
     }
 
     // bytecode prelude: state size and exception stack size; 16 bit uints
-    bc->n_state = mp_decode_uint(&ip);
-    bc->n_exc_stack = mp_decode_uint(&ip);
+    prc->n_state = mp_decode_uint(&ip);
+    prc->n_exc_stack = mp_decode_uint(&ip);
 
     // bytecode prelude: initialise closed over variables
     {
         for (const byte* c = ip; *c++ != 255;) {
-            bc->local_num_len++;
+            prc->local_num_len++;
         }
 
-        bc->local_num = m_new0(uint, bc->local_num_len);
-        for (mp_uint_t i = 0; i < bc->local_num_len; i++) {
-            bc->local_num[i] = *ip++;
+        prc->local_num = m_new0(uint, prc->local_num_len);
+        for (mp_uint_t i = 0; i < prc->local_num_len; i++) {
+            prc->local_num[i] = *ip++;
         }
         
         // skip 255 marker
@@ -542,66 +548,70 @@ STATIC mp_persist_bytecode_t *persister_parse_bytecode_from_fun_bc(mp_obj_t obj)
     {
         for (const byte* c = ci; *c;) {
             if ((ci[0] & 0x80) == 0) {
-                bc->lineno_info_len += 1;
+                prc->lineno_info_len += 1;
                 c += 1;
             } else {
-                bc->lineno_info_len += 2;                
+                prc->lineno_info_len += 2;                
                 c += 2;
             }
         }
     
-        bc->lineno_info = m_new0(byte, bc->lineno_info_len);
+        prc->lineno_info = m_new0(byte, prc->lineno_info_len);
         const byte* c = ci;
-        for (mp_uint_t i = 0; i < bc->lineno_info_len; i++) {
-            bc->lineno_info[i] = *c++;
+        for (mp_uint_t i = 0; i < prc->lineno_info_len; i++) {
+            prc->lineno_info[i] = *c++;
         }
     }
     
-    bc->bytecode_body = ip;
-    bc->bytecode_body_size = len;
+    prc->bytecode_body = ip;
+    prc->bytecode_body_size = len;
     
-    return bc;
+    return prc;
 }
 
-STATIC void persister_pack_bytecode(mp_obj_persister_t *persister, mp_persist_bytecode_t *bc) {
+STATIC void persister_pack_raw_code(mp_obj_persister_t *persister, mp_persist_raw_code_t *prc) {
     mp_obj_system_buf_t *sysbuf = persister->sysbuf;
 
-    // NOTE: mp_persist_bytecode_t is are part of fun_bc.
+    // NOTE: mp_persist_raw_code_t is are part of fun_bc.
 
     WRITE_TYPE('X');
-    WRITE_STR0("bytecode");
+    WRITE_STR0("raw_code");
     WRITE_INT8('0'); // version: 0
-    PACK_QSTR(bc->block_name);
-    PACK_QSTR(bc->source_file);
+    PACK_QSTR(prc->block_name);
+    PACK_QSTR(prc->source_file);
 
-    WRITE_SIZE(bc->arg_names_len);
-    for (mp_uint_t i = 0; i < bc->arg_names_len; i++) {
-        PACK_QSTR(bc->arg_names[i]);
+    WRITE_SIZE(prc->arg_names_len);
+    for (mp_uint_t i = 0; i < prc->arg_names_len; i++) {
+        PACK_QSTR(prc->arg_names[i]);
     }
 
-    WRITE_INT16(bc->n_state);
-    WRITE_INT16(bc->n_exc_stack);
+    WRITE_INT16(prc->n_state);
+    WRITE_INT16(prc->n_exc_stack);
 
-    WRITE_SIZE(bc->local_num_len);
-    for (mp_uint_t i = 0; i < bc->local_num_len; i++) {
+    WRITE_SIZE(prc->local_num_len);
+    for (mp_uint_t i = 0; i < prc->local_num_len; i++) {
         // TODO: ptr?
-        WRITE_PTR(bc->local_num[i]);
+        WRITE_PTR(prc->local_num[i]);
     }
 
-    WRITE_SIZE(bc->lineno_info_len);
-    for (mp_uint_t i = 0; i < bc->lineno_info_len; i++) {
-        WRITE_INT8(bc->lineno_info[i]);
+    WRITE_SIZE(prc->lineno_info_len);
+    for (mp_uint_t i = 0; i < prc->lineno_info_len; i++) {
+        WRITE_INT8(prc->lineno_info[i]);
     }
     
-    WRITE_SIZE(bc->bytecode_body_size);
-    WRITE_STRN((const char *)bc->bytecode_body, bc->bytecode_body_size);
+    WRITE_SIZE(prc->bytecode_body_size);
+    WRITE_STRN((const char *)prc->bytecode_body, prc->bytecode_body_size);
 }
 
 STATIC void persister_pack_code_state(mp_obj_persister_t *persister, mp_obj_t obj) {
 
     mp_code_state *code_state = obj;
+    mp_obj_t fun_obj = code_state->fun;
 
-    assert(persister_parse_bytecode_from_fun_bc(code_state->fun)->code_info == code_state->code_info);
+    assert(MP_OBJ_IS_TYPE(fun_obj, &mp_type_fun_bc));
+    mp_obj_fun_bc_t *fun_bc = fun_obj;
+
+    assert(persister_parse_raw_code(fun_bc->raw_code)->code_info == code_state->code_info);
     
     PACKING {
         WRITE_TYPE('X');
@@ -683,21 +693,6 @@ STATIC mp_obj_fun_bc_t *persister_find_root_fun_bc(mp_obj_t obj) {
     return NULL;
 }
 
-STATIC void persister_pack_raw_code(mp_obj_persister_t *persister, mp_obj_t obj) {
-    // TODO: persist raw code (move code from fun_bc, and fun_bc contains def_args only?)
-    
-    // do not check type.
-    mp_raw_code_t *raw_code = obj;
-    
-    (void)raw_code;
-    
-    // raw_code dump
-    PACKING {
-        WRITE_TYPE('R');
-        
-    }
-}
-
 STATIC void persister_pack_fun_bc(mp_obj_persister_t *persister, mp_obj_t obj) {
     (void)persister_pack_raw_code;
     
@@ -711,9 +706,9 @@ STATIC void persister_pack_fun_bc(mp_obj_persister_t *persister, mp_obj_t obj) {
     }
     
     assert(MP_OBJ_IS_TYPE(obj, &mp_type_fun_bc));
-    
     mp_obj_fun_bc_t *fun_bc = obj;
-    mp_persist_bytecode_t *bc = persister_parse_bytecode_from_fun_bc(fun_bc);
+    
+    mp_persist_raw_code_t *prc = persister_parse_raw_code(fun_bc->raw_code);
 
     // function dump
     PACKING {
@@ -743,7 +738,7 @@ STATIC void persister_pack_fun_bc(mp_obj_persister_t *persister, mp_obj_t obj) {
             omg hell...
         */
         
-        persister_pack_bytecode(persister, bc);
+        persister_pack_raw_code(persister, prc);
     }
 }
 

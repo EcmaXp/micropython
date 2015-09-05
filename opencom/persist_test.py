@@ -152,7 +152,7 @@ class FunBC():
         self.bytecode = 
     """
 
-class _FakeBytecode():
+class _FakeRawcode():
     pass
 
 class ParseError(RuntimeError):
@@ -324,7 +324,7 @@ class Parser():
         n_def_args = load_int(8)
         flags = load_int(8)
         extra_args = self.load()
-        bytecode = self.load()
+        raw_code = self.load()
         
         print("== func ==")
         print("n_pos_args", n_pos_args)
@@ -332,14 +332,14 @@ class Parser():
         print("n_def_args", n_def_args)
         print("flags", flags)
         print("extra_args", extra_args)
-        print("block_name", bytecode.block_name)
-        print("source_file", bytecode.source_file)
-        print("arg_names", bytecode.arg_names)
-        print("n_state", bytecode.n_state)
-        print("n_exc_stack", bytecode.n_exc_stack)
-        print("local_nums", bytecode.local_nums)
-        print("lineno_info", bytecode.lineno_info)
-        print("body", bytecode.body)
+        print("block_name", raw_code.block_name)
+        print("source_file", raw_code.source_file)
+        print("arg_names", raw_code.arg_names)
+        print("n_state", raw_code.n_state)
+        print("n_exc_stack", raw_code.n_exc_stack)
+        print("local_nums", raw_code.local_nums)
+        print("lineno_info", raw_code.lineno_info)
+        print("body", raw_code.body)
         print("==")
         
         func = upersist.function(
@@ -349,44 +349,44 @@ class Parser():
             n_def_args,
             flags,
             extra_args,
-            bytecode.block_name,
-            bytecode.source_file,
-            bytecode.arg_names,
-            bytecode.n_state,
-            bytecode.n_exc_stack,
-            bytecode.local_nums,
-            bytecode.lineno_info,
-            bytecode.body,
+            raw_code.block_name,
+            raw_code.source_file,
+            raw_code.arg_names,
+            raw_code.n_state,
+            raw_code.n_exc_stack,
+            raw_code.local_nums,
+            raw_code.lineno_info,
+            raw_code.body,
         )
         
-        return "fake function with bytecode {!r}".format(func)
+        return "fake function with raw_code {!r}".format(func)
         
-    def load_bytecode(self):
-        "bytecode (will used for fun_bc)"
+    def load_raw_code(self):
+        "raw_code (will used for fun_bc or MAKE_FUNCTION_xxx)"
         load_int = lambda n: self.decode_int(self.fp.read(n // 8))
         skip = lambda n: self.read(n) and None
         version = self.fp.read(1)
         assert version == b'0'
         
-        bc = _FakeBytecode()
-        bc.block_name = self.load()
-        bc.source_file = self.load()
+        prc = _FakeRawcode()
+        prc.block_name = self.load()
+        prc.source_file = self.load()
 
-        bc.arg_names = arg_names = []
+        prc.arg_names = arg_names = []
         for i in range(self.load_size()):
             arg_names.append(self.load())
         
-        bc.n_state = load_int(16)
-        bc.n_exc_stack = load_int(16)
+        prc.n_state = load_int(16)
+        prc.n_exc_stack = load_int(16)
 
-        bc.local_nums = local_nums = []
+        prc.local_nums = local_nums = []
         for i in range(self.load_size()):
             local_nums.append(load_int(32))
         
-        bc.lineno_info = self.load_b()
-        bc.body = self.load_b()
+        prc.lineno_info = self.load_b()
+        prc.body = self.load_b()
         
-        return bc
+        return prc
     
     def load_object(self, size):
         assert 1 <= size <= 4
