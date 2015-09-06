@@ -23,10 +23,22 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
- 
- #define HANDLE_SLABEL
- #define HANDLE_PTR
- #define HANDLE_UINT
- #define HANDLE_QSTR
- #define HANDLE_OP(x)
- 
+#ifndef __MICROPY_INCLUDED_OPENCOM_COPYBC0_H__
+#define __MICROPY_INCLUDED_OPENCOM_COPYBC0_H__
+
+#include "py/obj.h"
+
+#define ASSIGN(tag, data) opdata.is_##tag = true; opdata.data.u_##tag = (data);
+
+#define HANDLE(x, y, z) handler(handler_data, x, y, z)
+#define HANDLE_ULABEL ASSIGN(num, ip + unum - code_start)
+#define HANDLE_SLABEL ASSIGN(num, ip + unum - code_start)
+#define HANDLE_PTR ASSIGN(ptr, (machine_ptr_t)unum);
+#define HANDLE_INT ASSIGN(num, num);
+#define HANDLE_UINT ASSIGN(unum, unum);
+#define HANDLE_QSTR ASSIGN(qstr, qst);
+#define HANDLE_OP opdata.ip = (ip - 1); opdata.op = *(ip - 1);
+#define HANDLE_FINISH opdata.next_ip = ip; return opdata;
+#define HANDLE_INVAILD assert(0); opdata.next_ip = ip; return opdata;
+
+#endif // __MICROPY_INCLUDED_OPENCOM_COPYBC0_H__

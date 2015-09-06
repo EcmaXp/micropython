@@ -38,26 +38,68 @@ template = """
  * THE SOFTWARE.
  */
 
+#include <assert.h>
+
 #include "py/obj.h"
 #include "copybc.h"
 #include "copybc0.h"
 
-const byte *mp_copybc_copy(const byte *ip, copybc_handler* handler) {
-    // init copy
-    
-<RESULT>
+<mecro_result>
+
+void mp_copybc_copy(const byte *ip, mp_uint_t len, mp_copybc_handler_t handler, void *handler_data) {
+    const byte const *code_start = ip;
+    while (ip < len + code_start) {
+        mp_copybc_opdata_t opdata = mp_copybc_subcopy(code_start, ip);
+        ip = opdata.next_ip;
+        handler(handler_data, &opdata);
+    }
+}
+
+mp_copybc_opdata_t mp_copybc_subcopy(const byte const *code_start, const byte **ip_start) {
+    mp_copybc_opdata_t opdata = {-1, false, false, false};
+    const byte *ip = *ip_start;
+
+    <result>
 """
+
+mecro_result = []
+result = []
 
 with open("../py/showbc.c", 'r') as fp:
     content = fp.read()
     lines = content.splitlines()
 
+get_indent = lambda: line[:len(line) - len(sline)]
+def build_line(sline):
+    indent = get_indent()
+    line = indent + sline
+    return sline, line
+
+assert "#if MICROPY_DEBUG_PRINTERS" in content and "const byte *mp_showbc_code_start;" in content
+
+start_mecro_parse = False
+for line in lines:
+    if "#if MICROPY_DEBUG_PRINTERS" in line:
+        start_mecro_parse = True
+        continue
+    elif not start_mecro_parse:
+        continue
+    elif "const byte *mp_showbc_code_start;" in line:
+        assert start_mecro_parse
+        start_mecro_parse = False
+        break
+
+    sline = line.strip()
+    if sline.startswith("//"):
+        continue
+    elif "//" in line:
+        line = line[:line.index("//")]
+    
+    mecro_result.append(line)
+
 assert "const byte *mp_bytecode_print_str(const byte *ip) {" in content
 
-result = []
-
-get_indent = lambda: line[:len(line) - len(sline)]
-
+chk_point = 0
 start_parse = False
 for line in lines:
     if "const byte *mp_bytecode_print_str" in line:
@@ -70,39 +112,58 @@ for line in lines:
         start_parse = False
         break
     
+    line = line.rstrip()
+    if "//" in line:
+        line = line[:line.index("//")]
+    
     sline = line.strip()
-    if sline.startswith("//"):
+    if not sline:
         continue
+    elif "DECODE_" in line:
+        result.append(line)
+        result.append(build_line(sline.replace("DECODE_", "HANDLE_"))[1])
+    elif "switch (*ip++) {" in sline:
+        chk_point += 1
+    elif "while ((*ip++ & 0x80) != 0)" in sline:
+        chk_point += 1
+        result.append(line)
+        result.append(build_line("HANDLE_INT;")[1])
+        continue
+    elif "*ip++" in sline:
+        result.append(build_line("HANDLE_EXTRA(*ip++);")[1])
     elif sline.startswith("printf"):
-        if "*ip++" in sline:
-            indent = get_indent()
-            sline = "*ip++;"
-            line = indent + sline
-        else:
-            continue
+        continue
     elif sline.startswith("mp_obj_print_helper"):
-        indent = get_indent()
-        sline = "(mp_obj_t)unum;"
-        line = indent + sline
+        chk_point += 1
         continue
     elif sline.startswith("case") and ":" in sline:
         indent = get_indent()
         result.append(line)
-        result.append(indent + " " * 4 + "HANDLE_OP(ip[-1]);")
+        result.append(indent + " " * 4 + "HANDLE_OP;")
         continue
     elif sline == "mp_uint_t op = ip[-1] - MP_BC_BINARY_OP_MULTI;":
-        indent = get_indent()
+        chk_point += 1
         result.append(line)
-        result.append(indent + "HANDLE_OP(op);")
+        result.append(build_line("(void)op;")[1])
+        result.append(build_line("HANDLE_OP;")[1])
         continue
-    elif "//" in line:
-        line = line[:line.index("//")]
-    
-    line = line.replace("DECODE_", "HANDLE_")
-    result.append(line)
+    elif sline == "break;":
+        result.append(build_line("HANDLE_FINISH;")[1])
+        continue
+    elif sline == "return ip;":
+        chk_point += 1
+        result.append(build_line("HANDLE_INVAILD;")[1])
+        continue
+    else:
+        result.append(line)
+
+assert chk_point == 6
+
+mecro_result = "\n".join(mecro_result).strip()
+result = "\n".join(result).strip()
 
 with open(sys.argv[1], 'w') as fp:
-    content = template.replace("<RESULT>", "\n".join(result))
+    content = template.replace("<mecro_result>", mecro_result).replace("<result>", result)
     fp.write(content)
     
     if not content.endswith("\n\n"):
