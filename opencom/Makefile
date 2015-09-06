@@ -88,6 +88,10 @@ $(BUILD)/jnupy.o: jnupy.c
 	$(Q)$(PYTHON) jnupy_ap.py jnupy.c
 	$(call compile_c)
 
+$(BUILD)/copybc.o: copybc.c py/showbc.c
+	$(Q)$(PYTHON) copybc_ap.py copybc.c
+	$(call compile_c)
+
 CFLAGS_EXTRA += -fPIC
 
 LDFLAGS_EXTRA += -shared
@@ -122,6 +126,7 @@ endif
 # source files
 SRC_C = \
 	jnupy.c \
+	copybc.c \
 	gccollect.c \
 	$(SRC_MOD)
 

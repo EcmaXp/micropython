@@ -28,6 +28,7 @@
 #include <assert.h>
 
 #include "py/obj.h"
+#include "py/bc0.h"
 #include "copybc.h"
 #include "copybc0.h"
 
@@ -60,12 +61,12 @@ void mp_copybc_copy(const byte *ip, mp_uint_t len, mp_copybc_handler_t handler, 
     }
 }
 
-mp_copybc_opdata_t mp_copybc_subcopy(const byte const *code_start, const byte **ip_start) {
-    mp_copybc_opdata_t opdata = {-1, false, false, false};
-    const byte *ip = *ip_start;
+mp_copybc_opdata_t mp_copybc_subcopy(const byte const *code_start, const byte *ip) {
+    mp_copybc_opdata_t opdata = {ip, ip, -1, false, false, false};
 
     mp_uint_t unum;
     qstr qst;
+    switch (*ip++) {
         case MP_BC_LOAD_CONST_FALSE:
             HANDLE_OP;
             HANDLE_FINISH;
@@ -238,8 +239,8 @@ mp_copybc_opdata_t mp_copybc_subcopy(const byte const *code_start, const byte **
             HANDLE_FINISH;
         case MP_BC_SETUP_WITH:
             HANDLE_OP;
-            DECODE_ULABEL; 
-            DHANDLE_ULABEL;
+            DECODE_ULABEL;
+            HANDLE_ULABEL;
             HANDLE_FINISH;
         case MP_BC_WITH_CLEANUP:
             HANDLE_OP;
@@ -252,13 +253,13 @@ mp_copybc_opdata_t mp_copybc_subcopy(const byte const *code_start, const byte **
             HANDLE_FINISH;
         case MP_BC_SETUP_EXCEPT:
             HANDLE_OP;
-            DECODE_ULABEL; 
-            DHANDLE_ULABEL;
+            DECODE_ULABEL;
+            HANDLE_ULABEL;
             HANDLE_FINISH;
         case MP_BC_SETUP_FINALLY:
             HANDLE_OP;
-            DECODE_ULABEL; 
-            DHANDLE_ULABEL;
+            DECODE_ULABEL;
+            HANDLE_ULABEL;
             HANDLE_FINISH;
         case MP_BC_END_FINALLY:
             HANDLE_OP;
@@ -268,8 +269,8 @@ mp_copybc_opdata_t mp_copybc_subcopy(const byte const *code_start, const byte **
             HANDLE_FINISH;
         case MP_BC_FOR_ITER:
             HANDLE_OP;
-            DECODE_ULABEL; 
-            DHANDLE_ULABEL;
+            DECODE_ULABEL;
+            HANDLE_ULABEL;
             HANDLE_FINISH;
         case MP_BC_POP_BLOCK:
             HANDLE_OP;

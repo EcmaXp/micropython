@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "opencom/modmicrothread.h"
+#include "opencom/copybc.h"
 #include "py/objfun.h"
 #include "py/objclosure.h"
 #include "py/objboundmeth.h"
@@ -494,12 +495,25 @@ typedef struct _mp_persist_raw_code_t {
 const byte *mp_persist_copy_bytecode(const byte *ip) {
     // mp_bytecode_print_str
     
-    mp_uint_t unum;
-    qstr qst;
-
+    
     // parse result in mp_bytecode_print
 
     return ip;
+}
+
+STATIC void mp_persist_debug_opcode(void *start_bc, const mp_copybc_opdata_t *opdata) {
+    printf("c[" INT_FMT ":" INT_FMT "] => OP %d", opdata->ip - (byte *)start_bc, opdata->next_ip - (byte *)start_bc, (int)opdata->op);
+    if (opdata->is_ptr)
+        printf(" ptr=%p", opdata->data.u_ptr);
+    if (opdata->is_num)
+        printf(" num=" INT_FMT, opdata->data.u_num);
+    if (opdata->is_unum)
+        printf(" unum=" UINT_FMT, opdata->data.u_unum);
+    if (opdata->is_qstr)
+        printf(" qstr=%s", qstr_str(opdata->data.u_qstr));
+    if (opdata->has_extra)
+        printf(" extra=" UINT_FMT, opdata->extra);
+    printf("\n");
 }
 
 STATIC mp_persist_raw_code_t *persister_parse_raw_code(mp_raw_code_t *raw_code) {
@@ -578,6 +592,8 @@ STATIC mp_persist_raw_code_t *persister_parse_raw_code(mp_raw_code_t *raw_code) 
     
     prc->bytecode_body = ip;
     prc->bytecode_body_size = len;
+    
+    mp_copybc_copy(ip, len, &mp_persist_debug_opcode, (void *)ip);
     
     mp_bytecode_print2(ip, len);
     (void)mp_persist_copy_bytecode;

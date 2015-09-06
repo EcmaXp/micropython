@@ -29,8 +29,6 @@
 #include "py/mpconfig.h"
 #include "py/qstr.h"
 
-typedef void (*mp_copybc_handler_t)(void*, const mp_copybc_opdata_t*);
-
 typedef struct _mp_copybc_opdata_t {
     const byte *ip;
     const byte *next_ip;
@@ -49,7 +47,9 @@ typedef struct _mp_copybc_opdata_t {
     mp_uint_t extra;
 } mp_copybc_opdata_t;
 
+typedef void (*mp_copybc_handler_t)(void*, const mp_copybc_opdata_t*);
+
 void mp_copybc_copy(const byte *ip, mp_uint_t len, mp_copybc_handler_t handler, void *handler_data);
-mp_copybc_opdata_t mp_copybc_subcopy(const byte const *code_start, const byte **ip_start);
+mp_copybc_opdata_t mp_copybc_subcopy(const byte const *code_start, const byte *ip);
 
 #endif // __MICROPY_INCLUDED_OPENCOM_COPYBC_H__

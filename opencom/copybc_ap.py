@@ -41,6 +41,7 @@ template = """
 #include <assert.h>
 
 #include "py/obj.h"
+#include "py/bc0.h"
 #include "copybc.h"
 #include "copybc0.h"
 
@@ -55,9 +56,8 @@ void mp_copybc_copy(const byte *ip, mp_uint_t len, mp_copybc_handler_t handler, 
     }
 }
 
-mp_copybc_opdata_t mp_copybc_subcopy(const byte const *code_start, const byte **ip_start) {
-    mp_copybc_opdata_t opdata = {-1, false, false, false};
-    const byte *ip = *ip_start;
+mp_copybc_opdata_t mp_copybc_subcopy(const byte const *code_start, const byte *ip) {
+    mp_copybc_opdata_t opdata = {ip, ip, -1, false, false, false};
 
     <result>
 """
@@ -114,9 +114,9 @@ for line in lines:
     
     line = line.rstrip()
     if "//" in line:
-        line = line[:line.index("//")]
-    
+        line = line[:line.index("//")].rstrip()
     sline = line.strip()
+    
     if not sline:
         continue
     elif "DECODE_" in line:
@@ -124,36 +124,31 @@ for line in lines:
         result.append(build_line(sline.replace("DECODE_", "HANDLE_"))[1])
     elif "switch (*ip++) {" in sline:
         chk_point += 1
+        result.append(line)
     elif "while ((*ip++ & 0x80) != 0)" in sline:
         chk_point += 1
         result.append(line)
         result.append(build_line("HANDLE_INT;")[1])
-        continue
     elif "*ip++" in sline:
         result.append(build_line("HANDLE_EXTRA(*ip++);")[1])
     elif sline.startswith("printf"):
-        continue
+        pass
     elif sline.startswith("mp_obj_print_helper"):
         chk_point += 1
-        continue
     elif sline.startswith("case") and ":" in sline:
         indent = get_indent()
         result.append(line)
         result.append(indent + " " * 4 + "HANDLE_OP;")
-        continue
     elif sline == "mp_uint_t op = ip[-1] - MP_BC_BINARY_OP_MULTI;":
         chk_point += 1
         result.append(line)
         result.append(build_line("(void)op;")[1])
         result.append(build_line("HANDLE_OP;")[1])
-        continue
     elif sline == "break;":
         result.append(build_line("HANDLE_FINISH;")[1])
-        continue
     elif sline == "return ip;":
         chk_point += 1
         result.append(build_line("HANDLE_INVAILD;")[1])
-        continue
     else:
         result.append(line)
 

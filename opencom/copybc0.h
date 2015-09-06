@@ -28,16 +28,17 @@
 
 #include "py/obj.h"
 
-#define ASSIGN(tag, data) opdata.is_##tag = true; opdata.data.u_##tag = (data);
+#define ASSIGN(tag_is, tag_data, x) opdata.tag_is = true; opdata.data.tag_data = (x);
 
 #define HANDLE(x, y, z) handler(handler_data, x, y, z)
-#define HANDLE_ULABEL ASSIGN(num, ip + unum - code_start)
-#define HANDLE_SLABEL ASSIGN(num, ip + unum - code_start)
-#define HANDLE_PTR ASSIGN(ptr, (machine_ptr_t)unum);
-#define HANDLE_INT ASSIGN(num, num);
-#define HANDLE_UINT ASSIGN(unum, unum);
-#define HANDLE_QSTR ASSIGN(qstr, qst);
+#define HANDLE_ULABEL ASSIGN(is_num, u_num, ip + unum - code_start)
+#define HANDLE_SLABEL ASSIGN(is_num, u_num, ip + unum - code_start)
+#define HANDLE_PTR ASSIGN(is_ptr, u_ptr, (machine_ptr_t)unum);
+#define HANDLE_INT ASSIGN(is_num, u_num, num);
+#define HANDLE_UINT ASSIGN(is_unum, u_unum, unum);
+#define HANDLE_QSTR ASSIGN(is_qstr, u_qstr, qst);
 #define HANDLE_OP opdata.ip = (ip - 1); opdata.op = *(ip - 1);
+#define HANDLE_EXTRA(x) opdata.has_extra = true; opdata.extra = (x);
 #define HANDLE_FINISH opdata.next_ip = ip; return opdata;
 #define HANDLE_INVAILD assert(0); opdata.next_ip = ip; return opdata;
 
