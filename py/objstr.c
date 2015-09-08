@@ -172,15 +172,17 @@ mp_obj_t mp_obj_str_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw,
 STATIC mp_obj_t bytes_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
     (void)type_in;
 
-    if (n_args == 0) {
-        return mp_const_empty_bytes;
-    }
-
-#if MICROPY_CPYTHON_COMPAT
+    #if MICROPY_CPYTHON_COMPAT
     if (n_kw != 0) {
         mp_arg_error_unimpl_kw();
     }
-#endif
+    #else
+    (void)n_kw;
+    #endif
+
+    if (n_args == 0) {
+        return mp_const_empty_bytes;
+    }
 
     if (MP_OBJ_IS_STR(args[0])) {
         if (n_args < 2 || n_args > 3) {
@@ -699,7 +701,9 @@ STATIC mp_obj_t str_startswith(mp_uint_t n_args, const mp_obj_t *args) {
 STATIC mp_obj_t str_endswith(mp_uint_t n_args, const mp_obj_t *args) {
     GET_STR_DATA_LEN(args[0], str, str_len);
     GET_STR_DATA_LEN(args[1], suffix, suffix_len);
-    assert(n_args == 2);
+    if (n_args > 2) {
+        mp_not_implemented("start/end indices");
+    }
 
     if (suffix_len > str_len) {
         return mp_const_false;
