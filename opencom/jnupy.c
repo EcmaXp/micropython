@@ -295,6 +295,7 @@ void jnupy_throw_jerror_auto() {
     _JNUPY_LOAD(id, jnupy_refclass(name))
 #define JNUPY_LOAD_ENUM(clsname, name, clsid, id) \
     _JNUPY_LOAD(id, jnupy_refenum(_JNUPY_REF_ID(clsid), name, "L" clsname ";"))
+// " // fix github syntex highlighter
 #define JNUPY_LOAD_METHOD(clsname, name, type, clsid, id) \
     _JNUPY_LOAD(id, JNUPY_RAW_CALL(GetMethodID, _JNUPY_REF_ID(clsid), name, type))
 #define JNUPY_LOAD_FIELD(clsname, name, type, clsid, id) \
