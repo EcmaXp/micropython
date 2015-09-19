@@ -1132,6 +1132,10 @@ STATIC mp_obj_t mod_persist_function(mp_uint_t n_args, const mp_obj_t *args) {
         return mp_const_none;    
     }
     
+    if (n_args) {
+        return mp_const_none;
+    }
+    
     mp_uint_t arg_idx = 0; 
     mp_obj_t global_dict = args[arg_idx++];
     mp_uint_t n_pos_args = mp_obj_get_int(args[arg_idx++]);
