@@ -1,17 +1,16 @@
 # Build Instructions for MPOC
 
 ```bash
-cd java
-mkdir build
-javac org/micropython/jnupy/PythonState -d ../build
-jar 
-```
-
-```bash
 make
 ```
 
-```bash
-export CLASSPATH=""
+It will compile `micropython.jar` and `libmicropython.so`
 
+# Execute python script with MPOC
+
+```bash
+./micropython <python-script>
 ```
+
+Note. micropython script is not executable ELF file.
+      it is just warpper for micropython.jar
