@@ -194,7 +194,7 @@ STATIC JNIEnv *jnupy_glob_java_env;
 /** JNUPY CALL MECRO **/
 #define JNUPY_RAW_CALL_WITH(env, func, ...) (*env)->func(env, __VA_ARGS__)
 #define JNUPY_RAW_CALL(func, ...) (*JNUPY_ENV)->func(JNUPY_ENV, __VA_ARGS__)
-#define JNUPY_RAW_CALL_SINGLE(func) (*JNUPY_ENV)->func(JNUPY_ENV)
+#define JNUPY_RAW_CALL1(func) (*JNUPY_ENV)->func(JNUPY_ENV)
 #define JNUPY_RAW_AUTO_THROW (jnupy_throw_jerror_auto())
 #define JNUPY_CALL(func, ...) (*JNUPY_ENV)->func(JNUPY_ENV, __VA_ARGS__); JNUPY_RAW_AUTO_THROW
 /* JNUPY_CALL usage:
@@ -206,9 +206,9 @@ jobject msg = JNUPY_CALL(GetLongField, JNUPY_SELF, JFIELD(PythonNativeState, mpS
 JNUPY_CALL(NewGlobalRef, jfunc);
 
 // It can't mix with if, for, while, return, or etc control block.
-// But you can use JNUPY_RAW_CALL, and after call, must check by JNUPY_RAW_CALL_SINGLE(ExceptionOccurred)
+// But you can use JNUPY_RAW_CALL, and after call, must check by JNUPY_RAW_CALL1(ExceptionOccurred)
 if (JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/AssertionError", CM4H2), "There is no state") == 0) {
-    if (JNUPY_RAW_CALL_SINGLE(ExceptionOccurred)) {
+    if (JNUPY_RAW_CALL1(ExceptionOccurred)) {
         return;
     }
 }
@@ -264,7 +264,7 @@ NORETURN void nlr_gk_jump_raw(void *val) {
 
 NORETURN void jnupy_throw_jerror(jthrowable jerror);
 void jnupy_throw_jerror_auto() {
-    jthrowable jerror = JNUPY_RAW_CALL_SINGLE(ExceptionOccurred);
+    jthrowable jerror = JNUPY_RAW_CALL1(ExceptionOccurred);
     if (jerror != NULL) {
         jnupy_throw_jerror(jerror);
     }
@@ -1379,7 +1379,7 @@ jobject mp_obj_jfunc_get(mp_obj_t self_in) {
 }
 
 NORETURN void jnupy_throw_jerror(jthrowable jerror) {
-    JNUPY_RAW_CALL_SINGLE(ExceptionClear);
+    JNUPY_RAW_CALL1(ExceptionClear);
     nlr_buf_t nlr;
     if (nlr_push(&nlr) == 0) {
         mp_obj_t pyexc = MP_OBJ_NULL;
