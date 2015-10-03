@@ -28,8 +28,10 @@
 #include <string.h>
 #include <errno.h>
 #include <dlfcn.h>
+#include <ctype.h>
 
 #include "py/nlr.h"
+#include "py/runtime0.h"
 #include "py/runtime.h"
 #include "py/binary.h"
 
@@ -47,6 +49,13 @@ static jmethodID Class_getMethods_mid;
 static jmethodID Class_getConstructors_mid;
 static jmethodID Method_getName_mid;
 static jmethodID Method_toString_mid;
+
+static jclass List_class;
+static jmethodID List_get_mid;
+static jmethodID List_set_mid;
+static jmethodID List_size_mid;
+
+static jclass IndexException_class;
 
 STATIC const mp_obj_type_t jobject_type;
 STATIC const mp_obj_type_t jmethod_type;
@@ -72,6 +81,31 @@ typedef struct _mp_obj_jmethod_t {
     qstr name;
     bool is_static;
 } mp_obj_jmethod_t;
+
+// Utility functions
+
+STATIC bool is_object_type(const char *jtypesig) {
+    while (*jtypesig != ' ' && *jtypesig) {
+        if (*jtypesig == '.') {
+            return true;
+        }
+        jtypesig++;
+    }
+    return false;
+}
+
+STATIC void check_exception(void) {
+    jobject exc = JJ1(ExceptionOccurred);
+    if (exc) {
+        //JJ1(ExceptionDescribe);
+        mp_obj_t py_e = new_jobject(exc);
+        JJ1(ExceptionClear);
+        if (JJ(IsInstanceOf, exc, IndexException_class)) {
+            nlr_raise(mp_obj_new_exception_arg1(&mp_type_IndexError, py_e));
+        }
+        nlr_raise(mp_obj_new_exception_arg1(&mp_type_Exception, py_e));
+    }
+}
 
 // jclass
 
@@ -167,19 +201,76 @@ STATIC void jobject_attr(mp_obj_t self_in, qstr attr_in, mp_obj_t *dest) {
     }
 }
 
+STATIC mp_obj_t jobject_subscr(mp_obj_t self_in, mp_obj_t index, mp_obj_t value) {
+    mp_obj_jobject_t *self = self_in;
+    if (!JJ(IsInstanceOf, self->obj, List_class)) {
+        return MP_OBJ_NULL;
+    }
+
+    mp_uint_t idx = mp_obj_get_int(index);
+
+    if (value == MP_OBJ_NULL) {
+        // delete
+        assert(0);
+    } else if (value == MP_OBJ_SENTINEL) {
+        // load
+        jobject el = JJ(CallObjectMethod, self->obj, List_get_mid, idx);
+        if (el == NULL) {
+            check_exception();
+        }
+        return new_jobject(el);
+    } else {
+        // store
+        assert(0);
+    }
+
+
+return MP_OBJ_NULL;
+}
+
+STATIC mp_obj_t jobject_unary_op(mp_uint_t op, mp_obj_t self_in) {
+    mp_obj_jobject_t *self = self_in;
+    switch (op) {
+        case MP_UNARY_OP_BOOL:
+        case MP_UNARY_OP_LEN: {
+            jint len = JJ(CallIntMethod, self->obj, List_size_mid);
+            if (op == MP_UNARY_OP_BOOL) {
+                return MP_BOOL(len != 0);
+            }
+            return MP_OBJ_NEW_SMALL_INT(len);
+        }
+        default:
+            return MP_OBJ_NULL; // op not supported
+    }
+}
+
 STATIC const mp_obj_type_t jobject_type = {
     { &mp_type_type },
     .name = MP_QSTR_jobject,
     .print = jobject_print,
+    .unary_op = jobject_unary_op,
     .attr = jobject_attr,
+    .subscr = jobject_subscr,
 //    .locals_dict = (mp_obj_t)&jobject_locals_dict,
 };
 
 STATIC mp_obj_t new_jobject(jobject jo) {
-    mp_obj_jobject_t *o = m_new_obj(mp_obj_jobject_t);
-    o->base.type = &jobject_type;
-    o->obj = jo;
-    return o;
+    if (jo == NULL) {
+        return mp_const_none;
+    } else if (JJ(IsInstanceOf, jo, String_class)) {
+        const char *s = JJ(GetStringUTFChars, jo, NULL);
+        mp_obj_t ret = mp_obj_new_str(s, strlen(s), false);
+        JJ(ReleaseStringUTFChars, jo, s);
+        return ret;
+    } else if (JJ(IsInstanceOf, jo, Class_class)) {
+        return new_jclass(jo);
+    } else {
+        mp_obj_jobject_t *o = m_new_obj(mp_obj_jobject_t);
+        o->base.type = &jobject_type;
+        o->obj = jo;
+        return o;
+    }
+
 }
 
 
@@ -226,6 +317,9 @@ STATIC bool py2jvalue(const char **jtypesig, mp_obj_t arg, jvalue *out) {
         }
     } else if (type == &jobject_type) {
         printf("TODO: Check java arg type!!\n");
+        while (isalpha(*arg_type) || *arg_type == '.') {
+            arg_type++;
+        }
         mp_obj_jobject_t *jo = arg;
         out->l = jo->obj;
     } else {
@@ -242,31 +336,15 @@ STATIC bool py2jvalue(const char **jtypesig, mp_obj_t arg, jvalue *out) {
 // it.
 #define MATCH(s, static) (!strncmp(s, static, sizeof(static) - 1))
 STATIC mp_obj_t jvalue2py(const char *jtypesig, jobject arg) {
-    mp_obj_t ret;
     if (arg == NULL || MATCH(jtypesig, "void")) {
         return mp_const_none;
+    } else if (MATCH(jtypesig, "boolean")) {
+        return mp_obj_new_bool((bool)arg);
     } else if (MATCH(jtypesig, "int")) {
         return mp_obj_new_int((mp_int_t)arg);
-    } else if (MATCH(jtypesig, "java.lang.String")) {
-ret_string:;
-        const char *s = JJ(GetStringUTFChars, arg, NULL);
-        ret = mp_obj_new_str(s, strlen(s), false);
-        JJ(ReleaseStringUTFChars, arg, s);
-        return ret;
-    } else {
-        while (*jtypesig != ' ' && *jtypesig) {
-            if (*jtypesig == '.') {
-                // Non-primitive, object type
-                if (JJ(IsInstanceOf, arg, String_class)) {
-                    goto ret_string;
-                } else if (JJ(IsInstanceOf, arg, Class_class)) {
-                    return new_jclass(arg);
-                } else {
-                    return new_jobject(arg);
-                }
-            }
-            jtypesig++;
-        }
+    } else if (is_object_type(jtypesig)) {
+        // Non-primitive, object type
+        return new_jobject(arg);
     }
 
     printf("Unknown return type: %s\n", jtypesig);
@@ -295,7 +373,7 @@ STATIC mp_obj_t call_method(jobject obj, const char *name, jarray methods, bool 
 
             int name_len = strlen(name);
             if (strncmp(name, meth_name, name_len/*arg_types - meth_name - 1*/) || meth_name[name_len] != '('/*(*/) {
-                continue;
+                goto next_method;
             }
         }
 //        printf("method[%d]=%p %s\n", i, meth, decl);
@@ -303,7 +381,7 @@ STATIC mp_obj_t call_method(jobject obj, const char *name, jarray methods, bool 
 //        printf("name=%p meth_name=%s\n", name, meth_name);
 
         bool found = true;
-        for (int i = 0; i < n_args; i++) {
+        for (int i = 0; i < n_args && *arg_types != ')'; i++) {
             if (!py2jvalue(&arg_types, args[i], &jargs[i])) {
                 goto next_method;
             }
@@ -313,27 +391,48 @@ STATIC mp_obj_t call_method(jobject obj, const char *name, jarray methods, bool 
             }
         }
 
+        if (*arg_types != ')') {
+            goto next_method;
+        }
+
         if (found) {
 //            printf("found!\n");
             jmethodID method_id = JJ(FromReflectedMethod, meth);
             jobject res;
+            mp_obj_t ret;
             if (is_constr) {
-                res = JJ(NewObjectA, obj, method_id, jargs);
                 JJ(ReleaseStringUTFChars, name_o, decl);
+                res = JJ(NewObjectA, obj, method_id, jargs);
                 return new_jobject(res);
             } else {
-                res = JJ(CallObjectMethodA, obj, method_id, jargs);
-                mp_obj_t ret = jvalue2py(ret_type, res);
-                JJ(ReleaseStringUTFChars, name_o, decl);
-                if (ret != MP_OBJ_NULL) {
-                    return ret;
+                if (MATCH(ret_type, "void")) {
+                    JJ(CallVoidMethodA, obj, method_id, jargs);
+                    ret = mp_const_none;
+                } else if (MATCH(ret_type, "int")) {
+                    jint res = JJ(CallIntMethodA, obj, method_id, jargs);
+                    ret = mp_obj_new_int(res);
+                } else if (MATCH(ret_type, "boolean")) {
+                    jboolean res = JJ(CallBooleanMethodA, obj, method_id, jargs);
+                    ret = mp_obj_new_bool(res);
+                } else if (is_object_type(ret_type)) {
+                    res = JJ(CallObjectMethodA, obj, method_id, jargs);
+                    ret = new_jobject(res);
+                } else {
+                    JJ(ReleaseStringUTFChars, name_o, decl);
+                    nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "cannot handle return type"));
                 }
-                nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "cannot handle return type"));
+
+                JJ(ReleaseStringUTFChars, name_o, decl);
+                JJ(DeleteLocalRef, name_o);
+                JJ(DeleteLocalRef, meth);
+                return ret;
             }
         }
 
 next_method:
         JJ(ReleaseStringUTFChars, name_o, decl);
+        JJ(DeleteLocalRef, name_o);
+        JJ(DeleteLocalRef, meth);
     }
 
     nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "method not found"));
@@ -411,6 +510,15 @@ STATIC void create_jvm() {
                                      "()Ljava/lang/String;");
     Method_toString_mid = (*env)->GetMethodID(env, method_class, "toString",
                                      "()Ljava/lang/String;");
+
+    List_class = JJ(FindClass, "java/util/List");
+    List_get_mid = JJ(GetMethodID, List_class, "get",
+                                     "(I)Ljava/lang/Object;");
+    List_set_mid = JJ(GetMethodID, List_class, "set",
+                                     "(ILjava/lang/Object;)Ljava/lang/Object;");
+    List_size_mid = JJ(GetMethodID, List_class, "size",
+                                     "()I");
+    IndexException_class = JJ(FindClass, "java/lang/IndexOutOfBoundsException");
 }
 
 STATIC mp_obj_t mod_jni_cls(mp_obj_t cls_name_in) {

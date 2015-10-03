@@ -5,8 +5,8 @@
     <ClCompile Include="$(PyBaseDir)py\*.c" />
     <ClCompile Include="$(PyBaseDir)extmod\*.c" />
     <ClCompile Include="$(PyBaseDir)opencom\*.c" Exclude="$(PyBaseDir)opencom\modmsgpack.c;$(PyBaseDir)opencom\modpersist.c" />
-    <ClCompile Include="$(PyBaseDir)unix\*.c" Exclude="$(PyBaseDir)unix\gccollect.c;$(PyBaseDir)unix\alloc.c;$(PyBaseDir)unix\modffi.c;$(PyBaseDir)unix\modsocket.c;$(PyBaseDir)unix\modtermios.c;$(PyBaseDir)unix\seg_helpers.c;$(PyBaseDir)unix\unix_mphal.c;$(PyBaseDir)unix\main.c;$(PyBaseDir)unix\file.c" />
-    <ClCompile Include="$(PyBaseDir)windows\*.c" Exclude="$(PyBaseDir)windows\windows_mphal.c;$(PyBaseDir)windows\file.c" />
+    <ClCompile Include="$(PyBaseDir)unix\*.c" Exclude="$(PyBaseDir)unix\alloc.c;$(PyBaseDir)unix\modffi.c;$(PyBaseDir)unix\modjni.c;$(PyBaseDir)unix\modsocket.c;$(PyBaseDir)unix\modtermios.c;$(PyBaseDir)unix\seg_helpers.c;$(PyBaseDir)unix\unix_mphal.c" />
+    <ClCompile Include="$(PyBaseDir)windows\*.c" />
     <ClCompile Include="$(PyBaseDir)windows\msvc\*.c" />
   </ItemGroup>
   <ItemGroup>
