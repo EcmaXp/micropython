@@ -28,7 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "opencom/modmicrothread.h"
-#include "opencom/copybc.h"
+#include "opencom/parsebc.h"
 #include "py/objfun.h"
 #include "py/objclosure.h"
 #include "py/objboundmeth.h"
@@ -37,6 +37,7 @@
 #include "py/parse.h"
 #include "py/emit.h"
 #include "py/emitbc.h"
+#include "py/gc.h"
 
 #if !MICROPY_ENABLE_GC
 #error Persist module require gc. (really?)
@@ -52,9 +53,9 @@
 // mp_map cloneed.
 // TODO: replace mp_map_lookup with minimal version!
 
-STATIC mp_map_elem_t *modpersist_mp_map_lookup(mp_map_t *map, mp_obj_t index);
+STATIC mp_map_elem_t *mod_persist_mp_map_lookup(mp_map_t *map, mp_obj_t index);
 
-STATIC void modpersist_mp_map_rehash(mp_map_t *map) {
+STATIC void mod_persist_mp_map_rehash(mp_map_t *map) {
     mp_uint_t old_alloc = map->alloc;
     mp_map_elem_t *old_table = map->table;
     map->alloc = (map->alloc * 2 + 1) | 1;
@@ -62,17 +63,17 @@ STATIC void modpersist_mp_map_rehash(mp_map_t *map) {
     map->table = m_new0(mp_map_elem_t, map->alloc);
     for (mp_uint_t i = 0; i < old_alloc; i++) {
         if (old_table[i].key != MP_OBJ_NULL && old_table[i].key != MP_OBJ_SENTINEL) {
-            modpersist_mp_map_lookup(map, old_table[i].key)->value = old_table[i].value;
+            mod_persist_mp_map_lookup(map, old_table[i].key)->value = old_table[i].value;
         }
     }
     m_del(mp_map_elem_t, old_table, old_alloc);
 }
 
-STATIC mp_map_elem_t *modpersist_mp_map_lookup(mp_map_t *map, mp_obj_t index) {
+STATIC mp_map_elem_t *mod_persist_mp_map_lookup(mp_map_t *map, mp_obj_t index) {
     // mp_map_lookup_kind_t lookup_kind = MP_MAP_LOOKUP_ADD_IF_NOT_FOUND;
     
     if (map->alloc == 0) {
-        modpersist_mp_map_rehash(map);
+        mod_persist_mp_map_rehash(map);
     }
 
     mp_uint_t hash = (mp_uint_t)index;
@@ -107,7 +108,7 @@ STATIC mp_map_elem_t *modpersist_mp_map_lookup(mp_map_t *map, mp_obj_t index) {
                 avail_slot->value = MP_OBJ_NULL;
                 return avail_slot;
             } else {
-                modpersist_mp_map_rehash(map);
+                mod_persist_mp_map_rehash(map);
                 start_pos = pos = hash % map->alloc;
             }
         }
@@ -145,7 +146,7 @@ STATIC mp_map_elem_t *modpersist_mp_map_lookup(mp_map_t *map, mp_obj_t index) {
 
 #define PACKING \
     mp_obj_system_buf_t *sysbuf = persister->sysbuf; \
-    if (modpersist_starting_dump(persister, obj))
+    if (mod_persist_starting_dump(persister, obj))
         /* body */
 
 // 3-way tagging
@@ -412,8 +413,8 @@ const mp_obj_type_t mp_type_persister;
 STATIC void persister_pack_any(mp_obj_persister_t *persister, mp_obj_t o);
 STATIC void persister_pack_qstr(mp_obj_persister_t *persister, mp_obj_t obj);
 
-STATIC bool modpersist_starting_dump(mp_obj_persister_t *persister, mp_obj_t obj) {
-    mp_map_elem_t *persist_reg = modpersist_mp_map_lookup(persister->objmap, obj);
+STATIC bool mod_persist_starting_dump(mp_obj_persister_t *persister, mp_obj_t obj) {
+    mp_map_elem_t *persist_reg = mod_persist_mp_map_lookup(persister->objmap, obj);
 
     bool is_require_packing = (persist_reg->value == MP_OBJ_NULL);
     if (is_require_packing) {
@@ -437,13 +438,6 @@ STATIC bool modpersist_starting_dump(mp_obj_persister_t *persister, mp_obj_t obj
 }
 
 STATIC mp_obj_t persister_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
-    // TODO: make mp_obj_t type. (like Packer, for share packed thing)
-    /* TODO: disable gc auto collect when dumping.
-             before disable gc, just gc.collect call?
-    */
-    // TODO: make map that targeting pointers?
-    // TODO: registered type can persist by calling some?
-    
     mp_obj_t user_persist_func = MP_OBJ_NULL;
     mp_arg_check_num(n_args, n_kw, 0, 1, false);
     if (1 <= n_args) {
@@ -492,16 +486,64 @@ typedef struct _mp_persist_raw_code_t {
 
 // TODO: build auto parser for mp_bytecode_print?
 
-const byte *mp_persist_copy_bytecode(const byte *ip) {
-    // mp_bytecode_print_str
-    
-    
-    // parse result in mp_bytecode_print
+typedef struct mp_persist_bcdata_t {
+    mp_parsebc_opcounter_t *counter;
+    byte *op_data;
+    mp_obj_t *ptr_data;
+    mp_int_t *num_data;
+    mp_uint_t *unum_data;
+    qstr *qstr_data;
+    mp_uint_t *extra_data;
+} mp_persist_bcdata_t;
 
-    return ip;
+STATIC void mp_persist_copy_bytecode_sub(void *data_ptr, const mp_parsebc_opdata_t *opdata) {
+    mp_persist_bcdata_t *bcdata = data_ptr;
+    *bcdata->op_data++ = opdata->op;
+
+    if (opdata->is_ptr)
+        *bcdata->ptr_data++ = opdata->data.u_ptr;
+    if (opdata->is_num)
+        *bcdata->num_data++ = opdata->data.u_num;
+    if (opdata->is_unum)
+        *bcdata->unum_data++ = opdata->data.u_unum;
+    if (opdata->is_qstr)
+        *bcdata->qstr_data++ = opdata->data.u_qstr;
+    if (opdata->has_extra)
+        *bcdata->extra_data++ = opdata->extra;
 }
 
-STATIC void mp_persist_debug_opcode(void *start_bc, const mp_copybc_opdata_t *opdata) {
+mp_parsebc_opcounter_t *mp_persist_copy_bytecode(const byte *ip, mp_uint_t len) {
+    mp_parsebc_opcounter_t *opcounter = mp_parsebc_count(ip, len);
+    mp_persist_bcdata_t *bcdata = m_new_obj(mp_persist_bcdata_t);
+    mp_persist_bcdata_t *bctemp = m_new_obj(mp_persist_bcdata_t);
+    
+    bcdata->counter = opcounter;
+    bcdata->op_data = m_new0(byte, opcounter->op_count);
+    bcdata->ptr_data = m_new0(mp_obj_t, opcounter->ptr_count);
+    bcdata->num_data = m_new0(mp_int_t, opcounter->num_count);
+    bcdata->unum_data = m_new0(mp_uint_t, opcounter->unum_count);
+    bcdata->qstr_data = m_new0(qstr, opcounter->qstr_count);
+    bcdata->extra_data = m_new0(mp_uint_t, opcounter->extra_count);
+    memcpy(bctemp, bcdata, sizeof(mp_persist_bcdata_t));
+    
+    mp_parsebc(ip, len, &mp_persist_copy_bytecode_sub, bctemp);
+    
+    // abort();
+    
+    return opcounter;
+}
+
+/*
+Store the bytecode by split to 6 layer
+
+A. OP
+B. PTR
+C. NUM - UNUM
+D. QSTR
+E. EXTRA
+*/
+
+STATIC void mp_persist_debug_opcode(void *start_bc, const mp_parsebc_opdata_t *opdata) {
     printf("c[" INT_FMT ":" INT_FMT "] => OP %d", opdata->ip - (byte *)start_bc, opdata->next_ip - (byte *)start_bc, (int)opdata->op);
     if (opdata->is_ptr)
         printf(" ptr=%p", opdata->data.u_ptr);
@@ -593,9 +635,10 @@ STATIC mp_persist_raw_code_t *persister_parse_raw_code(mp_raw_code_t *raw_code) 
     prc->bytecode_body = ip;
     prc->bytecode_body_size = len;
     
-    mp_copybc_copy(ip, len, &mp_persist_debug_opcode, (void *)ip);
-    
-    mp_bytecode_print2(ip, len);
+    // mp_parsebc(ip, len, &mp_persist_debug_opcode, (void *)ip);
+    (void)mp_persist_debug_opcode;
+    // mp_bytecode_print2(ip, len);
+    mp_persist_copy_bytecode(ip, len);
     (void)mp_persist_copy_bytecode;
     
     // TODO: parse bytecode and find all rawcode and parse again... HELL?
@@ -1092,8 +1135,31 @@ STATIC mp_obj_t mod_persist_dumps(mp_obj_t obj) {
     mp_obj_t persister_obj = persister_make_new((mp_obj_t)&mp_type_persister, 0, 0, NULL);
     mp_obj_persister_t *persister = persister_obj;
 
-    PACK_ANY(obj);
+    /* TODO: disable gc auto collect when dumping.
+             before disable gc, just gc.collect call?
+    */
+    // why need gc collect...?
+    // TODO: registered type can persist by calling some?
 
+    /*
+    bool gc_auto = MP_STATE_MEM(gc_auto_collect_enabled);
+    if (gc_auto) {
+        gc_collect();
+        MP_STATE_MEM(gc_auto_collect_enabled) = false;
+    }
+    
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) == 0) {
+    */
+    PACK_ANY(obj);
+    /*
+    } else {
+        if (gc_auto) {
+            MP_STATE_MEM(gc_auto_collect_enabled) = gc_auto;
+        }
+    }
+    */
+    
     return mp_obj_new_bytes(persister->sysbuf->buf, persister->sysbuf->len);
 }
 
@@ -1152,6 +1218,7 @@ STATIC mp_obj_t mod_persist_function(mp_uint_t n_args, const mp_obj_t *args) {
         mp_obj_tuple_get(extra_args_obj, &len, &items);
         extra_args = m_new(mp_obj_t, len);
         assert(n_def_args == len);
+        (void)n_def_args;
 
         for (mp_uint_t i = 0; i < len; i++) {
             extra_args[i] = items[i];

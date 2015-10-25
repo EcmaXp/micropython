@@ -1833,11 +1833,11 @@ JNUPY_FUNC_DEF(jobject, jnupy_1code_1compile)
     }
 
     qstr source_name = lex->source_name;
-    mp_parse_node_t pn = mp_parse(lex, flag);
+    mp_parse_tree_t parse_tree = mp_parse(lex, flag);
 
     JNUPY_CALL(ReleaseStringUTFChars, code, codebuf);
 
-    mp_obj_t module_fun = mp_compile(pn, source_name, MP_EMIT_OPT_NONE, false);
+    mp_obj_t module_fun = mp_compile(&parse_tree, source_name, MP_EMIT_OPT_NONE, false);
     if (module_fun == NULL) {
         return NULL;
     }

@@ -84,12 +84,12 @@ endif
 LDFLAGS = $(LDFLAGS_MOD) $(LDFLAGS_ARCH) -lm $(LDFLAGS_EXTRA)
 
 # jnupy settings
-$(BUILD)/jnupy.o: jnupy.c
+$(BUILD)/jnupy.o: jnupy.c jnupy_ap.py
 	$(Q)$(PYTHON) jnupy_ap.py jnupy.c
 	$(call compile_c)
 
-$(BUILD)/copybc.o: copybc.c py/showbc.c
-	$(Q)$(PYTHON) copybc_ap.py copybc.c
+$(BUILD)/parsebc.o: parsebc.c parsebc_ap.py py/showbc.c
+	$(Q)$(PYTHON) parsebc_ap.py parsebc.c parsebc_tpl.c
 	$(call compile_c)
 
 CFLAGS_EXTRA += -fPIC
@@ -126,7 +126,7 @@ endif
 # source files
 SRC_C = \
 	jnupy.c \
-	copybc.c \
+	parsebc.c \
 	gccollect.c \
 	$(SRC_MOD)
 

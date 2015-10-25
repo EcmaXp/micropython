@@ -472,6 +472,8 @@ STATIC const mp_obj_type_t jmethod_type = {
 #define LIBJVM_SO "libjvm.so"
 #endif
 
+STATIC void setup_env();
+
 STATIC void create_jvm() {
     JavaVMInitArgs args;
     JavaVMOption options;
@@ -495,7 +497,17 @@ STATIC void create_jvm() {
     if (st < 0 || !env) {
         nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_OSError, "unable to create JVM"));
     }
+    
+    setup_env();
+}
 
+void modjni_setup_jvm(JavaVM *jvm_in, JNIENV *env_in) {
+    jvm = jvm_in;
+    env = env_in;
+    setup_env();
+}
+
+STATIC void setup_env() {
     Class_class = JJ(FindClass, "java/lang/Class");
     jclass method_class = JJ(FindClass, "java/lang/reflect/Method");
     String_class = JJ(FindClass, "java/lang/String");

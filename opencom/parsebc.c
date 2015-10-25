@@ -1,4 +1,3 @@
-
 /*
  * This file is part of the Micro Python project, http://micropython.org/
  *
@@ -29,8 +28,8 @@
 
 #include "py/obj.h"
 #include "py/bc0.h"
-#include "copybc.h"
-#include "copybc0.h"
+#include "parsebc.h"
+#include "parsebc0.h"
 
 #define DECODE_UINT { \
     unum = 0; \
@@ -52,17 +51,17 @@
     ip += sizeof(mp_uint_t); \
 } while (0)
 
-void mp_copybc_copy(const byte *ip, mp_uint_t len, mp_copybc_handler_t handler, void *handler_data) {
+void mp_parsebc(const byte *ip, mp_uint_t len, mp_parsebc_handler_t handler, void *handler_data) {
     const byte const *code_start = ip;
     while (ip < len + code_start) {
-        mp_copybc_opdata_t opdata = mp_copybc_subcopy(code_start, ip);
+        mp_parsebc_opdata_t opdata = mp_parsebc_op(code_start, ip);
         ip = opdata.next_ip;
         handler(handler_data, &opdata);
     }
 }
 
-mp_copybc_opdata_t mp_copybc_subcopy(const byte const *code_start, const byte *ip) {
-    mp_copybc_opdata_t opdata = {ip, ip, -1, false, false, false};
+mp_parsebc_opdata_t mp_parsebc_op(const byte const *code_start, const byte *ip) {
+    mp_parsebc_opdata_t opdata = {ip, ip, -1, false, false, false};
 
     mp_uint_t unum;
     qstr qst;
@@ -424,3 +423,26 @@ mp_copybc_opdata_t mp_copybc_subcopy(const byte const *code_start, const byte *i
     HANDLE_INVAILD;
 }
 
+STATIC void mp_parsebc_count_sub(void *counter_ptr, const mp_parsebc_opdata_t *opdata);
+
+mp_parsebc_opcounter_t *mp_parsebc_count(const byte *ip, mp_uint_t len) {
+    mp_parsebc_opcounter_t *opcounter = m_new0(mp_parsebc_opcounter_t, 1);
+    mp_parsebc(ip, len, &mp_parsebc_count_sub, opcounter);
+    return opcounter;
+}
+
+STATIC void mp_parsebc_count_sub(void *counter_ptr, const mp_parsebc_opdata_t *opdata) {
+    mp_parsebc_opcounter_t *counter = counter_ptr;
+    counter->op_count++;
+
+    if (opdata->is_ptr)
+        counter->ptr_count++;
+    if (opdata->is_num)
+        counter->num_count++;
+    if (opdata->is_unum)
+        counter->unum_count++;
+    if (opdata->is_qstr)
+        counter->qstr_count++;
+    if (opdata->has_extra)
+        counter->extra_count++;
+}

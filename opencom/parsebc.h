@@ -23,13 +23,13 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#ifndef __MICROPY_INCLUDED_OPENCOM_COPYBC_H__
-#define __MICROPY_INCLUDED_OPENCOM_COPYBC_H__
+#ifndef __MICROPY_INCLUDED_OPENCOM_parsebc_H__
+#define __MICROPY_INCLUDED_OPENCOM_parsebc_H__
 
 #include "py/mpconfig.h"
 #include "py/qstr.h"
 
-typedef struct _mp_copybc_opdata_t {
+typedef struct _mp_parsebc_opdata_t {
     const byte *ip;
     const byte *next_ip;
     byte op;
@@ -45,11 +45,22 @@ typedef struct _mp_copybc_opdata_t {
         qstr u_qstr;
     } data;
     mp_uint_t extra;
-} mp_copybc_opdata_t;
+} mp_parsebc_opdata_t;
 
-typedef void (*mp_copybc_handler_t)(void*, const mp_copybc_opdata_t*);
+typedef struct _mp_parsebc_opcounter_t {
+    // xxx_count is good naming?
+    mp_uint_t op_count;
+    mp_uint_t ptr_count;
+    mp_uint_t num_count;
+    mp_uint_t unum_count;
+    mp_uint_t qstr_count;
+    mp_uint_t extra_count;
+} mp_parsebc_opcounter_t;
 
-void mp_copybc_copy(const byte *ip, mp_uint_t len, mp_copybc_handler_t handler, void *handler_data);
-mp_copybc_opdata_t mp_copybc_subcopy(const byte const *code_start, const byte *ip);
+typedef void (*mp_parsebc_handler_t)(void*, const mp_parsebc_opdata_t*);
 
-#endif // __MICROPY_INCLUDED_OPENCOM_COPYBC_H__
+void mp_parsebc(const byte *ip, mp_uint_t len, mp_parsebc_handler_t handler, void *handler_data);
+mp_parsebc_opdata_t mp_parsebc_op(const byte const *code_start, const byte *ip);
+mp_parsebc_opcounter_t *mp_parsebc_count(const byte *ip, mp_uint_t len);
+
+#endif // __MICROPY_INCLUDED_OPENCOM_parsebc_H__
