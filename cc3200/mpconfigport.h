@@ -30,6 +30,11 @@
 
 #include <stdint.h>
 
+#ifndef BOOTLOADER
+#include "FreeRTOS.h"
+#include "semphr.h"
+#endif
+
 // options to control how Micro Python is built
 
 #define MICROPY_ALLOC_PATH_MAX                      (128)
@@ -43,6 +48,7 @@
 #define MICROPY_HELPER_REPL                         (1)
 #define MICROPY_ENABLE_SOURCE_LINE                  (1)
 #define MICROPY_ENABLE_DOC_STRING                   (0)
+#define MICROPY_REPL_AUTO_INDENT                    (1)
 #define MICROPY_ERROR_REPORTING                     (MICROPY_ERROR_REPORTING_TERSE)
 #define MICROPY_LONGINT_IMPL                        (MICROPY_LONGINT_IMPL_MPZ)
 #define MICROPY_FLOAT_IMPL                          (MICROPY_FLOAT_IMPL_NONE)
@@ -55,18 +61,21 @@
 #endif
 #define MICROPY_QSTR_BYTES_IN_HASH                  (1)
 
-/* Enable FatFS LFNs
-    0: Disable LFN feature.
-    1: Enable LFN with static working buffer on the BSS. Always NOT reentrant.
-    2: Enable LFN with dynamic working buffer on the STACK.
-    3: Enable LFN with dynamic working buffer on the HEAP.
-*/
-#define MICROPY_ENABLE_LFN                          (2)
-#define MICROPY_LFN_CODE_PAGE                       (437)       // 1=SFN/ANSI 437=LFN/U.S.(OEM)
+// fatfs configuration used in ffconf.h
+#define MICROPY_FATFS_ENABLE_LFN                    (2)
+#define MICROPY_FATFS_MAX_LFN                       (MICROPY_ALLOC_PATH_MAX)
+#define MICROPY_FATFS_LFN_CODE_PAGE                 (437) // 1=SFN/ANSI 437=LFN/U.S.(OEM)
+#define MICROPY_FATFS_RPATH                         (2)
+#define MICROPY_FATFS_VOLUMES                       (2)
+#define MICROPY_FATFS_REENTRANT                     (1)
+#define MICROPY_FATFS_TIMEOUT                       (2500)
+#define MICROPY_FATFS_SYNC_T                        SemaphoreHandle_t
+
 #define MICROPY_STREAMS_NON_BLOCK                   (1)
 #define MICROPY_MODULE_WEAK_LINKS                   (1)
 #define MICROPY_CAN_OVERRIDE_BUILTINS               (1)
 #define MICROPY_PY_BUILTINS_TIMEOUTERROR            (1)
+#define MICROPY_PY_ALL_SPECIAL_METHODS              (1)
 #ifndef DEBUG
 #define MICROPY_PY_BUILTINS_STR_UNICODE             (1)
 #define MICROPY_PY_BUILTINS_STR_SPLITLINES          (1)
@@ -113,6 +122,7 @@ extern const struct _mp_obj_fun_builtin_t mp_builtin_open_obj;
 
 // extra built in modules to add to the list of known ones
 extern const struct _mp_obj_module_t machine_module;
+extern const struct _mp_obj_module_t wipy_module;
 extern const struct _mp_obj_module_t mp_module_ure;
 extern const struct _mp_obj_module_t mp_module_ujson;
 extern const struct _mp_obj_module_t mp_module_uos;
@@ -125,6 +135,7 @@ extern const struct _mp_obj_module_t mp_module_ussl;
 
 #define MICROPY_PORT_BUILTIN_MODULES \
     { MP_OBJ_NEW_QSTR(MP_QSTR_machine),     (mp_obj_t)&machine_module },      \
+	{ MP_OBJ_NEW_QSTR(MP_QSTR_wipy),        (mp_obj_t)&wipy_module },         \
     { MP_OBJ_NEW_QSTR(MP_QSTR_uos),         (mp_obj_t)&mp_module_uos },       \
     { MP_OBJ_NEW_QSTR(MP_QSTR_utime),       (mp_obj_t)&mp_module_utime },     \
     { MP_OBJ_NEW_QSTR(MP_QSTR_uselect),     (mp_obj_t)&mp_module_uselect },   \
@@ -176,7 +187,6 @@ typedef void            *machine_ptr_t;             // must be of pointer size
 typedef const void      *machine_const_ptr_t;       // must be of pointer size
 typedef long            mp_off_t;
 
-void mp_hal_stdout_tx_strn_cooked(const char *str, uint32_t len);
 #define MP_PLAT_PRINT_STRN(str, len) mp_hal_stdout_tx_strn_cooked(str, len)
 
 #define MICROPY_BEGIN_ATOMIC_SECTION()              disable_irq()
@@ -200,7 +210,7 @@ void mp_hal_stdout_tx_strn_cooked(const char *str, uint32_t len);
 // Include board specific configuration
 #include "mpconfigboard.h"
 
-#define MICROPY_HAL_H                               "cc3200_hal.h"
+#define MICROPY_MPHALPORT_H                         "cc3200_hal.h"
 #define MICROPY_PORT_HAS_TELNET                     (1)
 #define MICROPY_PORT_HAS_FTP                        (1)
 #define MICROPY_PY_SYS_PLATFORM                     "WiPy"

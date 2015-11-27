@@ -103,7 +103,7 @@ STATIC mp_obj_t dict_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw
 STATIC mp_obj_t dict_unary_op(mp_uint_t op, mp_obj_t self_in) {
     mp_obj_dict_t *self = MP_OBJ_CAST(self_in);
     switch (op) {
-        case MP_UNARY_OP_BOOL: return MP_BOOL(self->map.used != 0);
+        case MP_UNARY_OP_BOOL: return mp_obj_new_bool(self->map.used != 0);
         case MP_UNARY_OP_LEN: return MP_OBJ_NEW_SMALL_INT(self->map.used);
         default: return MP_OBJ_NULL; // op not supported
     }
@@ -114,7 +114,7 @@ STATIC mp_obj_t dict_binary_op(mp_uint_t op, mp_obj_t lhs_in, mp_obj_t rhs_in) {
     switch (op) {
         case MP_BINARY_OP_IN: {
             mp_map_elem_t *elem = mp_map_lookup(&o->map, rhs_in, MP_MAP_LOOKUP);
-            return MP_BOOL(elem != NULL);
+            return mp_obj_new_bool(elem != NULL);
         }
         case MP_BINARY_OP_EQUAL: {
             #if MICROPY_PY_COLLECTIONS_ORDEREDDICT
@@ -251,7 +251,7 @@ STATIC mp_obj_t dict_fromkeys(mp_uint_t n_args, const mp_obj_t *args) {
     mp_obj_t iter = mp_getiter(args[1]);
     mp_obj_t len = mp_obj_len_maybe(iter);
     mp_obj_t value = mp_const_none;
-    mp_obj_t next = NULL;
+    mp_obj_t next = MP_OBJ_NULL;
     mp_obj_t self_out;
 
     if (n_args > 2) {
@@ -374,7 +374,7 @@ STATIC mp_obj_t dict_update(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kw
         } else {
             // update from a generic iterable of pairs
             mp_obj_t iter = mp_getiter(args[1]);
-            mp_obj_t next = NULL;
+            mp_obj_t next = MP_OBJ_NULL;
             while ((next = mp_iternext(iter)) != MP_OBJ_STOP_ITERATION) {
                 mp_obj_t inneriter = mp_getiter(next);
                 mp_obj_t key = mp_iternext(inneriter);

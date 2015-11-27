@@ -100,6 +100,11 @@
 #if defined( __MINGW32__ ) && defined( __LP64__ )
 typedef long mp_int_t; // must be pointer size
 typedef unsigned long mp_uint_t; // must be pointer size
+#elif defined ( __MINGW32__ ) && defined( _WIN64 )
+#include <stdint.h>
+typedef __int64 mp_int_t;
+typedef unsigned __int64 mp_uint_t;
+#define MP_SSIZE_MAX __INT64_MAX__
 #elif defined ( _MSC_VER ) && defined( _WIN64 )
 typedef __int64 mp_int_t;
 typedef unsigned __int64 mp_uint_t;
@@ -126,7 +131,8 @@ typedef long mp_off_t;
 typedef void *machine_ptr_t; // must be of pointer size
 typedef const void *machine_const_ptr_t; // must be of pointer size
 
-#define MP_PLAT_PRINT_STRN(str, len) fwrite(str, 1, len, stdout)
+#include <unistd.h>
+#define MP_PLAT_PRINT_STRN(str, len) do { int ret = write(1, str, len); (void)ret; } while (0)
 
 extern const struct _mp_obj_fun_builtin_t mp_builtin_input_obj;
 extern const struct _mp_obj_fun_builtin_t mp_builtin_open_obj;
@@ -137,7 +143,7 @@ extern const struct _mp_obj_fun_builtin_t mp_builtin_open_obj;
 extern const struct _mp_obj_module_t mp_module_os;
 extern const struct _mp_obj_module_t mp_module_time;
 #define MICROPY_PORT_BUILTIN_MODULES \
-    { MP_OBJ_NEW_QSTR(MP_QSTR_time), (mp_obj_t)&mp_module_time }, \
+    { MP_OBJ_NEW_QSTR(MP_QSTR_utime), (mp_obj_t)&mp_module_time }, \
     { MP_OBJ_NEW_QSTR(MP_QSTR__os), (mp_obj_t)&mp_module_os }, \
 
 #if MICROPY_USE_READLINE == 1
@@ -147,16 +153,14 @@ extern const struct _mp_obj_module_t mp_module_time;
 
 #define MP_STATE_PORT               MP_STATE_VM
 
-#define MICROPY_HAL_H               "windows_mphal.h"
+#define MICROPY_MPHALPORT_H         "windows_mphal.h"
 
 // We need to provide a declaration/definition of alloca()
 #include <malloc.h>
 
 #include "realpath.h"
 #include "init.h"
-
-// sleep for given number of milliseconds
-void msec_sleep(double msec);
+#include "sleep.h"
 
 // MSVC specifics
 #ifdef _MSC_VER
@@ -192,6 +196,13 @@ void msec_sleep(double msec);
 #define PATH_MAX                    MICROPY_ALLOC_PATH_MAX
 #define S_ISREG(m)                  (((m) & S_IFMT) == S_IFREG)
 #define S_ISDIR(m)                  (((m) & S_IFMT) == S_IFDIR)
+#ifdef _WIN64
+#define SSIZE_MAX                   _I64_MAX
+typedef __int64                     ssize_t;
+#else
+#define SSIZE_MAX                   _I32_MAX
+typedef int                         ssize_t;
+#endif
 
 
 // Put static/global variables in sections with a known name

@@ -31,13 +31,16 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+
+
+#include "py/mpstate.h"
+#include "py/mphal.h"
+#include "py/runtime.h"
+#include "py/objstr.h"
 #include "inc/hw_types.h"
 #include "inc/hw_ints.h"
 #include "inc/hw_nvic.h"
 #include "hw_memmap.h"
-#include "py/mpstate.h"
-#include "py/runtime.h"
-#include MICROPY_HAL_H
 #include "rom_map.h"
 #include "interrupt.h"
 #include "systick.h"
@@ -101,11 +104,11 @@ void HAL_IncrementTick(void) {
     HAL_tickCount++;
 }
 
-uint32_t HAL_GetTick(void) {
+mp_uint_t mp_hal_ticks_ms(void) {
     return HAL_tickCount;
 }
 
-void HAL_Delay(uint32_t delay) {
+void mp_hal_delay_ms(mp_uint_t delay) {
     // only if we are not within interrupt context and interrupts are enabled
     if ((HAL_NVIC_INT_CTRL_REG & HAL_VECTACTIVE_MASK) == 0 && query_irq() == IRQ_STATE_ENABLED) {
         #ifdef USE_FREERTOS
@@ -137,12 +140,12 @@ void mp_hal_stdout_tx_str(const char *str) {
     mp_hal_stdout_tx_strn(str, strlen(str));
 }
 
-void mp_hal_stdout_tx_strn(const char *str, uint32_t len) {
+void mp_hal_stdout_tx_strn(const char *str, size_t len) {
     if (MP_STATE_PORT(os_term_dup_obj)) {
         if (MP_OBJ_IS_TYPE(MP_STATE_PORT(os_term_dup_obj)->stream_o, &pyb_uart_type)) {
             uart_tx_strn(MP_STATE_PORT(os_term_dup_obj)->stream_o, str, len);
         } else {
-            MP_STATE_PORT(os_term_dup_obj)->write[2] = mp_obj_new_bytes((const byte*)str, len);
+            MP_STATE_PORT(os_term_dup_obj)->write[2] = mp_obj_new_str_of_type(&mp_type_str, (const byte *)str, len);
             mp_call_method_n_kw(1, 0, MP_STATE_PORT(os_term_dup_obj)->write);
         }
     }
@@ -150,7 +153,7 @@ void mp_hal_stdout_tx_strn(const char *str, uint32_t len) {
     telnet_tx_strn(str, len);
 }
 
-void mp_hal_stdout_tx_strn_cooked (const char *str, uint32_t len) {
+void mp_hal_stdout_tx_strn_cooked (const char *str, size_t len) {
     int32_t nslen = 0;
     const char *_str = str;
 
@@ -181,15 +184,16 @@ int mp_hal_stdin_rx_chr(void) {
                 }
             } else {
                 MP_STATE_PORT(os_term_dup_obj)->read[2] = mp_obj_new_int(1);
-                mp_obj_t rbytes = mp_call_method_n_kw(1, 0, MP_STATE_PORT(os_term_dup_obj)->read);
-                if (rbytes != mp_const_none) {
+                mp_obj_t data = mp_call_method_n_kw(1, 0, MP_STATE_PORT(os_term_dup_obj)->read);
+                // data len is > 0
+                if (mp_obj_is_true(data)) {
                     mp_buffer_info_t bufinfo;
-                    mp_get_buffer_raise(rbytes, &bufinfo, MP_BUFFER_READ);
+                    mp_get_buffer_raise(data, &bufinfo, MP_BUFFER_READ);
                     return ((int *)(bufinfo.buf))[0];
                 }
             }
         }
-        HAL_Delay(1);
+        mp_hal_delay_ms(1);
     }
 }
 

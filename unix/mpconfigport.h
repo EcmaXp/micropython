@@ -50,6 +50,7 @@
 #define MICROPY_MALLOC_USES_ALLOCATED_SIZE (1)
 #define MICROPY_MEM_STATS           (1)
 #define MICROPY_DEBUG_PRINTERS      (1)
+#define MICROPY_DEBUG_STDERR        (1)
 #define MICROPY_USE_READLINE_HISTORY (1)
 #define MICROPY_HELPER_REPL         (1)
 #define MICROPY_REPL_EMACS_KEYS     (1)
@@ -84,7 +85,9 @@
 #define MICROPY_PY_SYS_STDFILES     (1)
 #define MICROPY_PY_SYS_EXC_INFO     (1)
 #define MICROPY_PY_COLLECTIONS_ORDEREDDICT (1)
+#ifndef MICROPY_PY_MATH_SPECIAL_FUNCTIONS
 #define MICROPY_PY_MATH_SPECIAL_FUNCTIONS (1)
+#endif
 #define MICROPY_PY_CMATH            (1)
 #define MICROPY_PY_IO_FILEIO        (1)
 #define MICROPY_PY_GC_COLLECT_RETVAL (1)
@@ -93,6 +96,7 @@
 #define MICROPY_STACKLESS           (0)
 #define MICROPY_STACKLESS_STRICT    (0)
 
+#define MICROPY_PY_OS_STATVFS       (1)
 #define MICROPY_PY_UCTYPES          (1)
 #define MICROPY_PY_UZLIB            (1)
 #define MICROPY_PY_UJSON            (1)
@@ -121,6 +125,7 @@
 #define MICROPY_EMERGENCY_EXCEPTION_BUF_SIZE  (256)
 
 extern const struct _mp_obj_module_t mp_module_os;
+extern const struct _mp_obj_module_t mp_module_uselect;
 extern const struct _mp_obj_module_t mp_module_time;
 extern const struct _mp_obj_module_t mp_module_termios;
 extern const struct _mp_obj_module_t mp_module_socket;
@@ -159,6 +164,7 @@ extern const struct _mp_obj_module_t mp_module_jni;
     MICROPY_PY_TIME_DEF \
     MICROPY_PY_SOCKET_DEF \
     { MP_OBJ_NEW_QSTR(MP_QSTR__os), (mp_obj_t)&mp_module_os }, \
+    { MP_OBJ_NEW_QSTR(MP_QSTR_uselect), (mp_obj_t)&mp_module_uselect }, \
     MICROPY_PY_TERMIOS_DEF \
 
 // type definitions for the specific machine
@@ -191,11 +197,21 @@ void mp_unix_mark_exec(void);
 #define MP_PLAT_ALLOC_EXEC(min_size, ptr, size) mp_unix_alloc_exec(min_size, ptr, size)
 #define MP_PLAT_FREE_EXEC(ptr, size) mp_unix_free_exec(ptr, size)
 
-#define MP_PLAT_PRINT_STRN(str, len) fwrite(str, 1, len, stdout)
+#include <unistd.h>
+#define MP_PLAT_PRINT_STRN(str, len) do { ssize_t ret = write(1, str, len); (void)ret; } while (0)
 
 #ifdef __linux__
 // Can access physical memory using /dev/mem
 #define MICROPY_PLAT_DEV_MEM  (1)
+#endif
+
+#ifdef __ANDROID__
+#include <android/api-level.h>
+#if __ANDROID_API__ < 4
+// Bionic libc in Android 1.5 misses these 2 functions
+#define MP_NEED_LOG2 (1)
+#define nan(x) NAN
+#endif
 #endif
 
 extern const struct _mp_obj_fun_builtin_t mp_builtin_input_obj;
@@ -210,8 +226,6 @@ extern const struct _mp_obj_fun_builtin_t mp_builtin_open_obj;
     const char *readline_hist[50]; \
     mp_obj_t keyboard_interrupt_obj; \
     void *mmap_region_head; \
-
-#define MICROPY_HAL_H "unix_mphal.h"
 
 // We need to provide a declaration/definition of alloca()
 #ifdef __FreeBSD__

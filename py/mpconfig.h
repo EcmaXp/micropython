@@ -63,6 +63,19 @@
 //  - xxxx...xxx0 : a pointer to an mp_obj_base_t (unless a fake object)
 #define MICROPY_OBJ_REPR_B (1)
 
+// A MicroPython object is a machine word having the following form (called R):
+//  - iiiiiiii iiiiiiii iiiiiiii iiiiiii1 small int with 31-bit signed value
+//  - 01111111 1qqqqqqq qqqqqqqq qqqqq110 str with 20-bit qstr value
+//  - s1111111 10000000 00000000 00000010 +/- inf
+//  - s1111111 1xxxxxxx xxxxxxxx xxxxx010 nan, x != 0
+//  - seeeeeee efffffff ffffffff ffffff10 30-bit fp, e != 0xff
+//  - pppppppp pppppppp pppppppp pppppp00 ptr (4 byte alignment)
+// Str and float stored as O = R + 0x80800000, retrieved as R = O - 0x80800000.
+// This makes strs easier to encode/decode as they have zeros in the top 9 bits.
+// This scheme only works with 32-bit word size and float enabled.
+
+#define MICROPY_OBJ_REPR_C (2)
+
 #ifndef MICROPY_OBJ_REPR
 #define MICROPY_OBJ_REPR (MICROPY_OBJ_REPR_A)
 #endif
@@ -191,8 +204,33 @@
 #define MICROPY_CODE_STATE_HAS_FUN (0)
 #endif
 
+// Don't use alloca calls. As alloca() is not part of ANSI C, this
+// workaround option is provided for compilers lacking this de-facto
+// standard function. The way it works is allocating from heap, and
+// relying on garbage collection to free it eventually. This is of
+// course much less optimal than real alloca().
+#if defined(MICROPY_NO_ALLOCA) && MICROPY_NO_ALLOCA
+#undef alloca
+#define alloca(x) m_malloc(x)
+
 /*****************************************************************************/
 /* Micro Python emitters                                                     */
+
+// Whether to support loading of persistent code
+#ifndef MICROPY_PERSISTENT_CODE_LOAD
+#define MICROPY_PERSISTENT_CODE_LOAD (0)
+#endif
+
+// Whether to support saving of persistent code
+#ifndef MICROPY_PERSISTENT_CODE_SAVE
+#define MICROPY_PERSISTENT_CODE_SAVE (0)
+#endif
+
+// Whether generated code can persist independently of the VM/runtime instance
+// This is enabled automatically when needed by other features
+#ifndef MICROPY_PERSISTENT_CODE
+#define MICROPY_PERSISTENT_CODE (MICROPY_PERSISTENT_CODE_LOAD || MICROPY_PERSISTENT_CODE_SAVE)
+#endif
 
 // Whether to emit x64 native code
 #ifndef MICROPY_EMIT_X64
@@ -214,6 +252,11 @@
 #define MICROPY_EMIT_INLINE_THUMB (0)
 #endif
 
+// Whether to enable ARMv7-M instruction support in the Thumb2 inline assembler
+#ifndef MICROPY_EMIT_INLINE_THUMB_ARMV7M
+#define MICROPY_EMIT_INLINE_THUMB_ARMV7M (1)
+#endif
+
 // Whether to enable float support in the Thumb2 inline assembler
 #ifndef MICROPY_EMIT_INLINE_THUMB_FLOAT
 #define MICROPY_EMIT_INLINE_THUMB_FLOAT (1)
@@ -229,6 +272,11 @@
 
 /*****************************************************************************/
 /* Compiler configuration                                                    */
+
+// Whether to enable constant folding; eg 1+2 rewritten as 3
+#ifndef MICROPY_COMP_CONST_FOLDING
+#define MICROPY_COMP_CONST_FOLDING (1)
+#endif
 
 // Whether to enable lookup of constants in modules; eg module.CONST
 #ifndef MICROPY_COMP_MODULE_CONST
@@ -416,6 +464,11 @@ typedef double mp_float_t;
 #define MICROPY_STREAMS_NON_BLOCK (0)
 #endif
 
+// Whether to call __init__ when importing builtin modules for the first time
+#ifndef MICROPY_MODULE_BUILTIN_INIT
+#define MICROPY_MODULE_BUILTIN_INIT (0)
+#endif
+
 // Whether module weak links are supported
 #ifndef MICROPY_MODULE_WEAK_LINKS
 #define MICROPY_MODULE_WEAK_LINKS (0)
@@ -492,6 +545,11 @@ endif
 // behaviour (usually segfault) if the first argument is the wrong type.
 #ifndef MICROPY_BUILTIN_METHOD_CHECK_SELF_ARG
 #define MICROPY_BUILTIN_METHOD_CHECK_SELF_ARG (1)
+#endif
+
+// Support for user-space VFS mount (selected ports)
+#ifndef MICROPY_FSUSERMOUNT
+#define MICROPY_FSUSERMOUNT (0)
 #endif
 
 /*****************************************************************************/
@@ -751,6 +809,10 @@ endif
 #define MICROPY_PY_MACHINE (0)
 #endif
 
+#ifndef MICROPY_PY_USSL
+#define MICROPY_PY_USSL (0)
+#endif
+
 /*****************************************************************************/
 /* Hooks for a port to add builtins                                          */
 
@@ -873,7 +935,7 @@ endif
 
 // This macro is used to do all output (except when MICROPY_PY_IO is defined)
 #ifndef MP_PLAT_PRINT_STRN
-#define MP_PLAT_PRINT_STRN(str, len) printf("%.*s", (int)len, str)
+#define MP_PLAT_PRINT_STRN(str, len) mp_hal_stdout_tx_strn_cooked(str, len)
 #endif
 
 #ifndef MP_SSIZE_MAX
@@ -882,10 +944,14 @@ endif
 
 // printf format spec to use for mp_int_t and friends
 #ifndef INT_FMT
-#ifdef __LP64__
+#if defined(__LP64__)
 // Archs where mp_int_t == long, long != int
 #define UINT_FMT "%lu"
 #define INT_FMT "%ld"
+#elif defined(_WIN64)
+#include <inttypes.h>
+#define UINT_FMT "%"PRIu64
+#define INT_FMT "%"PRId64
 #else
 // Archs where mp_int_t == int
 #define UINT_FMT "%u"

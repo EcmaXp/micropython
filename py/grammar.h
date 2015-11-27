@@ -60,7 +60,7 @@ DEF_RULE(decorated, c(decorated), and(2), rule(decorators), rule(decorated_body)
 DEF_RULE(decorated_body, nc, or(2), rule(classdef), rule(funcdef))
 DEF_RULE(funcdef, c(funcdef), blank | and(8), tok(KW_DEF), tok(NAME), tok(DEL_PAREN_OPEN), opt_rule(typedargslist), tok(DEL_PAREN_CLOSE), opt_rule(funcdefrettype), tok(DEL_COLON), rule(suite))
 DEF_RULE(funcdefrettype, nc, ident | and(2), tok(DEL_MINUS_MORE), rule(test))
-// TODO typedargslist lets through more than is allowed
+// note: typedargslist lets through more than is allowed, compiler does further checks
 DEF_RULE(typedargslist, nc, list_with_end, rule(typedargslist_item), tok(DEL_COMMA))
 DEF_RULE(typedargslist_item, nc, or(3), rule(typedargslist_name), rule(typedargslist_star), rule(typedargslist_dbl_star))
 DEF_RULE(typedargslist_name, nc, ident | and(3), tok(NAME), opt_rule(typedargslist_colon), opt_rule(typedargslist_equal))
@@ -69,13 +69,13 @@ DEF_RULE(typedargslist_dbl_star, nc, and(3), tok(OP_DBL_STAR), tok(NAME), opt_ru
 DEF_RULE(typedargslist_colon, nc, ident | and(2), tok(DEL_COLON), rule(test))
 DEF_RULE(typedargslist_equal, nc, ident | and(2), tok(DEL_EQUAL), rule(test))
 DEF_RULE(tfpdef, nc, and(2), tok(NAME), opt_rule(typedargslist_colon))
-// TODO varargslist lets through more than is allowed
+// note: varargslist lets through more than is allowed, compiler does further checks
 DEF_RULE(varargslist, nc, list_with_end, rule(varargslist_item), tok(DEL_COMMA))
 DEF_RULE(varargslist_item, nc, or(3), rule(varargslist_name), rule(varargslist_star), rule(varargslist_dbl_star))
-DEF_RULE(varargslist_name, nc, and(2), tok(NAME), opt_rule(varargslist_equal))
+DEF_RULE(varargslist_name, nc, ident | and(2), tok(NAME), opt_rule(varargslist_equal))
 DEF_RULE(varargslist_star, nc, and(2), tok(OP_STAR), opt_rule(vfpdef))
 DEF_RULE(varargslist_dbl_star, nc, and(2), tok(OP_DBL_STAR), tok(NAME))
-DEF_RULE(varargslist_equal, nc, and(2), tok(DEL_EQUAL), rule(test))
+DEF_RULE(varargslist_equal, nc, ident | and(2), tok(DEL_EQUAL), rule(test))
 DEF_RULE(vfpdef, nc, ident | and(1), tok(NAME))
 
 // stmt: compound_stmt | simple_stmt
@@ -98,7 +98,7 @@ DEF_RULE(expr_stmt, c(expr_stmt), and(2), rule(testlist_star_expr), opt_rule(exp
 DEF_RULE(expr_stmt_2, nc, or(2), rule(expr_stmt_augassign), rule(expr_stmt_assign_list))
 DEF_RULE(expr_stmt_augassign, nc, and(2), rule(augassign), rule(expr_stmt_6))
 DEF_RULE(expr_stmt_assign_list, nc, one_or_more, rule(expr_stmt_assign))
-DEF_RULE(expr_stmt_assign, nc, and(2), tok(DEL_EQUAL), rule(expr_stmt_6))
+DEF_RULE(expr_stmt_assign, nc, ident | and(2), tok(DEL_EQUAL), rule(expr_stmt_6))
 DEF_RULE(expr_stmt_6, nc, or(2), rule(yield_expr), rule(testlist_star_expr))
 DEF_RULE(testlist_star_expr, c(generic_tuple), list_with_end, rule(testlist_star_expr_2), tok(DEL_COMMA))
 DEF_RULE(testlist_star_expr_2, nc, or(2), rule(star_expr), rule(test))
@@ -322,7 +322,7 @@ DEF_RULE(arglist_dbl_star, nc, and(2), tok(OP_DBL_STAR), rule(test))
 
 DEF_RULE(argument, nc, and(2), rule(test), opt_rule(argument_2))
 DEF_RULE(argument_2, nc, or(2), rule(comp_for), rule(argument_3))
-DEF_RULE(argument_3, nc, and(2), tok(DEL_EQUAL), rule(test))
+DEF_RULE(argument_3, nc, ident | and(2), tok(DEL_EQUAL), rule(test))
 DEF_RULE(comp_iter, nc, or(2), rule(comp_for), rule(comp_if))
 DEF_RULE(comp_for, nc, blank | and(5), tok(KW_FOR), rule(exprlist), tok(KW_IN), rule(or_test), opt_rule(comp_iter))
 DEF_RULE(comp_if, nc, and(3), tok(KW_IF), rule(test_nocond), opt_rule(comp_iter))

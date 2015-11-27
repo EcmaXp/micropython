@@ -33,9 +33,7 @@
 #include "py/scope.h"
 #include "py/emit.h"
 #include "py/compile.h"
-#include "py/smallint.h"
 #include "py/runtime.h"
-#include "py/builtin.h"
 
 // TODO need to mangle __attr names
 
@@ -58,8 +56,6 @@ typedef enum {
 #define EMIT_ARG(fun, ...) (comp->emit_method_table->fun(comp->emit, __VA_ARGS__))
 #define EMIT_LOAD_FAST(qst, local_num) (comp->emit_method_table->load_id.fast(comp->emit, qst, local_num))
 #define EMIT_LOAD_GLOBAL(qst) (comp->emit_method_table->load_id.global(comp->emit, qst))
-#define EMIT_INLINE_ASM(fun) (comp->emit_inline_asm_method_table->fun(comp->emit_inline_asm))
-#define EMIT_INLINE_ASM_ARG(fun, ...) (comp->emit_inline_asm_method_table->fun(comp->emit_inline_asm, __VA_ARGS__))
 
 #else
 
@@ -70,6 +66,9 @@ typedef enum {
 #define EMIT_LOAD_GLOBAL(qst) (mp_emit_bc_load_global(comp->emit, qst))
 
 #endif
+
+#define EMIT_INLINE_ASM(fun) (comp->emit_inline_asm_method_table->fun(comp->emit_inline_asm))
+#define EMIT_INLINE_ASM_ARG(fun, ...) (comp->emit_inline_asm_method_table->fun(comp->emit_inline_asm, __VA_ARGS__))
 
 // elements in this struct are ordered to make it compact
 typedef struct _compiler_t {
@@ -121,234 +120,6 @@ STATIC void compile_syntax_error(compiler_t *comp, mp_parse_node_t pn, const cha
         comp->compile_error = mp_obj_new_exception_msg(&mp_type_SyntaxError, msg);
         compile_error_set_line(comp, pn);
     }
-}
-
-#if MICROPY_COMP_MODULE_CONST
-STATIC const mp_map_elem_t mp_constants_table[] = {
-    #if MICROPY_PY_UCTYPES
-    { MP_OBJ_NEW_QSTR(MP_QSTR_uctypes), (mp_obj_t)&mp_module_uctypes },
-    #endif
-    // Extra constants as defined by a port
-    MICROPY_PORT_CONSTANTS
-};
-STATIC MP_DEFINE_CONST_MAP(mp_constants_map, mp_constants_table);
-#endif
-
-// this function is essentially a simple preprocessor
-STATIC mp_parse_node_t fold_constants(compiler_t *comp, mp_parse_node_t pn, mp_map_t *consts) {
-    if (0) {
-        // dummy
-#if MICROPY_COMP_CONST
-    } else if (MP_PARSE_NODE_IS_ID(pn)) {
-        // lookup identifier in table of dynamic constants
-        qstr qst = MP_PARSE_NODE_LEAF_ARG(pn);
-        mp_map_elem_t *elem = mp_map_lookup(consts, MP_OBJ_NEW_QSTR(qst), MP_MAP_LOOKUP);
-        if (elem != NULL) {
-            pn = mp_parse_node_new_leaf(MP_PARSE_NODE_SMALL_INT, MP_OBJ_SMALL_INT_VALUE(elem->value));
-        }
-#endif
-    } else if (MP_PARSE_NODE_IS_STRUCT(pn)) {
-        mp_parse_node_struct_t *pns = (mp_parse_node_struct_t*)pn;
-
-        // fold some parse nodes before folding their arguments
-        switch (MP_PARSE_NODE_STRUCT_KIND(pns)) {
-#if MICROPY_COMP_CONST
-            case PN_expr_stmt:
-                if (!MP_PARSE_NODE_IS_NULL(pns->nodes[1])) {
-                    mp_parse_node_struct_t *pns1 = (mp_parse_node_struct_t*)pns->nodes[1];
-                    if (MP_PARSE_NODE_STRUCT_KIND(pns1) == PN_expr_stmt_assign) {
-                        if (MP_PARSE_NODE_IS_ID(pns->nodes[0])
-                            && MP_PARSE_NODE_IS_STRUCT_KIND(pns1->nodes[0], PN_power)
-                            && MP_PARSE_NODE_IS_ID(((mp_parse_node_struct_t*)pns1->nodes[0])->nodes[0])
-                            && MP_PARSE_NODE_LEAF_ARG(((mp_parse_node_struct_t*)pns1->nodes[0])->nodes[0]) == MP_QSTR_const
-                            && MP_PARSE_NODE_IS_STRUCT_KIND(((mp_parse_node_struct_t*)pns1->nodes[0])->nodes[1], PN_trailer_paren)
-                            && MP_PARSE_NODE_IS_NULL(((mp_parse_node_struct_t*)pns1->nodes[0])->nodes[2])
-                            ) {
-                            // code to assign dynamic constants: id = const(value)
-
-                            // get the id
-                            qstr id_qstr = MP_PARSE_NODE_LEAF_ARG(pns->nodes[0]);
-
-                            // get the value
-                            mp_parse_node_t pn_value = ((mp_parse_node_struct_t*)((mp_parse_node_struct_t*)pns1->nodes[0])->nodes[1])->nodes[0];
-                            pn_value = fold_constants(comp, pn_value, consts);
-                            if (!MP_PARSE_NODE_IS_SMALL_INT(pn_value)) {
-                                compile_syntax_error(comp, (mp_parse_node_t)pns, "constant must be an integer");
-                                break;
-                            }
-                            mp_int_t value = MP_PARSE_NODE_LEAF_SMALL_INT(pn_value);
-
-                            // store the value in the table of dynamic constants
-                            mp_map_elem_t *elem = mp_map_lookup(consts, MP_OBJ_NEW_QSTR(id_qstr), MP_MAP_LOOKUP_ADD_IF_NOT_FOUND);
-                            if (elem->value != MP_OBJ_NULL) {
-                                compile_syntax_error(comp, (mp_parse_node_t)pns, "constant redefined");
-                                break;
-                            }
-                            elem->value = MP_OBJ_NEW_SMALL_INT(value);
-
-                            // replace const(value) with value
-                            pns1->nodes[0] = pn_value;
-
-                            // finished folding this assignment
-                            return pn;
-                        }
-                    }
-                }
-                break;
-#endif
-            case PN_string:
-            case PN_bytes:
-            case PN_const_object:
-                return pn;
-        }
-
-        // fold arguments
-        int n = MP_PARSE_NODE_STRUCT_NUM_NODES(pns);
-        for (int i = 0; i < n; i++) {
-            pns->nodes[i] = fold_constants(comp, pns->nodes[i], consts);
-        }
-
-        // try to fold this parse node
-        switch (MP_PARSE_NODE_STRUCT_KIND(pns)) {
-            case PN_atom_paren:
-                if (n == 1 && MP_PARSE_NODE_IS_SMALL_INT(pns->nodes[0])) {
-                    // (int)
-                    pn = pns->nodes[0];
-                }
-                break;
-
-            case PN_expr:
-                if (n == 2 && MP_PARSE_NODE_IS_SMALL_INT(pns->nodes[0]) && MP_PARSE_NODE_IS_SMALL_INT(pns->nodes[1])) {
-                    // int | int
-                    mp_int_t arg0 = MP_PARSE_NODE_LEAF_SMALL_INT(pns->nodes[0]);
-                    mp_int_t arg1 = MP_PARSE_NODE_LEAF_SMALL_INT(pns->nodes[1]);
-                    pn = mp_parse_node_new_leaf(MP_PARSE_NODE_SMALL_INT, arg0 | arg1);
-                }
-                break;
-
-            case PN_and_expr:
-                if (n == 2 && MP_PARSE_NODE_IS_SMALL_INT(pns->nodes[0]) && MP_PARSE_NODE_IS_SMALL_INT(pns->nodes[1])) {
-                    // int & int
-                    mp_int_t arg0 = MP_PARSE_NODE_LEAF_SMALL_INT(pns->nodes[0]);
-                    mp_int_t arg1 = MP_PARSE_NODE_LEAF_SMALL_INT(pns->nodes[1]);
-                    pn = mp_parse_node_new_leaf(MP_PARSE_NODE_SMALL_INT, arg0 & arg1);
-                }
-                break;
-
-            case PN_shift_expr:
-                if (n == 3 && MP_PARSE_NODE_IS_SMALL_INT(pns->nodes[0]) && MP_PARSE_NODE_IS_SMALL_INT(pns->nodes[2])) {
-                    mp_int_t arg0 = MP_PARSE_NODE_LEAF_SMALL_INT(pns->nodes[0]);
-                    mp_int_t arg1 = MP_PARSE_NODE_LEAF_SMALL_INT(pns->nodes[2]);
-                    if (MP_PARSE_NODE_IS_TOKEN_KIND(pns->nodes[1], MP_TOKEN_OP_DBL_LESS)) {
-                        // int << int
-                        if (!(arg1 >= (mp_int_t)BITS_PER_WORD || arg0 > (MP_SMALL_INT_MAX >> arg1) || arg0 < (MP_SMALL_INT_MIN >> arg1))) {
-                            pn = mp_parse_node_new_leaf(MP_PARSE_NODE_SMALL_INT, arg0 << arg1);
-                        }
-                    } else {
-                        assert(MP_PARSE_NODE_IS_TOKEN_KIND(pns->nodes[1], MP_TOKEN_OP_DBL_MORE)); // should be
-                        // int >> int
-                        if (arg1 >= (mp_int_t)BITS_PER_WORD) {
-                            // Shifting to big amounts is underfined behavior
-                            // in C and is CPU-dependent; propagate sign bit.
-                            arg1 = BITS_PER_WORD - 1;
-                        }
-                        pn = mp_parse_node_new_leaf(MP_PARSE_NODE_SMALL_INT, arg0 >> arg1);
-                    }
-                }
-                break;
-
-            case PN_arith_expr:
-                // overflow checking here relies on SMALL_INT being strictly smaller than mp_int_t
-                if (n == 3 && MP_PARSE_NODE_IS_SMALL_INT(pns->nodes[0]) && MP_PARSE_NODE_IS_SMALL_INT(pns->nodes[2])) {
-                    mp_int_t arg0 = MP_PARSE_NODE_LEAF_SMALL_INT(pns->nodes[0]);
-                    mp_int_t arg1 = MP_PARSE_NODE_LEAF_SMALL_INT(pns->nodes[2]);
-                    if (MP_PARSE_NODE_IS_TOKEN_KIND(pns->nodes[1], MP_TOKEN_OP_PLUS)) {
-                        // int + int
-                        arg0 += arg1;
-                    } else {
-                        assert(MP_PARSE_NODE_IS_TOKEN_KIND(pns->nodes[1], MP_TOKEN_OP_MINUS)); // should be
-                        // int - int
-                        arg0 -= arg1;
-                    }
-                    if (MP_SMALL_INT_FITS(arg0)) {
-                        pn = mp_parse_node_new_leaf(MP_PARSE_NODE_SMALL_INT, arg0);
-                    }
-                }
-                break;
-
-            case PN_term:
-                if (n == 3 && MP_PARSE_NODE_IS_SMALL_INT(pns->nodes[0]) && MP_PARSE_NODE_IS_SMALL_INT(pns->nodes[2])) {
-                    mp_int_t arg0 = MP_PARSE_NODE_LEAF_SMALL_INT(pns->nodes[0]);
-                    mp_int_t arg1 = MP_PARSE_NODE_LEAF_SMALL_INT(pns->nodes[2]);
-                    if (MP_PARSE_NODE_IS_TOKEN_KIND(pns->nodes[1], MP_TOKEN_OP_STAR)) {
-                        // int * int
-                        if (!mp_small_int_mul_overflow(arg0, arg1)) {
-                            arg0 *= arg1;
-                            if (MP_SMALL_INT_FITS(arg0)) {
-                                pn = mp_parse_node_new_leaf(MP_PARSE_NODE_SMALL_INT, arg0);
-                            }
-                        }
-                    } else if (MP_PARSE_NODE_IS_TOKEN_KIND(pns->nodes[1], MP_TOKEN_OP_SLASH)) {
-                        // int / int
-                        // pass
-                    } else if (MP_PARSE_NODE_IS_TOKEN_KIND(pns->nodes[1], MP_TOKEN_OP_PERCENT)) {
-                        // int%int
-                        if (arg1 != 0) {
-                            pn = mp_parse_node_new_leaf(MP_PARSE_NODE_SMALL_INT, mp_small_int_modulo(arg0, arg1));
-                        }
-                    } else {
-                        assert(MP_PARSE_NODE_IS_TOKEN_KIND(pns->nodes[1], MP_TOKEN_OP_DBL_SLASH)); // should be
-                        if (arg1 != 0) {
-                            // int // int
-                            pn = mp_parse_node_new_leaf(MP_PARSE_NODE_SMALL_INT, mp_small_int_floor_divide(arg0, arg1));
-                        }
-                    }
-                }
-                break;
-
-            case PN_factor_2:
-                if (MP_PARSE_NODE_IS_SMALL_INT(pns->nodes[1])) {
-                    mp_int_t arg = MP_PARSE_NODE_LEAF_SMALL_INT(pns->nodes[1]);
-                    if (MP_PARSE_NODE_IS_TOKEN_KIND(pns->nodes[0], MP_TOKEN_OP_PLUS)) {
-                        // +int
-                        pn = mp_parse_node_new_leaf(MP_PARSE_NODE_SMALL_INT, arg);
-                    } else if (MP_PARSE_NODE_IS_TOKEN_KIND(pns->nodes[0], MP_TOKEN_OP_MINUS)) {
-                        // -int
-                        pn = mp_parse_node_new_leaf(MP_PARSE_NODE_SMALL_INT, -arg);
-                    } else {
-                        assert(MP_PARSE_NODE_IS_TOKEN_KIND(pns->nodes[0], MP_TOKEN_OP_TILDE)); // should be
-                        // ~int
-                        pn = mp_parse_node_new_leaf(MP_PARSE_NODE_SMALL_INT, ~arg);
-                    }
-                }
-                break;
-
-            case PN_power:
-                if (0) {
-#if MICROPY_COMP_MODULE_CONST
-                } else if (MP_PARSE_NODE_IS_ID(pns->nodes[0]) && MP_PARSE_NODE_IS_STRUCT_KIND(pns->nodes[1], PN_trailer_period) && MP_PARSE_NODE_IS_NULL(pns->nodes[2])) {
-                    // id.id
-                    // look it up in constant table, see if it can be replaced with an integer
-                    mp_parse_node_struct_t *pns1 = (mp_parse_node_struct_t*)pns->nodes[1];
-                    assert(MP_PARSE_NODE_IS_ID(pns1->nodes[0]));
-                    qstr q_base = MP_PARSE_NODE_LEAF_ARG(pns->nodes[0]);
-                    qstr q_attr = MP_PARSE_NODE_LEAF_ARG(pns1->nodes[0]);
-                    mp_map_elem_t *elem = mp_map_lookup((mp_map_t*)&mp_constants_map, MP_OBJ_NEW_QSTR(q_base), MP_MAP_LOOKUP);
-                    if (elem != NULL) {
-                        mp_obj_t dest[2];
-                        mp_load_method_maybe(elem->value, q_attr, dest);
-                        if (MP_OBJ_IS_SMALL_INT(dest[0]) && dest[1] == NULL) {
-                            mp_int_t val = MP_OBJ_SMALL_INT_VALUE(dest[0]);
-                            pn = mp_parse_node_new_leaf(MP_PARSE_NODE_SMALL_INT, val);
-                        }
-                    }
-#endif
-                }
-                break;
-        }
-    }
-
-    return pn;
 }
 
 STATIC void compile_trailer_paren_helper(compiler_t *comp, mp_parse_node_t pn_arglist, bool is_method_call, int n_positional_extra);
@@ -768,6 +539,12 @@ STATIC void close_over_variables_etc(compiler_t *comp, scope_t *this_scope, int 
     assert(n_pos_defaults >= 0);
     assert(n_kw_defaults >= 0);
 
+    // set flags
+    if (n_kw_defaults > 0) {
+        this_scope->scope_flags |= MP_SCOPE_FLAG_DEFKWARGS;
+    }
+    this_scope->num_def_pos_args = n_pos_defaults;
+
     // make closed over variables, if any
     // ensure they are closed over in the order defined in the outer scope (mainly to agree with CPython)
     int nfree = 0;
@@ -795,8 +572,9 @@ STATIC void close_over_variables_etc(compiler_t *comp, scope_t *this_scope, int 
     }
 }
 
-STATIC void compile_funcdef_param(compiler_t *comp, mp_parse_node_t pn) {
-    if (MP_PARSE_NODE_IS_STRUCT_KIND(pn, PN_typedargslist_star)) {
+STATIC void compile_funcdef_lambdef_param(compiler_t *comp, mp_parse_node_t pn) {
+    if (MP_PARSE_NODE_IS_STRUCT_KIND(pn, PN_typedargslist_star)
+        || MP_PARSE_NODE_IS_STRUCT_KIND(pn, PN_varargslist_star)) {
         comp->have_star = true;
         /* don't need to distinguish bare from named star
         mp_parse_node_struct_t *pns = (mp_parse_node_struct_t*)pn;
@@ -807,7 +585,8 @@ STATIC void compile_funcdef_param(compiler_t *comp, mp_parse_node_t pn) {
         }
         */
 
-    } else if (MP_PARSE_NODE_IS_STRUCT_KIND(pn, PN_typedargslist_dbl_star)) {
+    } else if (MP_PARSE_NODE_IS_STRUCT_KIND(pn, PN_typedargslist_dbl_star)
+        || MP_PARSE_NODE_IS_STRUCT_KIND(pn, PN_varargslist_dbl_star)) {
         // named double star
         // TODO do we need to do anything with this?
 
@@ -822,15 +601,21 @@ STATIC void compile_funcdef_param(compiler_t *comp, mp_parse_node_t pn) {
             pn_colon = MP_PARSE_NODE_NULL;
             pn_equal = MP_PARSE_NODE_NULL;
 
-        } else {
+        } else if (MP_PARSE_NODE_IS_STRUCT_KIND(pn, PN_typedargslist_name)) {
             // this parameter has a colon and/or equal specifier
-
-            assert(MP_PARSE_NODE_IS_STRUCT_KIND(pn, PN_typedargslist_name)); // should be
 
             mp_parse_node_struct_t *pns = (mp_parse_node_struct_t*)pn;
             pn_id = pns->nodes[0];
             pn_colon = pns->nodes[1];
             pn_equal = pns->nodes[2];
+
+        } else {
+            assert(MP_PARSE_NODE_IS_STRUCT_KIND(pn, PN_varargslist_name)); // should be
+            // this parameter has an equal specifier
+
+            mp_parse_node_struct_t *pns = (mp_parse_node_struct_t*)pn;
+            pn_id = pns->nodes[0];
+            pn_equal = pns->nodes[1];
         }
 
         if (MP_PARSE_NODE_IS_NULL(pn_equal)) {
@@ -876,6 +661,28 @@ STATIC void compile_funcdef_param(compiler_t *comp, mp_parse_node_t pn) {
     }
 }
 
+STATIC void compile_funcdef_lambdef(compiler_t *comp, scope_t *scope, mp_parse_node_t pn_params, pn_kind_t pn_list_kind) {
+    // compile default parameters
+    comp->have_star = false;
+    comp->num_dict_params = 0;
+    comp->num_default_params = 0;
+    apply_to_single_or_list(comp, pn_params, pn_list_kind, compile_funcdef_lambdef_param);
+
+    if (comp->compile_error != MP_OBJ_NULL) {
+        return;
+    }
+
+    // in Micro Python we put the default positional parameters into a tuple using the bytecode
+    // the default keywords args may have already made the tuple; if not, do it now
+    if (comp->num_default_params > 0 && comp->num_dict_params == 0) {
+        EMIT_ARG(build_tuple, comp->num_default_params);
+        EMIT(load_null); // sentinel indicating empty default keyword args
+    }
+
+    // make the function
+    close_over_variables_etc(comp, scope, comp->num_default_params, comp->num_dict_params);
+}
+
 // leaves function object on stack
 // returns function name
 STATIC qstr compile_funcdef_helper(compiler_t *comp, mp_parse_node_struct_t *pns, uint emit_options) {
@@ -886,38 +693,11 @@ STATIC qstr compile_funcdef_helper(compiler_t *comp, mp_parse_node_struct_t *pns
         pns->nodes[4] = (mp_parse_node_t)s;
     }
 
-    // save variables (probably don't need to do this, since we can't have nested definitions..?)
-    uint old_have_star = comp->have_star;
-    uint old_num_dict_params = comp->num_dict_params;
-    uint old_num_default_params = comp->num_default_params;
-
-    // compile default parameters
-    comp->have_star = false;
-    comp->num_dict_params = 0;
-    comp->num_default_params = 0;
-    apply_to_single_or_list(comp, pns->nodes[1], PN_typedargslist, compile_funcdef_param);
-
-    if (comp->compile_error != MP_OBJ_NULL) {
-        return MP_QSTR_NULL;
-    }
-
-    // in Micro Python we put the default positional parameters into a tuple using the bytecode
-    // the default keywords args may have already made the tuple; if not, do it now
-    if (comp->num_default_params > 0 && comp->num_dict_params == 0) {
-        EMIT_ARG(build_tuple, comp->num_default_params);
-        EMIT(load_null); // sentinel indicating empty default keyword args
-    }
-
     // get the scope for this function
     scope_t *fscope = (scope_t*)pns->nodes[4];
 
-    // make the function
-    close_over_variables_etc(comp, fscope, comp->num_default_params, comp->num_dict_params);
-
-    // restore variables
-    comp->have_star = old_have_star;
-    comp->num_dict_params = old_num_dict_params;
-    comp->num_default_params = old_num_default_params;
+    // compile the function definition
+    compile_funcdef_lambdef(comp, fscope, pns->nodes[1], PN_typedargslist);
 
     // return its name (the 'f' in "def f(...):")
     return fscope->simple_name;
@@ -1653,7 +1433,6 @@ STATIC void compile_for_stmt(compiler_t *comp, mp_parse_node_struct_t *pns) {
     comp->break_label |= MP_EMIT_BREAK_FROM_FOR;
 
     uint pop_label = comp_next_label(comp);
-    uint end_label = comp_next_label(comp);
 
     compile_node(comp, pns->nodes[1]); // iterator
     EMIT(get_iter);
@@ -1673,7 +1452,6 @@ STATIC void compile_for_stmt(compiler_t *comp, mp_parse_node_struct_t *pns) {
     compile_node(comp, pns->nodes[3]); // else (not tested)
 
     EMIT_ARG(label_assign, break_label);
-    EMIT_ARG(label_assign, end_label);
 }
 
 STATIC void compile_try_except(compiler_t *comp, mp_parse_node_t pn_body, int n_except, mp_parse_node_t *pn_excepts, mp_parse_node_t pn_else) {
@@ -1881,7 +1659,7 @@ STATIC void compile_expr_stmt(compiler_t *comp, mp_parse_node_struct_t *pns) {
                 EMIT(pop_top); // discard last result since this is a statement and leaves nothing on the stack
             }
         }
-    } else {
+    } else if (MP_PARSE_NODE_IS_STRUCT(pns->nodes[1])) {
         mp_parse_node_struct_t *pns1 = (mp_parse_node_struct_t*)pns->nodes[1];
         int kind = MP_PARSE_NODE_STRUCT_KIND(pns1);
         if (kind == PN_expr_stmt_augassign) {
@@ -1907,7 +1685,7 @@ STATIC void compile_expr_stmt(compiler_t *comp, mp_parse_node_struct_t *pns) {
             c_assign(comp, pns->nodes[0], ASSIGN_AUG_STORE); // lhs store for aug assign
         } else if (kind == PN_expr_stmt_assign_list) {
             int rhs = MP_PARSE_NODE_STRUCT_NUM_NODES(pns1) - 1;
-            compile_node(comp, ((mp_parse_node_struct_t*)pns1->nodes[rhs])->nodes[0]); // rhs
+            compile_node(comp, pns1->nodes[rhs]); // rhs
             // following CPython, we store left-most first
             if (rhs > 0) {
                 EMIT(dup_top);
@@ -1917,17 +1695,17 @@ STATIC void compile_expr_stmt(compiler_t *comp, mp_parse_node_struct_t *pns) {
                 if (i + 1 < rhs) {
                     EMIT(dup_top);
                 }
-                c_assign(comp, ((mp_parse_node_struct_t*)pns1->nodes[i])->nodes[0], ASSIGN_STORE); // middle store
+                c_assign(comp, pns1->nodes[i], ASSIGN_STORE); // middle store
             }
         } else {
-            assert(kind == PN_expr_stmt_assign); // should be
+        plain_assign:
             if (MICROPY_COMP_DOUBLE_TUPLE_ASSIGN
-                && MP_PARSE_NODE_IS_STRUCT_KIND(pns1->nodes[0], PN_testlist_star_expr)
+                && MP_PARSE_NODE_IS_STRUCT_KIND(pns->nodes[1], PN_testlist_star_expr)
                 && MP_PARSE_NODE_IS_STRUCT_KIND(pns->nodes[0], PN_testlist_star_expr)
-                && MP_PARSE_NODE_STRUCT_NUM_NODES((mp_parse_node_struct_t*)pns1->nodes[0]) == 2
+                && MP_PARSE_NODE_STRUCT_NUM_NODES((mp_parse_node_struct_t*)pns->nodes[1]) == 2
                 && MP_PARSE_NODE_STRUCT_NUM_NODES((mp_parse_node_struct_t*)pns->nodes[0]) == 2) {
                 // optimisation for a, b = c, d
-                mp_parse_node_struct_t *pns10 = (mp_parse_node_struct_t*)pns1->nodes[0];
+                mp_parse_node_struct_t *pns10 = (mp_parse_node_struct_t*)pns->nodes[1];
                 mp_parse_node_struct_t *pns0 = (mp_parse_node_struct_t*)pns->nodes[0];
                 if (MP_PARSE_NODE_IS_STRUCT_KIND(pns0->nodes[0], PN_star_expr)
                     || MP_PARSE_NODE_IS_STRUCT_KIND(pns0->nodes[1], PN_star_expr)) {
@@ -1940,12 +1718,12 @@ STATIC void compile_expr_stmt(compiler_t *comp, mp_parse_node_struct_t *pns) {
                 c_assign(comp, pns0->nodes[0], ASSIGN_STORE); // lhs store
                 c_assign(comp, pns0->nodes[1], ASSIGN_STORE); // lhs store
             } else if (MICROPY_COMP_TRIPLE_TUPLE_ASSIGN
-                && MP_PARSE_NODE_IS_STRUCT_KIND(pns1->nodes[0], PN_testlist_star_expr)
+                && MP_PARSE_NODE_IS_STRUCT_KIND(pns->nodes[1], PN_testlist_star_expr)
                 && MP_PARSE_NODE_IS_STRUCT_KIND(pns->nodes[0], PN_testlist_star_expr)
-                && MP_PARSE_NODE_STRUCT_NUM_NODES((mp_parse_node_struct_t*)pns1->nodes[0]) == 3
+                && MP_PARSE_NODE_STRUCT_NUM_NODES((mp_parse_node_struct_t*)pns->nodes[1]) == 3
                 && MP_PARSE_NODE_STRUCT_NUM_NODES((mp_parse_node_struct_t*)pns->nodes[0]) == 3) {
                 // optimisation for a, b, c = d, e, f
-                mp_parse_node_struct_t *pns10 = (mp_parse_node_struct_t*)pns1->nodes[0];
+                mp_parse_node_struct_t *pns10 = (mp_parse_node_struct_t*)pns->nodes[1];
                 mp_parse_node_struct_t *pns0 = (mp_parse_node_struct_t*)pns->nodes[0];
                 if (MP_PARSE_NODE_IS_STRUCT_KIND(pns0->nodes[0], PN_star_expr)
                     || MP_PARSE_NODE_IS_STRUCT_KIND(pns0->nodes[1], PN_star_expr)
@@ -1963,10 +1741,12 @@ STATIC void compile_expr_stmt(compiler_t *comp, mp_parse_node_struct_t *pns) {
                 c_assign(comp, pns0->nodes[2], ASSIGN_STORE); // lhs store
             } else {
                 no_optimisation:
-                compile_node(comp, pns1->nodes[0]); // rhs
+                compile_node(comp, pns->nodes[1]); // rhs
                 c_assign(comp, pns->nodes[0], ASSIGN_STORE); // lhs store
             }
         }
+    } else {
+        goto plain_assign;
     }
 }
 
@@ -1995,10 +1775,6 @@ STATIC void compile_test_if_expr(compiler_t *comp, mp_parse_node_struct_t *pns) 
 }
 
 STATIC void compile_lambdef(compiler_t *comp, mp_parse_node_struct_t *pns) {
-    // TODO default params etc for lambda; possibly just use funcdef code
-    //mp_parse_node_t pn_params = pns->nodes[0];
-    //mp_parse_node_t pn_body = pns->nodes[1];
-
     if (comp->pass == MP_PASS_SCOPE) {
         // create a new scope for this lambda
         scope_t *s = scope_new_and_link(comp, SCOPE_LAMBDA, (mp_parse_node_t)pns, comp->scope_cur->emit_options);
@@ -2009,8 +1785,8 @@ STATIC void compile_lambdef(compiler_t *comp, mp_parse_node_struct_t *pns) {
     // get the scope for this lambda
     scope_t *this_scope = (scope_t*)pns->nodes[2];
 
-    // make the lambda
-    close_over_variables_etc(comp, this_scope, 0, 0);
+    // compile the lambda definition
+    compile_funcdef_lambdef(comp, this_scope, pns->nodes[0], PN_varargslist);
 }
 
 STATIC void compile_or_and_test(compiler_t *comp, mp_parse_node_struct_t *pns, bool cond) {
@@ -2224,18 +2000,15 @@ STATIC void compile_trailer_paren_helper(compiler_t *comp, mp_parse_node_t pn_ar
                 star_flags |= MP_EMIT_STAR_FLAG_DOUBLE;
                 dblstar_args_node = pns_arg;
             } else if (MP_PARSE_NODE_STRUCT_KIND(pns_arg) == PN_argument) {
-                assert(MP_PARSE_NODE_IS_STRUCT(pns_arg->nodes[1])); // should always be
-                mp_parse_node_struct_t *pns2 = (mp_parse_node_struct_t*)pns_arg->nodes[1];
-                if (MP_PARSE_NODE_STRUCT_KIND(pns2) == PN_argument_3) {
+                if (!MP_PARSE_NODE_IS_STRUCT_KIND(pns_arg->nodes[1], PN_comp_for)) {
                     if (!MP_PARSE_NODE_IS_ID(pns_arg->nodes[0])) {
                         compile_syntax_error(comp, (mp_parse_node_t)pns_arg, "LHS of keyword arg must be an id");
                         return;
                     }
                     EMIT_ARG(load_const_str, MP_PARSE_NODE_LEAF_ARG(pns_arg->nodes[0]));
-                    compile_node(comp, pns2->nodes[0]);
+                    compile_node(comp, pns_arg->nodes[1]);
                     n_keyword += 1;
                 } else {
-                    assert(MP_PARSE_NODE_STRUCT_KIND(pns2) == PN_comp_for); // should always be
                     compile_comprehension(comp, pns_arg, SCOPE_GEN_EXPR);
                     n_positional++;
                 }
@@ -2732,7 +2505,12 @@ STATIC void compile_node(compiler_t *comp, mp_parse_node_t pn) {
 }
 
 STATIC void compile_scope_func_lambda_param(compiler_t *comp, mp_parse_node_t pn, pn_kind_t pn_name, pn_kind_t pn_star, pn_kind_t pn_dbl_star) {
-    // TODO verify that *k and **k are last etc
+    // check that **kw is last
+    if ((comp->scope_cur->scope_flags & MP_SCOPE_FLAG_VARKEYWORDS) != 0) {
+        compile_syntax_error(comp, pn, "invalid syntax");
+        return;
+    }
+
     qstr param_name = MP_QSTR_NULL;
     uint param_flag = ID_FLAG_IS_PARAM;
     if (MP_PARSE_NODE_IS_ID(pn)) {
@@ -2757,6 +2535,11 @@ STATIC void compile_scope_func_lambda_param(compiler_t *comp, mp_parse_node_t pn
                 comp->scope_cur->num_pos_args += 1;
             }
         } else if (MP_PARSE_NODE_STRUCT_KIND(pns) == pn_star) {
+            if (comp->have_star) {
+                // more than one star
+                compile_syntax_error(comp, pn, "invalid syntax");
+                return;
+            }
             comp->have_star = true;
             param_flag = ID_FLAG_IS_PARAM | ID_FLAG_IS_STAR_PARAM;
             if (MP_PARSE_NODE_IS_NULL(pns->nodes[0])) {
@@ -3317,7 +3100,10 @@ STATIC void scope_compute_things(scope_t *scope) {
     }
 }
 
-mp_obj_t mp_compile(mp_parse_tree_t *parse_tree, qstr source_file, uint emit_opt, bool is_repl) {
+#if !MICROPY_PERSISTENT_CODE_SAVE
+STATIC
+#endif
+mp_raw_code_t *mp_compile_to_raw_code(mp_parse_tree_t *parse_tree, qstr source_file, uint emit_opt, bool is_repl) {
     // put compiler state on the stack, it's relatively small
     compiler_t comp_state = {0};
     compiler_t *comp = &comp_state;
@@ -3327,13 +3113,6 @@ mp_obj_t mp_compile(mp_parse_tree_t *parse_tree, qstr source_file, uint emit_opt
 
     // create the module scope
     scope_t *module_scope = scope_new_and_link(comp, SCOPE_MODULE, parse_tree->root, emit_opt);
-
-    // optimise constants (scope must be set for error messages to work)
-    comp->scope_cur = module_scope;
-    mp_map_t consts;
-    mp_map_init(&consts, 0);
-    module_scope->pn = fold_constants(comp, module_scope->pn, &consts);
-    mp_map_deinit(&consts);
 
     // create standard emitter; it's used at least for MP_PASS_SCOPE
     emit_t *emit_bc = emit_bc_new();
@@ -3386,7 +3165,6 @@ mp_obj_t mp_compile(mp_parse_tree_t *parse_tree, qstr source_file, uint emit_opt
                 emit_inline_thumb = emit_inline_thumb_new(max_num_labels);
             }
             comp->emit = NULL;
-            comp->emit_method_table = NULL;
             comp->emit_inline_asm = emit_inline_thumb;
             comp->emit_inline_asm_method_table = &emit_inline_thumb_method_table;
             compile_scope_inline_asm(comp, s, MP_PASS_CODE_SIZE);
@@ -3498,7 +3276,12 @@ mp_obj_t mp_compile(mp_parse_tree_t *parse_tree, qstr source_file, uint emit_opt
     if (comp->compile_error != MP_OBJ_NULL) {
         nlr_raise(comp->compile_error);
     } else {
-        // return function that executes the outer module
-        return mp_make_function_from_raw_code(outer_raw_code, MP_OBJ_NULL, MP_OBJ_NULL);
+        return outer_raw_code;
     }
+}
+
+mp_obj_t mp_compile(mp_parse_tree_t *parse_tree, qstr source_file, uint emit_opt, bool is_repl) {
+    mp_raw_code_t *rc = mp_compile_to_raw_code(parse_tree, source_file, emit_opt, is_repl);
+    // return function that executes the outer module
+    return mp_make_function_from_raw_code(rc, MP_OBJ_NULL, MP_OBJ_NULL);
 }

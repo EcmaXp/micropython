@@ -44,14 +44,13 @@
 #include "py/repl.h"
 #include "py/gc.h"
 #include "py/stackctrl.h"
+#include "py/mphal.h"
 #include "genhdr/mpversion.h"
-#include MICROPY_HAL_H
 #include "input.h"
 
 // Command line options, with their defaults
 STATIC bool compile_only = false;
 STATIC uint emit_opt = MP_EMIT_OPT_NONE;
-mp_uint_t mp_verbose_flag = 0;
 
 #if MICROPY_ENABLE_GC
 // Heap size of GC heap (if enabled)
@@ -61,7 +60,8 @@ long heap_size = 1024*1024 * (sizeof(mp_uint_t) / 4);
 
 STATIC void stderr_print_strn(void *env, const char *str, mp_uint_t len) {
     (void)env;
-    fwrite(str, len, 1, stderr);
+    ssize_t dummy = write(STDERR_FILENO, str, len);
+    (void)dummy;
 }
 
 const mp_print_t mp_stderr_print = {NULL, stderr_print_strn};
@@ -153,7 +153,8 @@ STATIC char *strjoin(const char *s1, int sep_char, const char *s2) {
 #endif
 
 STATIC int do_repl(void) {
-    mp_hal_stdout_tx_str("Micro Python " MICROPY_GIT_TAG " on " MICROPY_BUILD_DATE "; " MICROPY_PY_SYS_PLATFORM " version\n");
+    mp_hal_stdout_tx_str("MicroPython " MICROPY_GIT_TAG " on " MICROPY_BUILD_DATE "; "
+        MICROPY_PY_SYS_PLATFORM " version\nUse Ctrl-D to exit, Ctrl-E for paste mode\n");
 
     #if MICROPY_USE_READLINE == 1
 
@@ -162,10 +163,12 @@ STATIC int do_repl(void) {
     vstr_t line;
     vstr_init(&line, 16);
     for (;;) {
+        mp_hal_stdio_mode_raw();
+
     input_restart:
         vstr_reset(&line);
-        mp_hal_stdio_mode_raw();
         int ret = readline(&line, ">>> ");
+        mp_parse_input_kind_t parse_input_kind = MP_PARSE_SINGLE_INPUT;
 
         if (ret == CHAR_CTRL_D) {
             // EOF
@@ -173,31 +176,56 @@ STATIC int do_repl(void) {
             mp_hal_stdio_mode_orig();
             vstr_clear(&line);
             return 0;
+        } else if (ret == CHAR_CTRL_E) {
+            // paste mode
+            mp_hal_stdout_tx_str("\npaste mode; Ctrl-C to cancel, Ctrl-D to finish\n=== ");
+            vstr_reset(&line);
+            for (;;) {
+                char c = mp_hal_stdin_rx_chr();
+                if (c == CHAR_CTRL_C) {
+                    // cancel everything
+                    mp_hal_stdout_tx_str("\n");
+                    goto input_restart;
+                } else if (c == CHAR_CTRL_D) {
+                    // end of input
+                    mp_hal_stdout_tx_str("\n");
+                    break;
+                } else {
+                    // add char to buffer and echo
+                    vstr_add_byte(&line, c);
+                    if (c == '\r') {
+                        mp_hal_stdout_tx_str("\n=== ");
+                    } else {
+                        mp_hal_stdout_tx_strn(&c, 1);
+                    }
+                }
+            }
+            parse_input_kind = MP_PARSE_FILE_INPUT;
         } else if (line.len == 0) {
             if (ret != 0) {
                 printf("\n");
             }
-            mp_hal_stdio_mode_orig();
-            continue;
-        }
-
-        while (mp_repl_continue_with_input(vstr_null_terminated_str(&line))) {
-            vstr_add_byte(&line, '\n');
-            ret = readline(&line, "... ");
-            if (ret == CHAR_CTRL_C) {
-                // cancel everything
-                printf("\n");
-                mp_hal_stdio_mode_orig();
-                goto input_restart;
-            } else if (ret == CHAR_CTRL_D) {
-                // stop entering compound statement
-                break;
+            goto input_restart;
+        } else {
+            // got a line with non-zero length, see if it needs continuing
+            while (mp_repl_continue_with_input(vstr_null_terminated_str(&line))) {
+                vstr_add_byte(&line, '\n');
+                ret = readline(&line, "... ");
+                if (ret == CHAR_CTRL_C) {
+                    // cancel everything
+                    printf("\n");
+                    goto input_restart;
+                } else if (ret == CHAR_CTRL_D) {
+                    // stop entering compound statement
+                    break;
+                }
             }
         }
+
         mp_hal_stdio_mode_orig();
 
         mp_lexer_t *lex = mp_lexer_new_from_str_len(MP_QSTR__lt_stdin_gt_, line.buf, line.len, false);
-        ret = execute_from_lexer(lex, MP_PARSE_SINGLE_INPUT, true);
+        ret = execute_from_lexer(lex, parse_input_kind, true);
         if (ret & FORCED_EXIT) {
             return ret;
         }
@@ -464,7 +492,7 @@ int main(int argc, char **argv) {
 
                 if (mp_obj_is_package(mod)) {
                     // TODO
-                    fprintf(stderr, "%s: -m for packages not yet implemented\n", argv[0]);
+                    mp_printf(&mp_stderr_print, "%s: -m for packages not yet implemented\n", argv[0]);
                     exit(1);
                 }
                 ret = 0;
@@ -474,7 +502,7 @@ int main(int argc, char **argv) {
             } else if (strcmp(argv[a], "-v") == 0) {
                 mp_verbose_flag++;
             } else if (strncmp(argv[a], "-O", 2) == 0) {
-                if (isdigit(argv[a][2])) {
+                if (unichar_isdigit(argv[a][2])) {
                     MP_STATE_VM(mp_optimise_value) = argv[a][2] & 0xf;
                 } else {
                     MP_STATE_VM(mp_optimise_value) = 0;
@@ -487,8 +515,7 @@ int main(int argc, char **argv) {
             char *pathbuf = malloc(PATH_MAX);
             char *basedir = realpath(argv[a], pathbuf);
             if (basedir == NULL) {
-                fprintf(stderr, "%s: can't open file '%s': [Errno %d] ", argv[0], argv[a], errno);
-                perror("");
+                mp_printf(&mp_stderr_print, "%s: can't open file '%s': [Errno %d] %s\n", argv[0], argv[a], errno, strerror(errno));
                 // CPython exits with 2 in such case
                 ret = 2;
                 break;
@@ -544,14 +571,6 @@ uint mp_import_stat(const char *path) {
         }
     }
     return MP_IMPORT_STAT_NO_EXIST;
-}
-
-int DEBUG_printf(const char *fmt, ...) {
-    va_list ap;
-    va_start(ap, fmt);
-    int ret = vfprintf(stderr, fmt, ap);
-    va_end(ap);
-    return ret;
 }
 
 void nlr_jump_fail(void *val) {
