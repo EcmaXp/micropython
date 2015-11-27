@@ -88,10 +88,6 @@ $(BUILD)/jnupy.o: jnupy.c jnupy_ap.py
 	$(Q)$(PYTHON) jnupy_ap.py jnupy.c
 	$(call compile_c)
 
-$(BUILD)/parsebc.o: parsebc.c parsebc_ap.py py/showbc.c
-	$(Q)$(PYTHON) parsebc_ap.py parsebc.c parsebc_tpl.c
-	$(call compile_c)
-
 CFLAGS_EXTRA += -fPIC
 
 LDFLAGS_EXTRA += -shared
@@ -126,7 +122,6 @@ endif
 # source files
 SRC_C = \
 	jnupy.c \
-	parsebc.c \
 	gccollect.c \
 	$(SRC_MOD)
 
