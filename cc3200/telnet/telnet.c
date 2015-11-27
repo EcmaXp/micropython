@@ -27,8 +27,8 @@
 #include <stdint.h>
 
 #include "py/mpconfig.h"
-#include MICROPY_HAL_H
 #include "py/obj.h"
+#include "py/mphal.h"
 #include "telnet.h"
 #include "simplelink.h"
 #include "modnetwork.h"
@@ -108,7 +108,7 @@ typedef struct {
  DECLARE PRIVATE DATA
  ******************************************************************************/
 static telnet_data_t telnet_data;
-static const char* telnet_welcome_msg       = "Micro Python " MICROPY_GIT_TAG " on " MICROPY_BUILD_DATE "; " MICROPY_HW_BOARD_NAME " with " MICROPY_HW_MCU_NAME "\r\n";
+static const char* telnet_welcome_msg       = "MicroPython " MICROPY_GIT_TAG " on " MICROPY_BUILD_DATE "; " MICROPY_HW_BOARD_NAME " with " MICROPY_HW_MCU_NAME "\r\n";
 static const char* telnet_request_user      = "Login as: ";
 static const char* telnet_request_password  = "Password: ";
 static const char* telnet_invalid_loggin    = "\r\nInvalid credentials, try again.\r\n";
@@ -451,8 +451,12 @@ static void telnet_parse_input (uint8_t *str, int16_t *len) {
                 (*len)--;
                 _str++;
             }
-            else {
+            else if (*_str > 0) {
                 *str++ = *_str++;
+            }
+            else {
+                _str++;
+                *len -= 1;
             }
         }
         else {
@@ -477,7 +481,7 @@ static bool telnet_send_with_retries (int16_t sd, const void *pBuf, int16_t len)
                 return false;
             }
             // start with the default delay and increment it on each retry
-            HAL_Delay (delay++);
+            mp_hal_delay_ms(delay++);
         } while (++retries <= TELNET_TX_RETRIES_MAX);
     }
     return false;

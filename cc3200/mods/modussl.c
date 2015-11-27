@@ -29,7 +29,6 @@
 
 #include "simplelink.h"
 #include "py/mpconfig.h"
-#include MICROPY_HAL_H
 #include "py/obj.h"
 #include "py/objstr.h"
 #include "py/runtime.h"
@@ -61,7 +60,7 @@ STATIC const mp_obj_type_t ssl_socket_type;
 /******************************************************************************/
 // Micro Python bindings; SSL class
 
-// ssl socket inherits from normal socket, so we take its
+// ssl sockets inherit from normal socket, so we take its
 // locals and stream methods
 STATIC const mp_obj_type_t ssl_socket_type = {
     { &mp_type_type },
@@ -91,7 +90,7 @@ STATIC mp_obj_t mod_ssl_wrap_socket(mp_uint_t n_args, const mp_obj_t *pos_args, 
         goto arg_error;
     }
 
-    // retrieve the file paths (with an 6 byte offset because to strip the '/flash' prefix)
+    // retrieve the file paths (with an 6 byte offset in order to strip it from the '/flash' prefix)
     const char *keyfile  = (args[1].u_obj == mp_const_none) ? NULL : &(mp_obj_str_get_str(args[1].u_obj)[6]);
     const char *certfile = (args[2].u_obj == mp_const_none) ? NULL : &(mp_obj_str_get_str(args[2].u_obj)[6]);
     const char *cafile   = (args[5].u_obj == mp_const_none || args[4].u_int != SSL_CERT_REQUIRED) ?
@@ -104,6 +103,10 @@ STATIC mp_obj_t mod_ssl_wrap_socket(mp_uint_t n_args, const mp_obj_t *pos_args, 
 
     _i16 sd = ((mod_network_socket_obj_t *)args[0].u_obj)->sock_base.sd;
     _i16 _errno;
+    _u8 method = SL_SO_SEC_METHOD_TLSV1;
+    if ((_errno = sl_SetSockOpt(sd, SL_SOL_SOCKET, SL_SO_SECMETHOD, &method, sizeof(method))) < 0) {
+        goto socket_error;
+    }
     if (keyfile && (_errno = sl_SetSockOpt(sd, SL_SOL_SOCKET, SL_SO_SECURE_FILES_PRIVATE_KEY_FILE_NAME, keyfile, strlen(keyfile))) < 0) {
         goto socket_error;
     }
@@ -116,7 +119,7 @@ STATIC mp_obj_t mod_ssl_wrap_socket(mp_uint_t n_args, const mp_obj_t *pos_args, 
 
     // create the ssl socket
     mp_obj_ssl_socket_t *ssl_sock = m_new_obj(mp_obj_ssl_socket_t);
-    // ssl socket inherits all properties from the original socket
+    // ssl sockets inherit all properties from the original socket
     memcpy (&ssl_sock->sock_base, &((mod_network_socket_obj_t *)args[0].u_obj)->sock_base, sizeof(mod_network_socket_base_t));
     ssl_sock->base.type = &ssl_socket_type;
     ssl_sock->sock_base.cert_req = (args[4].u_int == SSL_CERT_REQUIRED) ? true : false;

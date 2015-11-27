@@ -31,11 +31,11 @@
 #include <string.h>
 
 #include "py/mpconfig.h"
-#include MICROPY_HAL_H
 #include "py/obj.h"
 #include "py/runtime.h"
 #include "py/objlist.h"
 #include "py/stream.h"
+#include "py/mphal.h"
 #include "inc/hw_types.h"
 #include "inc/hw_ints.h"
 #include "inc/hw_memmap.h"
@@ -65,7 +65,7 @@
  *******-***********************************************************************/
 #define PYBUART_FRAME_TIME_US(baud)             ((11 * 1000000) / baud)
 #define PYBUART_2_FRAMES_TIME_US(baud)          (PYBUART_FRAME_TIME_US(baud) * 2)
-#define PYBUART_RX_TIMEOUT_US(baud)             (PYBUART_2_FRAMES_TIME_US(baud))
+#define PYBUART_RX_TIMEOUT_US(baud)             (PYBUART_2_FRAMES_TIME_US(baud) * 8) // we need at least characters in the FIFO
 
 #define PYBUART_TX_WAIT_US(baud)                ((PYBUART_FRAME_TIME_US(baud)) + 1)
 #define PYBUART_TX_MAX_TIMEOUT_MS               (5)
@@ -73,10 +73,10 @@
 #define PYBUART_RX_BUFFER_LEN                   (256)
 
 // interrupt triggers
-#define UART_TRIGGER_RX_ANY                   (0x01)
-#define UART_TRIGGER_RX_HALF                  (0x02)
-#define UART_TRIGGER_RX_FULL                  (0x04)
-#define UART_TRIGGER_TX_DONE                  (0x08)
+#define UART_TRIGGER_RX_ANY                     (0x01)
+#define UART_TRIGGER_RX_HALF                    (0x02)
+#define UART_TRIGGER_RX_FULL                    (0x04)
+#define UART_TRIGGER_TX_DONE                    (0x08)
 
 /******************************************************************************
  DECLARE PRIVATE FUNCTIONS
@@ -558,7 +558,7 @@ STATIC mp_obj_t pyb_uart_irq (mp_uint_t n_args, const mp_obj_t *pos_args, mp_map
 invalid_args:
     nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, mpexception_value_invalid_arguments));
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(pyb_uart_callback_obj, 1, pyb_uart_irq);
+STATIC MP_DEFINE_CONST_FUN_OBJ_KW(pyb_uart_irq_obj, 1, pyb_uart_irq);
 
 STATIC const mp_map_elem_t pyb_uart_locals_dict_table[] = {
     // instance methods
@@ -566,7 +566,7 @@ STATIC const mp_map_elem_t pyb_uart_locals_dict_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_deinit),      (mp_obj_t)&pyb_uart_deinit_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_any),         (mp_obj_t)&pyb_uart_any_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_sendbreak),   (mp_obj_t)&pyb_uart_sendbreak_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_irq),         (mp_obj_t)&pyb_uart_callback_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_irq),         (mp_obj_t)&pyb_uart_irq_obj },
 
     /// \method read([nbytes])
     { MP_OBJ_NEW_QSTR(MP_QSTR_read),        (mp_obj_t)&mp_stream_read_obj },
@@ -599,9 +599,9 @@ STATIC mp_uint_t pyb_uart_read(mp_obj_t self_in, void *buf_in, mp_uint_t size, i
 
     // wait for first char to become available
     if (!uart_rx_wait(self)) {
-        // we can either return 0 to indicate EOF (then read() method returns b'')
-        // or return EAGAIN error to indicate non-blocking (then read() method returns None)
-        return 0;
+        // return EAGAIN error to indicate non-blocking (then read() method returns None)
+        *errcode = EAGAIN;
+        return MP_STREAM_ERROR;
     }
 
     // read the data

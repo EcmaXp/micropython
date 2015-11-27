@@ -92,6 +92,7 @@ APP_MODS_SRC_C = $(addprefix mods/,\
 	modusocket.c \
 	modussl.c \
 	modutime.c \
+	modwipy.c \
 	modwlan.c \
 	pybadc.c \
 	pybpin.c \
@@ -150,6 +151,8 @@ APP_LIB_SRC_C = $(addprefix lib/,\
 	mp-readline/readline.c \
 	netutils/netutils.c \
 	timeutils/timeutils.c \
+	utils/pyexec.c \
+	utils/printf.c \
 	)
 	
 APP_STM_SRC_C = $(addprefix stmhal/,\
@@ -160,8 +163,6 @@ APP_STM_SRC_C = $(addprefix stmhal/,\
 	irq.c \
 	lexerfatfs.c \
 	moduselect.c \
-	printf.c \
-	pyexec.c \
 	pybstdio.c \
 	)
 
@@ -238,7 +239,7 @@ $(BUILD)/application.bin: $(BUILD)/application.axf
 
 $(BUILD)/mcuimg.bin: $(BUILD)/application.bin
 	$(ECHO) "Create $@"
-	$(Q)$(SHELL) $(APP_SIGN) $(BOARD) $(BTYPE)
+	$(Q)$(SHELL) $(APP_SIGN) $(BUILD)
 
 MAKE_PINS = boards/make-pins.py
 BOARD_PINS = boards/$(BOARD)/pins.csv

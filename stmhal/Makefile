@@ -32,7 +32,7 @@ DEVICE=0483:df11
 
 CROSS_COMPILE = arm-none-eabi-
 
-INC =  -I.
+INC += -I.
 INC += -I..
 INC += -I$(BUILD)
 INC += -I$(CMSIS_DIR)/inc
@@ -58,14 +58,16 @@ CFLAGS += -DSTM32_HAL_H='<stm32$(MCU_SERIES)xx_hal.h>'
 LDFLAGS = -nostdlib -T $(LD_FILE) -Map=$(@:.elf=.map) --cref
 LIBS =
 
+# Remove uncalled code from the final image.
+CFLAGS += -fdata-sections -ffunction-sections
+LDFLAGS += --gc-sections
+
 # Debugging/Optimization
 ifeq ($(DEBUG), 1)
 CFLAGS += -g -DPENDSV_DEBUG
 COPT = -O0
 else
-CFLAGS += -fdata-sections -ffunction-sections
 COPT += -Os -DNDEBUG
-LDFLAGS += --gc-sections
 endif
 
 # uncomment this if you want libgcc
@@ -103,6 +105,8 @@ SRC_LIB = $(addprefix lib/,\
 	mp-readline/readline.c \
 	netutils/netutils.c \
 	timeutils/timeutils.c \
+	utils/pyexec.c \
+	utils/printf.c \
 	)
 
 SRC_C = \
@@ -113,7 +117,7 @@ SRC_C = \
 	usbd_desc.c \
 	usbd_cdc_interface.c \
 	usbd_msc_storage.c \
-	mphal.c \
+	mphalport.c \
 	irq.c \
 	pendsv.c \
 	systick.c  \
@@ -129,12 +133,11 @@ SRC_C = \
 	uart.c \
 	can.c \
 	usb.c \
-	printf.c \
 	gccollect.c \
 	pybstdio.c \
-	pyexec.c \
 	help.c \
 	input.c \
+	modmachine.c \
 	modpyb.c \
 	modstm.c \
 	moduos.c \
@@ -152,7 +155,6 @@ SRC_C = \
 	storage.c \
 	file.c \
 	sdcard.c \
-	fsusermount.c \
 	diskio.c \
 	ffconf.c \
 	lcd.c \
@@ -284,7 +286,7 @@ $(BUILD)/firmware.hex: $(BUILD)/firmware.elf
 
 $(BUILD)/firmware.elf: $(OBJ)
 	$(ECHO) "LINK $@"
-	$(Q)$(LD) $(LDFLAGS) -o $@ $(OBJ) $(LIBS)
+	$(Q)$(LD) $(LDFLAGS) -o $@ $^ $(LIBS)
 	$(Q)$(SIZE) $@
 
 MAKE_PINS = boards/make-pins.py
@@ -299,7 +301,7 @@ GEN_PINS_AF_PY = $(BUILD)/pins_af.py
 INSERT_USB_IDS = ../tools/insert-usb-ids.py
 FILE2H = ../tools/file2h.py
 
-USB_IDS_FILE = usbd_desc.c
+USB_IDS_FILE = usb.h
 CDCINF_TEMPLATE = pybcdc.inf_template
 GEN_CDCINF_FILE = $(HEADER_BUILD)/pybcdc.inf
 GEN_CDCINF_HEADER = $(HEADER_BUILD)/pybcdc_inf.h

@@ -93,7 +93,7 @@ STATIC mp_obj_t mp_builtin_abs(mp_obj_t o_in) {
     if (0) {
         // dummy
 #if MICROPY_PY_BUILTINS_FLOAT
-    } else if (MP_OBJ_IS_TYPE(o_in, &mp_type_float)) {
+    } else if (mp_obj_is_float(o_in)) {
         mp_float_t value = mp_obj_float_get(o_in);
         // TODO check for NaN etc
         if (value < 0) {
@@ -416,6 +416,10 @@ STATIC mp_obj_t mp_builtin___repl_print__(mp_obj_t o) {
         mp_obj_print_helper(&mp_plat_print, o, PRINT_REPR);
         mp_print_str(&mp_plat_print, "\n");
         #endif
+        #if MICROPY_CAN_OVERRIDE_BUILTINS
+        mp_obj_t dest[2] = {MP_OBJ_SENTINEL, o};
+        mp_type_module.attr((mp_obj_t)&mp_module_builtins, MP_QSTR__, dest);
+        #endif
     }
     return mp_const_none;
 }
@@ -525,16 +529,16 @@ STATIC mp_obj_t mp_builtin_setattr(mp_obj_t base, mp_obj_t attr, mp_obj_t value)
 MP_DEFINE_CONST_FUN_OBJ_3(mp_builtin_setattr_obj, mp_builtin_setattr);
 
 STATIC mp_obj_t mp_builtin_hasattr(mp_obj_t object_in, mp_obj_t attr_in) {
-    assert(MP_OBJ_IS_QSTR(attr_in));
+    qstr attr = mp_obj_str_get_qstr(attr_in);
 
     mp_obj_t dest[2];
     // TODO: https://docs.python.org/3/library/functions.html?highlight=hasattr#hasattr
     // explicitly says "This is implemented by calling getattr(object, name) and seeing
     // whether it raises an AttributeError or not.", so we should explicitly wrap this
     // in nlr_push and handle exception.
-    mp_load_method_maybe(object_in, MP_OBJ_QSTR_VALUE(attr_in), dest);
+    mp_load_method_maybe(object_in, attr, dest);
 
-    return MP_BOOL(dest[0] != MP_OBJ_NULL);
+    return mp_obj_new_bool(dest[0] != MP_OBJ_NULL);
 }
 MP_DEFINE_CONST_FUN_OBJ_2(mp_builtin_hasattr_obj, mp_builtin_hasattr);
 

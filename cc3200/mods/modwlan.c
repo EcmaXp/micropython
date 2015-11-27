@@ -30,10 +30,10 @@
 
 #include "simplelink.h"
 #include "py/mpconfig.h"
-#include MICROPY_HAL_H
 #include "py/obj.h"
 #include "py/objstr.h"
 #include "py/runtime.h"
+#include "py/mphal.h"
 #include "inc/hw_types.h"
 #include "inc/hw_ints.h"
 #include "inc/hw_memmap.h"
@@ -110,7 +110,6 @@ typedef enum{
 #define MODWLAN_SL_SCAN_DISABLE         0
 #define MODWLAN_SL_MAX_NETWORKS         20
 
-#define MODWLAN_TIMEOUT_MS              5000
 #define MODWLAN_MAX_NETWORKS            20
 #define MODWLAN_SCAN_PERIOD_S           3600     // 1 hour
 #define MODWLAN_WAIT_FOR_SCAN_MS        1050
@@ -691,7 +690,7 @@ STATIC void wlan_sl_disconnect (void) {
     // other return-codes
     if (0 == sl_WlanDisconnect()) {
         while (IS_CONNECTED(wlan_obj.status)) {
-            HAL_Delay(MODWLAN_CONNECTION_WAIT_MS);
+            mp_hal_delay_ms(MODWLAN_CONNECTION_WAIT_MS);
             wlan_update();
         }
     }
@@ -711,7 +710,7 @@ STATIC modwlan_Status_t wlan_do_connect (const char* ssid, uint32_t ssid_len, co
         // wait for the WLAN Event
         uint32_t waitForConnectionMs = 0;
         while (timeout && !IS_CONNECTED(wlan_obj.status)) {
-            HAL_Delay(MODWLAN_CONNECTION_WAIT_MS);
+            mp_hal_delay_ms(MODWLAN_CONNECTION_WAIT_MS);
             waitForConnectionMs += MODWLAN_CONNECTION_WAIT_MS;
             if (timeout > 0 && waitForConnectionMs > timeout) {
                 return MODWLAN_ERROR_TIMEOUT;
@@ -829,20 +828,21 @@ STATIC mp_obj_t wlan_make_new (mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_k
     mp_arg_val_t args[MP_ARRAY_SIZE(wlan_init_args)];
     mp_arg_parse_all(n_args, all_args, &kw_args, MP_ARRAY_SIZE(args), wlan_init_args, args);
 
-    // check the peripheral id
-    if (args[0].u_int != 0) {
-        nlr_raise(mp_obj_new_exception_msg(&mp_type_OSError, mpexception_os_resource_not_avaliable));
-    }
-
     // setup the object
     wlan_obj_t *self = &wlan_obj;
     self->base.type = (mp_obj_t)&mod_network_nic_type_wlan;
 
-    // start the peripheral
-    wlan_init_helper(self, &args[1]);
-
-    // pass it to the sleep module
+    // give it to the sleep module
     pyb_sleep_set_wlan_obj(self);
+
+    if (n_args > 1 || n_kw > 0) {
+        // check the peripheral id
+        if (args[0].u_int != 0) {
+            nlr_raise(mp_obj_new_exception_msg(&mp_type_OSError, mpexception_os_resource_not_avaliable));
+        }
+        // start the peripheral
+        wlan_init_helper(self, &args[1]);
+    }
 
     return (mp_obj_t)self;
 }
@@ -857,7 +857,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_KW(wlan_init_obj, 1, wlan_init);
 
 STATIC mp_obj_t wlan_scan(mp_obj_t self_in) {
     STATIC const qstr wlan_scan_info_fields[] = {
-        MP_QSTR_ssid, MP_QSTR_bssid, MP_QSTR_auth, MP_QSTR_channel, MP_QSTR_rssi
+        MP_QSTR_ssid, MP_QSTR_bssid, MP_QSTR_sec, MP_QSTR_channel, MP_QSTR_rssi
     };
 
     // check for correct wlan mode
@@ -874,7 +874,7 @@ STATIC mp_obj_t wlan_scan(mp_obj_t self_in) {
     ASSERT_ON_ERROR(sl_WlanPolicySet(SL_POLICY_SCAN , MODWLAN_SL_SCAN_ENABLE, (_u8 *)&scanSeconds, sizeof(scanSeconds)));
 
     // wait for the scan to complete
-    HAL_Delay (MODWLAN_WAIT_FOR_SCAN_MS);
+    mp_hal_delay_ms(MODWLAN_WAIT_FOR_SCAN_MS);
 
     do {
         if (sl_WlanGetNetworkList(_index++, 1, &wlanEntry) <= 0) {
@@ -1185,6 +1185,9 @@ STATIC mp_obj_t wlan_irq (mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *
     // create the callback
     mp_obj_t _irq = mp_irq_new (self, args[2].u_obj, &wlan_irq_methods);
     self->irq_obj = _irq;
+
+    // enable the irq just before leaving
+    wlan_lpds_irq_enable(self);
 
     return _irq;
 

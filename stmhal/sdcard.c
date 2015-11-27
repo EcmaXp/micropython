@@ -24,8 +24,6 @@
  * THE SOFTWARE.
  */
 
-// TODO make it work with DMA
-
 #include STM32_HAL_H
 
 #include "py/nlr.h"
@@ -34,10 +32,65 @@
 #include "pin.h"
 #include "genhdr/pins.h"
 #include "bufhelper.h"
+#include "dma.h"
+#include "irq.h"
 
 #if MICROPY_HW_HAS_SDCARD
 
+#if defined(MCU_SERIES_F7)
+
+// The F7 series calls the peripheral SDMMC rather than SDIO, so provide some
+// #defines for backwards compatability.
+
+#define SDIO    SDMMC1
+
+#define SDIO_CLOCK_EDGE_RISING              SDMMC_CLOCK_EDGE_RISING
+#define SDIO_CLOCK_EDGE_FALLING             SDMMC_CLOCK_EDGE_FALLING
+
+#define SDIO_CLOCK_BYPASS_DISABLE           SDMMC_CLOCK_BYPASS_DISABLE
+#define SDIO_CLOCK_BYPASS_ENABLE            SDMMC_CLOCK_BYPASS_ENABLE
+
+#define SDIO_CLOCK_POWER_SAVE_DISABLE       SDMMC_CLOCK_POWER_SAVE_DISABLE
+#define SDIO_CLOCK_POWER_SAVE_ENABLE        SDMMC_CLOCK_POWER_SAVE_ENABLE
+
+#define SDIO_BUS_WIDE_1B                    SDMMC_BUS_WIDE_1B
+#define SDIO_BUS_WIDE_4B                    SDMMC_BUS_WIDE_4B
+#define SDIO_BUS_WIDE_8B                    SDMMC_BUS_WIDE_8B
+
+#define SDIO_HARDWARE_FLOW_CONTROL_DISABLE  SDMMC_HARDWARE_FLOW_CONTROL_DISABLE
+#define SDIO_HARDWARE_FLOW_CONTROL_ENABLE   SDMMC_HARDWARE_FLOW_CONTROL_ENABLE
+
+#define SDIO_TRANSFER_CLK_DIV               SDMMC_TRANSFER_CLK_DIV
+
+#endif
+
+// TODO: Since SDIO is fundamentally half-duplex, we really only need to
+//       tie up one DMA channel. However, the HAL DMA API doesn't
+// seem to provide a convenient way to change the direction. I believe that
+// its as simple as changing the CR register and the Init.Direction field
+// and make DMA_SetConfig public.
+
+// TODO: I think that as an optimization, we can allocate these dynamically
+//       if an sd card is detected. This will save approx 260 bytes of RAM
+//       when no sdcard was being used.
 static SD_HandleTypeDef sd_handle;
+static DMA_HandleTypeDef sd_rx_dma, sd_tx_dma;
+
+// Parameters to dma_init() for SDIO tx and rx.
+static const DMA_InitTypeDef dma_init_struct_sdio = {
+    .Channel             = 0,
+    .Direction           = 0,
+    .PeriphInc           = DMA_PINC_DISABLE,
+    .MemInc              = DMA_MINC_ENABLE,
+    .PeriphDataAlignment = DMA_PDATAALIGN_WORD,
+    .MemDataAlignment    = DMA_MDATAALIGN_WORD,
+    .Mode                = DMA_PFCTRL,
+    .Priority            = DMA_PRIORITY_VERY_HIGH,
+    .FIFOMode            = DMA_FIFOMODE_ENABLE,
+    .FIFOThreshold       = DMA_FIFO_THRESHOLD_FULL,
+    .MemBurst            = DMA_MBURST_INC4,
+    .PeriphBurst         = DMA_PBURST_INC4,
+};
 
 void sdcard_init(void) {
     GPIO_InitTypeDef GPIO_Init_Structure;
@@ -70,13 +123,15 @@ void HAL_SD_MspInit(SD_HandleTypeDef *hsd) {
     // enable SDIO clock
     __SDIO_CLK_ENABLE();
 
-    // GPIO have already been initialised by sdcard_init
+    // NVIC configuration for SDIO interrupts
+    HAL_NVIC_SetPriority(SDIO_IRQn, IRQ_PRI_SDIO, IRQ_SUBPRI_SDIO);
+    HAL_NVIC_EnableIRQ(SDIO_IRQn);
 
-    // interrupts are not used at the moment
-    // they are needed only for DMA transfer (I think...)
+    // GPIO have already been initialised by sdcard_init
 }
 
 void HAL_SD_MspDeInit(SD_HandleTypeDef *hsd) {
+    HAL_NVIC_DisableIRQ(SDIO_IRQn);
     __SDIO_CLK_DISABLE();
 }
 
@@ -140,6 +195,10 @@ uint64_t sdcard_get_capacity_in_bytes(void) {
     return cardinfo.CardCapacity;
 }
 
+void SDIO_IRQHandler(void) {
+    HAL_SD_IRQHandler(&sd_handle);
+}
+
 mp_uint_t sdcard_read_blocks(uint8_t *dest, uint32_t block_num, uint32_t num_blocks) {
     // check that dest pointer is aligned on a 4-byte boundary
     if (((uint32_t)dest & 3) != 0) {
@@ -151,12 +210,24 @@ mp_uint_t sdcard_read_blocks(uint8_t *dest, uint32_t block_num, uint32_t num_blo
         return SD_ERROR;
     }
 
-    // We must disable IRQs because the SDIO peripheral has a small FIFO
-    // buffer and we can't let it fill up in the middle of a read.
-    // This will not be needed when SD uses DMA for transfer.
-    mp_uint_t atomic_state = MICROPY_BEGIN_ATOMIC_SECTION();
-    HAL_SD_ErrorTypedef err = HAL_SD_ReadBlocks_BlockNumber(&sd_handle, (uint32_t*)dest, block_num, SDCARD_BLOCK_SIZE, num_blocks);
-    MICROPY_END_ATOMIC_SECTION(atomic_state);
+    HAL_SD_ErrorTypedef err = SD_OK;
+
+    if (query_irq() == IRQ_STATE_ENABLED) {
+        dma_init(&sd_rx_dma, DMA_STREAM_SDIO_RX, &dma_init_struct_sdio,
+            DMA_CHANNEL_SDIO_RX, DMA_PERIPH_TO_MEMORY, &sd_handle);
+        sd_handle.hdmarx = &sd_rx_dma;
+
+        err = HAL_SD_ReadBlocks_BlockNumber_DMA(&sd_handle, (uint32_t*)dest, block_num, SDCARD_BLOCK_SIZE, num_blocks);
+        if (err == SD_OK) {
+            // wait for DMA transfer to finish, with a large timeout
+            err = HAL_SD_CheckReadOperation(&sd_handle, 100000000);
+        }
+
+        dma_deinit(sd_handle.hdmarx);
+        sd_handle.hdmarx = NULL;
+    } else {
+        err = HAL_SD_ReadBlocks_BlockNumber(&sd_handle, (uint32_t*)dest, block_num, SDCARD_BLOCK_SIZE, num_blocks);
+    }
 
     return err;
 }
@@ -172,69 +243,26 @@ mp_uint_t sdcard_write_blocks(const uint8_t *src, uint32_t block_num, uint32_t n
         return SD_ERROR;
     }
 
-    // We must disable IRQs because the SDIO peripheral has a small FIFO
-    // buffer and we can't let it drain to empty in the middle of a write.
-    // This will not be needed when SD uses DMA for transfer.
-    mp_uint_t atomic_state = MICROPY_BEGIN_ATOMIC_SECTION();
-    HAL_SD_ErrorTypedef err = HAL_SD_WriteBlocks_BlockNumber(&sd_handle, (uint32_t*)src, block_num, SDCARD_BLOCK_SIZE, num_blocks);
-    MICROPY_END_ATOMIC_SECTION(atomic_state);
+    HAL_SD_ErrorTypedef err = SD_OK;
+
+    if (query_irq() == IRQ_STATE_ENABLED) {
+        dma_init(&sd_tx_dma, DMA_STREAM_SDIO_TX, &dma_init_struct_sdio,
+            DMA_CHANNEL_SDIO_TX, DMA_MEMORY_TO_PERIPH, &sd_handle);
+        sd_handle.hdmatx = &sd_tx_dma;
+
+        err = HAL_SD_WriteBlocks_BlockNumber_DMA(&sd_handle, (uint32_t*)src, block_num, SDCARD_BLOCK_SIZE, num_blocks);
+        if (err == SD_OK) {
+            // wait for DMA transfer to finish, with a large timeout
+            err = HAL_SD_CheckWriteOperation(&sd_handle, 100000000);
+        }
+        dma_deinit(sd_handle.hdmatx);
+        sd_handle.hdmatx = NULL;
+    } else {
+        err = HAL_SD_WriteBlocks_BlockNumber(&sd_handle, (uint32_t*)src, block_num, SDCARD_BLOCK_SIZE, num_blocks);
+    }
 
     return err;
 }
-
-#if 0
-DMA not implemented
-bool sdcard_read_blocks_dma(uint8_t *dest, uint32_t block_num, uint32_t num_blocks) {
-    // check that dest pointer is aligned on a 4-byte boundary
-    if (((uint32_t)dest & 3) != 0) {
-        return false;
-    }
-
-    // check that SD card is initialised
-    if (sd_handle.Instance == NULL) {
-        return false;
-    }
-
-    // do the read
-    if (HAL_SD_ReadBlocks_BlockNumber_DMA(&sd_handle, (uint32_t*)dest, block_num, SDCARD_BLOCK_SIZE) != SD_OK) {
-        return false;
-    }
-
-    // wait for DMA transfer to finish, with a large timeout
-    if (HAL_SD_CheckReadOperation(&sd_handle, 100000000) != SD_OK) {
-        return false;
-    }
-
-    return true;
-}
-
-bool sdcard_write_blocks_dma(const uint8_t *src, uint32_t block_num, uint32_t num_blocks) {
-    // check that src pointer is aligned on a 4-byte boundary
-    if (((uint32_t)src & 3) != 0) {
-        return false;
-    }
-
-    // check that SD card is initialised
-    if (sd_handle.Instance == NULL) {
-        return false;
-    }
-
-    SD_Error status;
-
-    status = HAL_SD_WriteBlocks_BlockNumber_DMA(&sd_handle, (uint32_t*)src, block_num, SDCARD_BLOCK_SIZE, num_blocks);
-    if (status != SD_OK) {
-        return false;
-    }
-
-    // wait for DMA transfer to finish, with a large timeout
-    status = HAL_SD_CheckWriteOperation(&sd_handle, 100000000);
-    if (status != SD_OK) {
-        return false;
-    }
-
-    return true;
-}
-#endif
 
 /******************************************************************************/
 // Micro Python bindings
@@ -244,7 +272,7 @@ bool sdcard_write_blocks_dma(const uint8_t *src, uint32_t block_num, uint32_t nu
 // consistent interface and methods to mount/unmount it.
 
 STATIC mp_obj_t sd_present(mp_obj_t self) {
-    return MP_BOOL(sdcard_is_present());
+    return mp_obj_new_bool(sdcard_is_present());
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(sd_present_obj, sd_present);
 
@@ -256,7 +284,7 @@ STATIC mp_obj_t sd_power(mp_obj_t self, mp_obj_t state) {
         sdcard_power_off();
         result = true;
     }
-    return MP_BOOL(result);
+    return mp_obj_new_bool(result);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(sd_power_obj, sd_power);
 

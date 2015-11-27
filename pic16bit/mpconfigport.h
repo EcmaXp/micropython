@@ -63,6 +63,7 @@
 #define MICROPY_CPYTHON_COMPAT      (0)
 #define MICROPY_LONGINT_IMPL        (MICROPY_LONGINT_IMPL_MPZ)
 #define MICROPY_FLOAT_IMPL          (MICROPY_FLOAT_IMPL_NONE)
+#define MICROPY_NO_ALLOCA           (1)
 
 // type definitions for the specific machine
 
@@ -86,7 +87,6 @@ typedef void *machine_ptr_t; // must be pointer size
 typedef const void *machine_const_ptr_t; // must be pointer size
 typedef int mp_off_t;
 
-void mp_hal_stdout_tx_strn_cooked(const char *str, mp_uint_t len);
 #define MP_PLAT_PRINT_STRN(str, len) mp_hal_stdout_tx_strn_cooked(str, len)
 
 // extra builtin names to add to the global namespace
@@ -99,15 +99,12 @@ extern const struct _mp_obj_module_t pyb_module;
 #define MICROPY_PORT_BUILTIN_MODULES \
     { MP_OBJ_NEW_QSTR(MP_QSTR_pyb), (mp_obj_t)&pyb_module }, \
 
-// We need to provide a declaration/definition of alloca()
-#define alloca(x) (void*)m_new(byte, (x))
-
 #define MP_STATE_PORT MP_STATE_VM
 
 #define MICROPY_PORT_ROOT_POINTERS \
     char *readline_hist[8]; \
     mp_obj_t keyboard_interrupt_obj; \
 
-#define MICROPY_HAL_H "pic16bit_mphal.h"
+#define MICROPY_MPHALPORT_H "pic16bit_mphal.h"
 #define MICROPY_HW_BOARD_NAME "dsPICSK"
 #define MICROPY_HW_MCU_NAME "dsPIC33"

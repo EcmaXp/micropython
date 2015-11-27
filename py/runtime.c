@@ -212,7 +212,7 @@ mp_obj_t mp_unary_op(mp_uint_t op, mp_obj_t arg) {
         mp_int_t val = MP_OBJ_SMALL_INT_VALUE(arg);
         switch (op) {
             case MP_UNARY_OP_BOOL:
-                return MP_BOOL(val != 0);
+                return mp_obj_new_bool(val != 0);
             case MP_UNARY_OP_HASH:
                 return arg;
             case MP_UNARY_OP_POSITIVE:
@@ -267,7 +267,7 @@ mp_obj_t mp_binary_op(mp_uint_t op, mp_obj_t lhs, mp_obj_t rhs) {
 
     // deal with is
     if (op == MP_BINARY_OP_IS) {
-        return MP_BOOL(lhs == rhs);
+        return mp_obj_new_bool(lhs == rhs);
     }
 
     // deal with == and != for all types
@@ -467,10 +467,10 @@ mp_obj_t mp_binary_op(mp_uint_t op, mp_obj_t lhs, mp_obj_t rhs) {
                     return tuple;
                 }
 
-                case MP_BINARY_OP_LESS: return MP_BOOL(lhs_val < rhs_val); break;
-                case MP_BINARY_OP_MORE: return MP_BOOL(lhs_val > rhs_val); break;
-                case MP_BINARY_OP_LESS_EQUAL: return MP_BOOL(lhs_val <= rhs_val); break;
-                case MP_BINARY_OP_MORE_EQUAL: return MP_BOOL(lhs_val >= rhs_val); break;
+                case MP_BINARY_OP_LESS: return mp_obj_new_bool(lhs_val < rhs_val); break;
+                case MP_BINARY_OP_MORE: return mp_obj_new_bool(lhs_val > rhs_val); break;
+                case MP_BINARY_OP_LESS_EQUAL: return mp_obj_new_bool(lhs_val <= rhs_val); break;
+                case MP_BINARY_OP_MORE_EQUAL: return mp_obj_new_bool(lhs_val >= rhs_val); break;
 
                 default:
                     goto unsupported_op;
@@ -482,7 +482,7 @@ mp_obj_t mp_binary_op(mp_uint_t op, mp_obj_t lhs, mp_obj_t rhs) {
                 return mp_obj_new_int(lhs_val);
             }
 #if MICROPY_PY_BUILTINS_FLOAT
-        } else if (MP_OBJ_IS_TYPE(rhs, &mp_type_float)) {
+        } else if (mp_obj_is_float(rhs)) {
             mp_obj_t res = mp_obj_float_binary_op(op, lhs_val, rhs);
             if (res == MP_OBJ_NULL) {
                 goto unsupported_op;
