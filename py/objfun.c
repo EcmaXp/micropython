@@ -343,7 +343,12 @@ const mp_obj_type_t mp_type_fun_bc = {
 #endif
 };
 
+#if MICROPY_OBJ_BC_HAVE_RAW_CODE
+mp_obj_t mp_obj_new_fun_bc_with_raw_code(mp_obj_t def_args_in, mp_obj_t def_kw_args, const byte *code, const mp_uint_t *const_table, mp_raw_code_t *raw_code) {
+#else
 mp_obj_t mp_obj_new_fun_bc(mp_obj_t def_args_in, mp_obj_t def_kw_args, const byte *code, const mp_uint_t *const_table) {
+#endif
+
     mp_uint_t n_def_args = 0;
     mp_uint_t n_extra_args = 0;
     mp_obj_tuple_t *def_args = def_args_in;
@@ -358,9 +363,11 @@ mp_obj_t mp_obj_new_fun_bc(mp_obj_t def_args_in, mp_obj_t def_kw_args, const byt
     mp_obj_fun_bc_t *o = m_new_obj_var(mp_obj_fun_bc_t, mp_obj_t, n_extra_args);
     o->base.type = &mp_type_fun_bc;
     o->globals = mp_globals_get();
-
     o->bytecode = code;
     o->const_table = const_table;
+    #if MICROPY_OBJ_BC_HAVE_RAW_CODE
+    o->raw_code = raw_code;
+    #endif
     if (def_args != MP_OBJ_NULL) {
         memcpy(o->extra_args, def_args->items, n_def_args * sizeof(mp_obj_t));
     }

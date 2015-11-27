@@ -150,7 +150,11 @@ mp_obj_t mp_make_function_from_raw_code(mp_raw_code_t *rc, mp_obj_t def_args, mp
     switch (rc->kind) {
         case MP_CODE_BYTECODE:
         no_other_choice:
-            fun = mp_obj_new_fun_bc(def_args, def_kw_args, rc->data.u_byte.bytecode, rc->data.u_byte.const_table);
+            #if MICROPY_OBJ_BC_HAVE_RAW_CODE
+                fun = mp_obj_new_fun_bc_with_raw_code(def_args, def_kw_args, rc->data.u_byte.bytecode, rc->data.u_byte.const_table, rc);
+            #else
+                fun = mp_obj_new_fun_bc(def_args, def_kw_args, rc->data.u_byte.bytecode, rc->data.u_byte.const_table);
+            #endif
             break;
         #if MICROPY_EMIT_NATIVE
         case MP_CODE_NATIVE_PY:

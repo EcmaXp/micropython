@@ -39,6 +39,18 @@
 }
 #define DECODE_ULABEL do { unum = (ip[0] | (ip[1] << 8)); ip += 2; } while (0)
 #define DECODE_SLABEL do { unum = (ip[0] | (ip[1] << 8)) - 0x8000; ip += 2; } while (0)
+
+#if MICROPY_PERSISTENT_CODE
+
+#define DECODE_QSTR \
+    qst = ip[0] | ip[1] << 8; \
+    ip += 2;
+#define DECODE_PTR \
+    DECODE_UINT; \
+    unum = mp_showbc_const_table[unum]
+
+#else
+
 #define DECODE_QSTR { \
     qst = 0; \
     do { \
@@ -50,6 +62,8 @@
     unum = *(mp_uint_t*)ip; \
     ip += sizeof(mp_uint_t); \
 } while (0)
+
+#endif
 
 void mp_parsebc(const byte *ip, mp_uint_t len, mp_parsebc_handler_t handler, void *handler_data) {
     const byte const *code_start = ip;
