@@ -212,6 +212,7 @@
 #if defined(MICROPY_NO_ALLOCA) && MICROPY_NO_ALLOCA
 #undef alloca
 #define alloca(x) m_malloc(x)
+#endif
 
 /*****************************************************************************/
 /* Micro Python emitters                                                     */

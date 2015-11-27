@@ -47,7 +47,6 @@
 #define MICROPY_GCREGS_SETJMP       (1)
 #define MICROPY_PY_COMPILE_SINGLE_WITH_REPL (1)
 #define MICROPY_OBJ_BC_HAVE_RAW_CODE   (1) // for copy bytecode.
-#define MICROPY_CODE_STATE_HAS_FUN  (1) // for persist state.
 
 // options to control how Micro Python is built
 #define MICROPY_COMP_MODULE_CONST   (1)

@@ -46,7 +46,7 @@
 #endif
 
 #if MICROPY_DEBUG_PRINTERS
-mp_uint_t mp_verbose_flag = 0;
+MP_THREAD mp_uint_t mp_verbose_flag = 0;
 #endif
 
 struct _mp_raw_code_t {
@@ -70,8 +70,6 @@ struct _mp_raw_code_t {
         } u_native;
     } data;
 };
-
-// TODO: export mp_raw_code_t for [-- not MICROPY_OBJ_BC_HAVE_RAW_CODE but copy]
 
 mp_raw_code_t *mp_emit_glue_new_raw_code(void) {
     mp_raw_code_t *rc = m_new0(mp_raw_code_t, 1);
@@ -152,15 +150,7 @@ mp_obj_t mp_make_function_from_raw_code(mp_raw_code_t *rc, mp_obj_t def_args, mp
     switch (rc->kind) {
         case MP_CODE_BYTECODE:
         no_other_choice:
-<<<<<<< HEAD
-            #if MICROPY_OBJ_BC_HAVE_RAW_CODE
-                fun = mp_obj_new_fun_bc_with_raw_code(rc->scope_flags, rc->n_pos_args, rc->n_kwonly_args, def_args, def_kw_args, rc->data.u_byte.code, rc);
-            #else
-                fun = mp_obj_new_fun_bc(rc->scope_flags, rc->n_pos_args, rc->n_kwonly_args, def_args, def_kw_args, rc->data.u_byte.code);
-            #endif
-=======
             fun = mp_obj_new_fun_bc(def_args, def_kw_args, rc->data.u_byte.bytecode, rc->data.u_byte.const_table);
->>>>>>> 30484338092bfaad9f4ecff13b4219d94157fa06
             break;
         #if MICROPY_EMIT_NATIVE
         case MP_CODE_NATIVE_PY:

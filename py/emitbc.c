@@ -32,7 +32,6 @@
 
 #include "py/mpstate.h"
 #include "py/emit.h"
-#include "py/emitbc.h"
 #include "py/bc0.h"
 
 #define BYTES_FOR_INT ((BYTES_PER_WORD * 8 + 6) / 7)
@@ -84,7 +83,9 @@ void emit_bc_free(emit_t *emit) {
     m_del_obj(emit_t, emit);
 }
 
-EMIT_BC_STATIC void emit_write_uint(emit_t *emit, emit_allocator_t allocator, mp_uint_t val) {
+typedef byte *(*emit_allocator_t)(emit_t *emit, int nbytes);
+
+STATIC void emit_write_uint(emit_t *emit, emit_allocator_t allocator, mp_uint_t val) {
     // We store each 7 bits in a separate byte, and that's how many bytes needed
     byte buf[BYTES_FOR_INT];
     byte *p = buf + sizeof(buf);
@@ -101,7 +102,7 @@ EMIT_BC_STATIC void emit_write_uint(emit_t *emit, emit_allocator_t allocator, mp
 }
 
 // all functions must go through this one to emit code info
-EMIT_BC_STATIC byte *emit_get_cur_to_write_code_info(emit_t *emit, int num_bytes_to_write) {
+STATIC byte *emit_get_cur_to_write_code_info(emit_t *emit, int num_bytes_to_write) {
     //printf("emit %d\n", num_bytes_to_write);
     if (emit->pass < MP_PASS_EMIT) {
         emit->code_info_offset += num_bytes_to_write;
@@ -114,17 +115,6 @@ EMIT_BC_STATIC byte *emit_get_cur_to_write_code_info(emit_t *emit, int num_bytes
     }
 }
 
-<<<<<<< HEAD
-EMIT_BC_STATIC void emit_align_code_info_to_machine_word(emit_t *emit) {
-    emit->code_info_offset = (emit->code_info_offset + sizeof(mp_uint_t) - 1) & (~(sizeof(mp_uint_t) - 1));
-}
-
-EMIT_BC_STATIC void emit_write_code_info_uint(emit_t *emit, mp_uint_t val) {
-    emit_write_uint(emit, emit_get_cur_to_write_code_info, val);
-}
-
-EMIT_BC_STATIC void emit_write_code_info_qstr(emit_t *emit, qstr qst) {
-=======
 STATIC void emit_write_code_info_byte(emit_t* emit, byte val) {
     *emit_get_cur_to_write_code_info(emit, 1) = val;
 }
@@ -140,13 +130,12 @@ STATIC void emit_write_code_info_qstr(emit_t *emit, qstr qst) {
     c[0] = qst;
     c[1] = qst >> 8;
     #else
->>>>>>> 30484338092bfaad9f4ecff13b4219d94157fa06
     emit_write_uint(emit, emit_get_cur_to_write_code_info, qst);
     #endif
 }
 
 #if MICROPY_ENABLE_SOURCE_LINE
-EMIT_BC_STATIC void emit_write_code_info_bytes_lines(emit_t *emit, mp_uint_t bytes_to_skip, mp_uint_t lines_to_skip) {
+STATIC void emit_write_code_info_bytes_lines(emit_t *emit, mp_uint_t bytes_to_skip, mp_uint_t lines_to_skip) {
     assert(bytes_to_skip > 0 || lines_to_skip > 0);
     //printf("  %d %d\n", bytes_to_skip, lines_to_skip);
     while (bytes_to_skip > 0 || lines_to_skip > 0) {
@@ -171,7 +160,7 @@ EMIT_BC_STATIC void emit_write_code_info_bytes_lines(emit_t *emit, mp_uint_t byt
 #endif
 
 // all functions must go through this one to emit byte code
-EMIT_BC_STATIC byte *emit_get_cur_to_write_bytecode(emit_t *emit, int num_bytes_to_write) {
+STATIC byte *emit_get_cur_to_write_bytecode(emit_t *emit, int num_bytes_to_write) {
     //printf("emit %d\n", num_bytes_to_write);
     if (emit->pass < MP_PASS_EMIT) {
         emit->bytecode_offset += num_bytes_to_write;
@@ -184,28 +173,12 @@ EMIT_BC_STATIC byte *emit_get_cur_to_write_bytecode(emit_t *emit, int num_bytes_
     }
 }
 
-<<<<<<< HEAD
-EMIT_BC_STATIC void emit_align_bytecode_to_machine_word(emit_t *emit) {
-    emit->bytecode_offset = (emit->bytecode_offset + sizeof(mp_uint_t) - 1) & (~(sizeof(mp_uint_t) - 1));
-}
-
-EMIT_BC_STATIC void emit_write_bytecode_byte(emit_t *emit, byte b1) {
-=======
 STATIC void emit_write_bytecode_byte(emit_t *emit, byte b1) {
->>>>>>> 30484338092bfaad9f4ecff13b4219d94157fa06
     byte *c = emit_get_cur_to_write_bytecode(emit, 1);
     c[0] = b1;
 }
 
-<<<<<<< HEAD
-EMIT_BC_STATIC void emit_write_bytecode_uint(emit_t *emit, mp_uint_t val) {
-    emit_write_uint(emit, emit_get_cur_to_write_bytecode, val);
-}
-
-EMIT_BC_STATIC void emit_write_bytecode_byte_byte(emit_t *emit, byte b1, byte b2) {
-=======
 STATIC void emit_write_bytecode_byte_byte(emit_t* emit, byte b1, byte b2) {
->>>>>>> 30484338092bfaad9f4ecff13b4219d94157fa06
     assert((b2 & (~0xff)) == 0);
     byte *c = emit_get_cur_to_write_bytecode(emit, 2);
     c[0] = b1;
@@ -213,7 +186,7 @@ STATIC void emit_write_bytecode_byte_byte(emit_t* emit, byte b1, byte b2) {
 }
 
 // Similar to emit_write_bytecode_uint(), just some extra handling to encode sign
-EMIT_BC_STATIC void emit_write_bytecode_byte_int(emit_t *emit, byte b1, mp_int_t num) {
+STATIC void emit_write_bytecode_byte_int(emit_t *emit, byte b1, mp_int_t num) {
     emit_write_bytecode_byte(emit, b1);
 
     // We store each 7 bits in a separate byte, and that's how many bytes needed
@@ -239,22 +212,11 @@ EMIT_BC_STATIC void emit_write_bytecode_byte_int(emit_t *emit, byte b1, mp_int_t
     *c = *p;
 }
 
-EMIT_BC_STATIC void emit_write_bytecode_byte_uint(emit_t *emit, byte b, mp_uint_t val) {
+STATIC void emit_write_bytecode_byte_uint(emit_t *emit, byte b, mp_uint_t val) {
     emit_write_bytecode_byte(emit, b);
     emit_write_uint(emit, emit_get_cur_to_write_bytecode, val);
 }
 
-<<<<<<< HEAD
-EMIT_BC_STATIC void emit_write_bytecode_prealigned_ptr(emit_t *emit, void *ptr) {
-    mp_uint_t *c = (mp_uint_t*)emit_get_cur_to_write_bytecode(emit, sizeof(mp_uint_t));
-    // Verify thar c is already uint-aligned
-    assert(c == MP_ALIGN(c, sizeof(mp_uint_t)));
-    *c = (mp_uint_t)ptr;
-}
-
-// aligns the pointer so it is friendly to GC
-EMIT_BC_STATIC void emit_write_bytecode_byte_ptr(emit_t *emit, byte b, void *ptr) {
-=======
 #if MICROPY_PERSISTENT_CODE
 STATIC void emit_write_bytecode_byte_const(emit_t *emit, byte b, mp_uint_t n, mp_uint_t c) {
     if (emit->pass == MP_PASS_EMIT) {
@@ -265,7 +227,6 @@ STATIC void emit_write_bytecode_byte_const(emit_t *emit, byte b, mp_uint_t n, mp
 #else
 STATIC void emit_write_bytecode_byte_ptr(emit_t *emit, byte b, void *ptr) {
     // aligns the pointer so it is friendly to GC
->>>>>>> 30484338092bfaad9f4ecff13b4219d94157fa06
     emit_write_bytecode_byte(emit, b);
     emit->bytecode_offset = (mp_uint_t)MP_ALIGN(emit->bytecode_offset, sizeof(mp_uint_t));
     mp_uint_t *c = (mp_uint_t*)emit_get_cur_to_write_bytecode(emit, sizeof(mp_uint_t));
@@ -275,13 +236,6 @@ STATIC void emit_write_bytecode_byte_ptr(emit_t *emit, byte b, void *ptr) {
 }
 #endif
 
-<<<<<<< HEAD
-/* currently unused
-EMIT_BC_STATIC void emit_write_bytecode_byte_uint_uint(emit_t *emit, byte b, mp_uint_t num1, mp_uint_t num2) {
-    emit_write_bytecode_byte(emit, b);
-    emit_write_bytecode_byte_uint(emit, num1);
-    emit_write_bytecode_byte_uint(emit, num2);
-=======
 STATIC void emit_write_bytecode_byte_qstr(emit_t* emit, byte b, qstr qst) {
     #if MICROPY_PERSISTENT_CODE
     assert((qst >> 16) == 0);
@@ -292,13 +246,8 @@ STATIC void emit_write_bytecode_byte_qstr(emit_t* emit, byte b, qstr qst) {
     #else
     emit_write_bytecode_byte_uint(emit, b, qst);
     #endif
->>>>>>> 30484338092bfaad9f4ecff13b4219d94157fa06
 }
 
-<<<<<<< HEAD
-EMIT_BC_STATIC void emit_write_bytecode_byte_qstr(emit_t *emit, byte b, qstr qst) {
-    emit_write_bytecode_byte_uint(emit, b, qst);
-=======
 STATIC void emit_write_bytecode_byte_obj(emit_t *emit, byte b, void *ptr) {
     #if MICROPY_PERSISTENT_CODE
     emit_write_bytecode_byte_const(emit, b,
@@ -317,11 +266,10 @@ STATIC void emit_write_bytecode_byte_raw_code(emit_t *emit, byte b, mp_raw_code_
     #else
     emit_write_bytecode_byte_ptr(emit, b, rc);
     #endif
->>>>>>> 30484338092bfaad9f4ecff13b4219d94157fa06
 }
 
 // unsigned labels are relative to ip following this instruction, stored as 16 bits
-EMIT_BC_STATIC void emit_write_bytecode_byte_unsigned_label(emit_t *emit, byte b1, mp_uint_t label) {
+STATIC void emit_write_bytecode_byte_unsigned_label(emit_t *emit, byte b1, mp_uint_t label) {
     mp_uint_t bytecode_offset;
     if (emit->pass < MP_PASS_EMIT) {
         bytecode_offset = 0;
@@ -335,7 +283,7 @@ EMIT_BC_STATIC void emit_write_bytecode_byte_unsigned_label(emit_t *emit, byte b
 }
 
 // signed labels are relative to ip following this instruction, stored as 16 bits, in excess
-EMIT_BC_STATIC void emit_write_bytecode_byte_signed_label(emit_t *emit, byte b1, mp_uint_t label) {
+STATIC void emit_write_bytecode_byte_signed_label(emit_t *emit, byte b1, mp_uint_t label) {
     int bytecode_offset;
     if (emit->pass < MP_PASS_EMIT) {
         bytecode_offset = 0;
@@ -349,7 +297,7 @@ EMIT_BC_STATIC void emit_write_bytecode_byte_signed_label(emit_t *emit, byte b1,
 }
 
 #if MICROPY_EMIT_NATIVE
-EMIT_BC_STATIC void mp_emit_bc_set_native_type(emit_t *emit, mp_uint_t op, mp_uint_t arg1, qstr arg2) {
+STATIC void mp_emit_bc_set_native_type(emit_t *emit, mp_uint_t op, mp_uint_t arg1, qstr arg2) {
     (void)emit;
     (void)op;
     (void)arg1;
@@ -524,7 +472,7 @@ void mp_emit_bc_set_source_line(emit_t *emit, mp_uint_t source_line) {
 #endif
 }
 
-EMIT_BC_STATIC void emit_bc_pre(emit_t *emit, mp_int_t stack_size_delta) {
+STATIC void emit_bc_pre(emit_t *emit, mp_int_t stack_size_delta) {
     if (emit->pass == MP_PASS_SCOPE) {
         return;
     }
@@ -959,7 +907,7 @@ void mp_emit_bc_make_closure(emit_t *emit, scope_t *scope, mp_uint_t n_closed_ov
     }
 }
 
-EMIT_BC_STATIC void emit_bc_call_function_method_helper(emit_t *emit, mp_int_t stack_adj, mp_uint_t bytecode_base, mp_uint_t n_positional, mp_uint_t n_keyword, mp_uint_t star_flags) {
+STATIC void emit_bc_call_function_method_helper(emit_t *emit, mp_int_t stack_adj, mp_uint_t bytecode_base, mp_uint_t n_positional, mp_uint_t n_keyword, mp_uint_t star_flags) {
     if (star_flags) {
         emit_bc_pre(emit, stack_adj - (mp_int_t)n_positional - 2 * (mp_int_t)n_keyword - 2);
         emit_write_bytecode_byte_uint(emit, bytecode_base + 1, (n_keyword << 8) | n_positional); // TODO make it 2 separate uints?

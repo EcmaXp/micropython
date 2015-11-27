@@ -95,6 +95,10 @@ void mp_setup_code_state(mp_code_state *code_state, mp_obj_t self_in, mp_uint_t 
     mp_obj_fun_bc_t *self = self_in;
     mp_uint_t n_state = code_state->n_state;
 
+    #if MICROPY_CODE_STATE_HAS_FUN
+    code_state->fun = self_in;
+    #endif
+
     // ip comes in as an offset into bytecode, so turn it into a true pointer
     code_state->ip = self->bytecode + (mp_uint_t)code_state->ip;
 
