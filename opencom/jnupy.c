@@ -836,8 +836,6 @@ void jnupy_setup_env(JNIEnv *env, jobject self) {
 #define MEM_SIZE(x, y) ((x) * _MEM_SIZE_##y * (BYTES_PER_WORD / 4))
 
 /** PORT IMPL VALUE/FUNCTIONS **/
-MP_THREAD mp_uint_t mp_verbose_flag = 0;
-
 STATIC bool _jnupy_attach_env() {
     if (JNUPY_ENV == NULL && JNUPY_G_ENV != NULL) {
         JNUPY_RAW_CALL_WITH(JNUPY_G_VM, AttachCurrentThread, (void **) &JNUPY_G_ENV, NULL);
