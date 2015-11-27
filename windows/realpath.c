@@ -26,7 +26,11 @@
 
 #include <stdlib.h>
 #include <errno.h>
-#include <unistd.h>
+#include <io.h>
+
+#ifndef R_OK
+    #define R_OK 4
+#endif
 
 // Make sure a path only has forward slashes.
 char *to_unix_path(char *p) {
