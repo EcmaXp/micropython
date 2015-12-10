@@ -250,9 +250,12 @@ TIM_HandleTypeDef *timer_tim6_init(uint freq) {
 
 // Interrupt dispatch
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+    #if !defined(MICROPY_HW_USE_ALT_IRQ_FOR_CDC)
     if (htim == &TIM3_Handle) {
         USBD_CDC_HAL_TIM_PeriodElapsedCallback();
-    } else if (htim == &TIM5_Handle) {
+    } else
+    #endif
+    if (htim == &TIM5_Handle) {
         servo_timer_irq_callback();
     }
 }
@@ -358,13 +361,13 @@ STATIC uint32_t compute_pwm_value_from_percent(uint32_t period, mp_obj_t percent
     if (0) {
     #if MICROPY_PY_BUILTINS_FLOAT
     } else if (MP_OBJ_IS_TYPE(percent_in, &mp_type_float)) {
-        float percent = mp_obj_get_float(percent_in);
+        mp_float_t percent = mp_obj_get_float(percent_in);
         if (percent <= 0.0) {
             cmp = 0;
         } else if (percent >= 100.0) {
             cmp = period;
         } else {
-            cmp = percent / 100.0 * ((float)period);
+            cmp = percent / 100.0 * ((mp_float_t)period);
         }
     #endif
     } else {
@@ -388,11 +391,11 @@ STATIC uint32_t compute_pwm_value_from_percent(uint32_t period, mp_obj_t percent
 // Helper function to compute percentage from timer perion and PWM value.
 STATIC mp_obj_t compute_percent_from_pwm_value(uint32_t period, uint32_t cmp) {
     #if MICROPY_PY_BUILTINS_FLOAT
-    float percent;
+    mp_float_t percent;
     if (cmp >= period) {
         percent = 100.0;
     } else {
-        percent = (float)cmp * 100.0 / ((float)period);
+        percent = (mp_float_t)cmp * 100.0 / ((mp_float_t)period);
     }
     return mp_obj_new_float(percent);
     #else
@@ -653,7 +656,11 @@ STATIC mp_obj_t pyb_timer_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t
     switch (tim->tim_id) {
         case 1: tim->tim.Instance = TIM1; tim->irqn = TIM1_UP_TIM10_IRQn; break;
         case 2: tim->tim.Instance = TIM2; tim->irqn = TIM2_IRQn; tim->is_32bit = true; break;
+        #if defined(MICROPY_HW_USE_ALT_IRQ_FOR_CDC)
+        case 3: tim->tim.Instance = TIM3; tim->irqn = TIM3_IRQn; break;
+        #else
         case 3: nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "Timer 3 is for internal use only")); // TIM3 used for low-level stuff; go via regs if necessary
+        #endif
         case 4: tim->tim.Instance = TIM4; tim->irqn = TIM4_IRQn; break;
         case 5: tim->tim.Instance = TIM5; tim->irqn = TIM5_IRQn; tim->is_32bit = true; break;
         #if defined(TIM6)

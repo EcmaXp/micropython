@@ -58,7 +58,7 @@ STATIC uint emit_opt = MP_EMIT_OPT_NONE;
 long heap_size = 1024*1024 * (sizeof(mp_uint_t) / 4);
 #endif
 
-STATIC void stderr_print_strn(void *env, const char *str, mp_uint_t len) {
+STATIC void stderr_print_strn(void *env, const char *str, size_t len) {
     (void)env;
     ssize_t dummy = write(STDERR_FILENO, str, len);
     (void)dummy;
@@ -70,11 +70,11 @@ const mp_print_t mp_stderr_print = {NULL, stderr_print_strn};
 // If exc is SystemExit, return value where FORCED_EXIT bit set,
 // and lower 8 bits are SystemExit value. For all other exceptions,
 // return 1.
-STATIC int handle_uncaught_exception(mp_obj_t exc) {
+STATIC int handle_uncaught_exception(mp_obj_base_t *exc) {
     // check for SystemExit
-    if (mp_obj_is_subclass_fast(mp_obj_get_type(exc), &mp_type_SystemExit)) {
+    if (mp_obj_is_subclass_fast(MP_OBJ_FROM_PTR(exc->type), MP_OBJ_FROM_PTR(&mp_type_SystemExit))) {
         // None is an exit value of 0; an int is its value; anything else is 1
-        mp_obj_t exit_val = mp_obj_exception_get_value(exc);
+        mp_obj_t exit_val = mp_obj_exception_get_value(MP_OBJ_FROM_PTR(exc));
         mp_int_t val = 0;
         if (exit_val != mp_const_none && !mp_obj_get_int_maybe(exit_val, &val)) {
             val = 1;
@@ -83,7 +83,7 @@ STATIC int handle_uncaught_exception(mp_obj_t exc) {
     }
 
     // Report all other exceptions
-    mp_obj_print_exception(&mp_stderr_print, exc);
+    mp_obj_print_exception(&mp_stderr_print, MP_OBJ_FROM_PTR(exc));
     return 1;
 }
 
@@ -121,6 +121,12 @@ STATIC int execute_from_lexer(mp_lexer_t *lex, mp_parse_input_kind_t input_kind,
         if (!compile_only) {
             // execute it
             mp_call_function_0(module_fun);
+            // check for pending exception
+            if (MP_STATE_VM(mp_pending_exception) != MP_OBJ_NULL) {
+                mp_obj_t obj = MP_STATE_VM(mp_pending_exception);
+                MP_STATE_VM(mp_pending_exception) = MP_OBJ_NULL;
+                nlr_raise(obj);
+            }
         }
 
         mp_hal_set_interrupt_char(-1);
@@ -130,7 +136,7 @@ STATIC int execute_from_lexer(mp_lexer_t *lex, mp_parse_input_kind_t input_kind,
     } else {
         // uncaught exception
         mp_hal_set_interrupt_char(-1);
-        return handle_uncaught_exception((mp_obj_t)nlr.ret_val);
+        return handle_uncaught_exception(nlr.ret_val);
     }
 }
 
@@ -364,7 +370,26 @@ STATIC void set_sys_argv(char *argv[], int argc, int start_arg) {
 #define PATHLIST_SEP_CHAR ':'
 #endif
 
+/*
+typedef union _a_t { uint32_t u32; uint64_t u64; } a_t;
+STATIC const uint64_t table[4] = {
+    1,
+    2,
+    3,
+    //(a_t){(uint32_t)&set_sys_argv}.u64,
+    ((a_t){(uint32_t)123}).u64,
+};
+*/
+
 int main(int argc, char **argv) {
+    /*
+    printf("sizeof(void*)=%u\n", (uint)sizeof(void*));
+    for (int i = 0; i < sizeof(table); ++i) {
+        byte *ptr = (void*)&table[0];
+        printf(" %02x", ptr[i]);
+        if ((i + 1)%8 == 0) printf("\n");
+    }
+    */
     mp_stack_set_limit(40000 * (BYTES_PER_WORD / 4));
 
     pre_process_options(argc, argv);
@@ -397,7 +422,7 @@ int main(int argc, char **argv) {
             p++;
         }
     }
-    mp_obj_list_init(mp_sys_path, path_num);
+    mp_obj_list_init(MP_OBJ_TO_PTR(mp_sys_path), path_num);
     mp_obj_t *path_items;
     mp_obj_list_get(mp_sys_path, &path_num, &path_items);
     path_items[0] = MP_OBJ_NEW_QSTR(MP_QSTR_);
@@ -421,7 +446,7 @@ int main(int argc, char **argv) {
     }
     }
 
-    mp_obj_list_init(mp_sys_argv, 0);
+    mp_obj_list_init(MP_OBJ_TO_PTR(mp_sys_argv), 0);
 
     #if defined(MICROPY_UNIX_COVERAGE)
     {
@@ -487,7 +512,7 @@ int main(int argc, char **argv) {
                     nlr_pop();
                 } else {
                     // uncaught exception
-                    return handle_uncaught_exception((mp_obj_t)nlr.ret_val) & 0xff;
+                    return handle_uncaught_exception(nlr.ret_val) & 0xff;
                 }
 
                 if (mp_obj_is_package(mod)) {
@@ -499,8 +524,10 @@ int main(int argc, char **argv) {
                 break;
             } else if (strcmp(argv[a], "-X") == 0) {
                 a += 1;
+            #if MICROPY_DEBUG_PRINTERS
             } else if (strcmp(argv[a], "-v") == 0) {
                 mp_verbose_flag++;
+            #endif
             } else if (strncmp(argv[a], "-O", 2) == 0) {
                 if (unichar_isdigit(argv[a][2])) {
                     MP_STATE_VM(mp_optimise_value) = argv[a][2] & 0xf;

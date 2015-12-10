@@ -124,24 +124,24 @@ STATIC NORETURN void syntax_error(void) {
 STATIC mp_obj_t uctypes_struct_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 2, 3, false);
     mp_obj_uctypes_struct_t *o = m_new_obj(mp_obj_uctypes_struct_t);
-    o->base.type = type_in;
-    o->addr = (void*)mp_obj_get_int(args[0]);
+    o->base.type = MP_OBJ_TO_PTR(type_in);
+    o->addr = (void*)(uintptr_t)mp_obj_get_int(args[0]);
     o->desc = args[1];
     o->flags = LAYOUT_NATIVE;
     if (n_args == 3) {
         o->flags = mp_obj_get_int(args[2]);
     }
-    return o;
+    return MP_OBJ_FROM_PTR(o);
 }
 
 STATIC void uctypes_struct_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     (void)kind;
-    mp_obj_uctypes_struct_t *self = self_in;
+    mp_obj_uctypes_struct_t *self = MP_OBJ_TO_PTR(self_in);
     const char *typen = "unk";
     if (MP_OBJ_IS_TYPE(self->desc, &mp_type_dict)) {
         typen = "STRUCT";
     } else if (MP_OBJ_IS_TYPE(self->desc, &mp_type_tuple)) {
-        mp_obj_tuple_t *t = (mp_obj_tuple_t*)self->desc;
+        mp_obj_tuple_t *t = MP_OBJ_TO_PTR(self->desc);
         mp_int_t offset = MP_OBJ_SMALL_INT_VALUE(t->items[0]);
         uint agg_type = GET_TYPE(offset, AGG_TYPE_BITS);
         switch (agg_type) {
@@ -155,7 +155,7 @@ STATIC void uctypes_struct_print(const mp_print_t *print, mp_obj_t self_in, mp_p
 }
 
 // Get size of any type descriptor
-STATIC mp_uint_t uctypes_struct_size(mp_obj_t desc_in, mp_uint_t *max_field_size);
+STATIC mp_uint_t uctypes_struct_size(mp_obj_t desc_in, int layout_type, mp_uint_t *max_field_size);
 
 // Get size of scalar type descriptor
 static inline mp_uint_t uctypes_struct_scalar_size(int val_type) {
@@ -167,7 +167,7 @@ static inline mp_uint_t uctypes_struct_scalar_size(int val_type) {
 }
 
 // Get size of aggregate type descriptor
-STATIC mp_uint_t uctypes_struct_agg_size(mp_obj_tuple_t *t, mp_uint_t *max_field_size) {
+STATIC mp_uint_t uctypes_struct_agg_size(mp_obj_tuple_t *t, int layout_type, mp_uint_t *max_field_size) {
     mp_uint_t total_size = 0;
 
     mp_int_t offset_ = MP_OBJ_SMALL_INT_VALUE(t->items[0]);
@@ -175,7 +175,7 @@ STATIC mp_uint_t uctypes_struct_agg_size(mp_obj_tuple_t *t, mp_uint_t *max_field
 
     switch (agg_type) {
         case STRUCT:
-            return uctypes_struct_size(t->items[1], max_field_size);
+            return uctypes_struct_size(t->items[1], layout_type, max_field_size);
         case PTR:
             if (sizeof(void*) > *max_field_size) {
                 *max_field_size = sizeof(void*);
@@ -194,7 +194,7 @@ STATIC mp_uint_t uctypes_struct_agg_size(mp_obj_tuple_t *t, mp_uint_t *max_field
                 }
             } else {
                 // Elements of array are aggregates
-                item_s = uctypes_struct_size(t->items[2], max_field_size);
+                item_s = uctypes_struct_size(t->items[2], layout_type, max_field_size);
             }
 
             return item_s * arr_sz;
@@ -206,13 +206,10 @@ STATIC mp_uint_t uctypes_struct_agg_size(mp_obj_tuple_t *t, mp_uint_t *max_field
     return total_size;
 }
 
-STATIC mp_uint_t uctypes_struct_size(mp_obj_t desc_in, mp_uint_t *max_field_size) {
-    mp_obj_dict_t *d = desc_in;
-    mp_uint_t total_size = 0;
-
+STATIC mp_uint_t uctypes_struct_size(mp_obj_t desc_in, int layout_type, mp_uint_t *max_field_size) {
     if (!MP_OBJ_IS_TYPE(desc_in, &mp_type_dict)) {
         if (MP_OBJ_IS_TYPE(desc_in, &mp_type_tuple)) {
-            return uctypes_struct_agg_size((mp_obj_tuple_t*)desc_in, max_field_size);
+            return uctypes_struct_agg_size((mp_obj_tuple_t*)MP_OBJ_TO_PTR(desc_in), layout_type, max_field_size);
         } else if (MP_OBJ_IS_SMALL_INT(desc_in)) {
             // We allow sizeof on both type definitions and structures/structure fields,
             // but scalar structure field is lowered into native Python int, so all
@@ -222,6 +219,9 @@ STATIC mp_uint_t uctypes_struct_size(mp_obj_t desc_in, mp_uint_t *max_field_size
         }
         syntax_error();
     }
+
+    mp_obj_dict_t *d = MP_OBJ_TO_PTR(desc_in);
+    mp_uint_t total_size = 0;
 
     for (mp_uint_t i = 0; i < d->map.alloc; i++) {
         if (MP_MAP_SLOT_IS_FILLED(&d->map, i)) {
@@ -241,10 +241,10 @@ STATIC mp_uint_t uctypes_struct_size(mp_obj_t desc_in, mp_uint_t *max_field_size
                 if (!MP_OBJ_IS_TYPE(v, &mp_type_tuple)) {
                     syntax_error();
                 }
-                mp_obj_tuple_t *t = (mp_obj_tuple_t*)v;
+                mp_obj_tuple_t *t = MP_OBJ_TO_PTR(v);
                 mp_int_t offset = MP_OBJ_SMALL_INT_VALUE(t->items[0]);
                 offset &= VALUE_MASK(AGG_TYPE_BITS);
-                mp_uint_t s = uctypes_struct_agg_size(t, max_field_size);
+                mp_uint_t s = uctypes_struct_agg_size(t, layout_type, max_field_size);
                 if (offset + s > total_size) {
                     total_size = offset + s;
                 }
@@ -253,7 +253,9 @@ STATIC mp_uint_t uctypes_struct_size(mp_obj_t desc_in, mp_uint_t *max_field_size
     }
 
     // Round size up to alignment of biggest field
-    total_size = (total_size + *max_field_size - 1) & ~(*max_field_size - 1);
+    if (layout_type == LAYOUT_NATIVE) {
+        total_size = (total_size + *max_field_size - 1) & ~(*max_field_size - 1);
+    }
     return total_size;
 }
 
@@ -262,14 +264,16 @@ STATIC mp_obj_t uctypes_struct_sizeof(mp_obj_t obj_in) {
     if (MP_OBJ_IS_TYPE(obj_in, &mp_type_bytearray)) {
         return mp_obj_len(obj_in);
     }
+    int layout_type = LAYOUT_NATIVE;
     // We can apply sizeof either to structure definition (a dict)
     // or to instantiated structure
     if (MP_OBJ_IS_TYPE(obj_in, &uctypes_struct_type)) {
         // Extract structure definition
-        mp_obj_uctypes_struct_t *obj = obj_in;
+        mp_obj_uctypes_struct_t *obj = MP_OBJ_TO_PTR(obj_in);
         obj_in = obj->desc;
+        layout_type = obj->flags;
     }
-    mp_uint_t size = uctypes_struct_size(obj_in, &max_field_size);
+    mp_uint_t size = uctypes_struct_size(obj_in, layout_type, &max_field_size);
     return MP_OBJ_NEW_SMALL_INT(size);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(uctypes_struct_sizeof_obj, uctypes_struct_sizeof);
@@ -359,13 +363,22 @@ STATIC void set_aligned(uint val_type, void *p, mp_int_t index, mp_obj_t val) {
             ((uint32_t*)p)[index] = (uint32_t)v; return;
         case INT32:
             ((int32_t*)p)[index] = (int32_t)v; return;
+        case INT64:
+        case UINT64:
+            if (sizeof(mp_int_t) == 8) {
+                ((uint64_t*)p)[index] = (uint64_t)v;
+            } else {
+                // TODO: Doesn't offer atomic store semantics, but should at least try
+                set_unaligned(val_type, p, MP_ENDIANNESS_BIG, val);
+            }
+            return;
         default:
             assert(0);
     }
 }
 
 STATIC mp_obj_t uctypes_struct_attr_op(mp_obj_t self_in, qstr attr, mp_obj_t set_val) {
-    mp_obj_uctypes_struct_t *self = self_in;
+    mp_obj_uctypes_struct_t *self = MP_OBJ_TO_PTR(self_in);
 
     // TODO: Support at least OrderedDict in addition
     if (!MP_OBJ_IS_TYPE(self->desc, &mp_type_dict)) {
@@ -443,7 +456,7 @@ STATIC mp_obj_t uctypes_struct_attr_op(mp_obj_t self_in, qstr attr, mp_obj_t set
         syntax_error();
     }
 
-    mp_obj_tuple_t *sub = (mp_obj_tuple_t*)deref;
+    mp_obj_tuple_t *sub = MP_OBJ_TO_PTR(deref);
     mp_int_t offset = MP_OBJ_SMALL_INT_VALUE(sub->items[0]);
     mp_uint_t agg_type = GET_TYPE(offset, AGG_TYPE_BITS);
     offset &= VALUE_MASK(AGG_TYPE_BITS);
@@ -456,23 +469,23 @@ STATIC mp_obj_t uctypes_struct_attr_op(mp_obj_t self_in, qstr attr, mp_obj_t set
             o->desc = sub->items[1];
             o->addr = self->addr + offset;
             o->flags = self->flags;
-            return o;
+            return MP_OBJ_FROM_PTR(o);
         }
         case ARRAY: {
             mp_uint_t dummy;
             if (IS_SCALAR_ARRAY(sub) && IS_SCALAR_ARRAY_OF_BYTES(sub)) {
-                return mp_obj_new_bytearray_by_ref(uctypes_struct_agg_size(sub, &dummy), self->addr + offset);
+                return mp_obj_new_bytearray_by_ref(uctypes_struct_agg_size(sub, self->flags, &dummy), self->addr + offset);
             }
             // Fall thru to return uctypes struct object
         }
         case PTR: {
             mp_obj_uctypes_struct_t *o = m_new_obj(mp_obj_uctypes_struct_t);
             o->base.type = &uctypes_struct_type;
-            o->desc = sub;
+            o->desc = MP_OBJ_FROM_PTR(sub);
             o->addr = self->addr + offset;
             o->flags = self->flags;
 //printf("PTR/ARR base addr=%p\n", o->addr);
-            return o;
+            return MP_OBJ_FROM_PTR(o);
         }
     }
 
@@ -494,7 +507,7 @@ STATIC void uctypes_struct_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
 }
 
 STATIC mp_obj_t uctypes_struct_subscr(mp_obj_t self_in, mp_obj_t index_in, mp_obj_t value) {
-    mp_obj_uctypes_struct_t *self = self_in;
+    mp_obj_uctypes_struct_t *self = MP_OBJ_TO_PTR(self_in);
 
     if (value == MP_OBJ_NULL) {
         // delete
@@ -505,7 +518,7 @@ STATIC mp_obj_t uctypes_struct_subscr(mp_obj_t self_in, mp_obj_t index_in, mp_ob
             nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "struct: cannot index"));
         }
 
-        mp_obj_tuple_t *t = (mp_obj_tuple_t*)self->desc;
+        mp_obj_tuple_t *t = MP_OBJ_TO_PTR(self->desc);
         mp_int_t offset = MP_OBJ_SMALL_INT_VALUE(t->items[0]);
         uint agg_type = GET_TYPE(offset, AGG_TYPE_BITS);
 
@@ -524,13 +537,13 @@ STATIC mp_obj_t uctypes_struct_subscr(mp_obj_t self_in, mp_obj_t index_in, mp_ob
                 return get_unaligned(val_type, p, self->flags);
             } else {
                 mp_uint_t dummy = 0;
-                mp_uint_t size = uctypes_struct_size(t->items[2], &dummy);
+                mp_uint_t size = uctypes_struct_size(t->items[2], self->flags, &dummy);
                 mp_obj_uctypes_struct_t *o = m_new_obj(mp_obj_uctypes_struct_t);
                 o->base.type = &uctypes_struct_type;
                 o->desc = t->items[2];
                 o->addr = self->addr + size * index;
                 o->flags = self->flags;
-                return o;
+                return MP_OBJ_FROM_PTR(o);
             }
         } else if (agg_type == PTR) {
             byte *p = *(void**)self->addr;
@@ -539,13 +552,13 @@ STATIC mp_obj_t uctypes_struct_subscr(mp_obj_t self_in, mp_obj_t index_in, mp_ob
                 return get_aligned(val_type, p, index);
             } else {
                 mp_uint_t dummy = 0;
-                mp_uint_t size = uctypes_struct_size(t->items[1], &dummy);
+                mp_uint_t size = uctypes_struct_size(t->items[1], self->flags, &dummy);
                 mp_obj_uctypes_struct_t *o = m_new_obj(mp_obj_uctypes_struct_t);
                 o->base.type = &uctypes_struct_type;
                 o->desc = t->items[1];
                 o->addr = p + size * index;
                 o->flags = self->flags;
-                return o;
+                return MP_OBJ_FROM_PTR(o);
             }
         }
 
@@ -559,9 +572,9 @@ STATIC mp_obj_t uctypes_struct_subscr(mp_obj_t self_in, mp_obj_t index_in, mp_ob
 
 STATIC mp_int_t uctypes_get_buffer(mp_obj_t self_in, mp_buffer_info_t *bufinfo, mp_uint_t flags) {
     (void)flags;
-    mp_obj_uctypes_struct_t *self = self_in;
+    mp_obj_uctypes_struct_t *self = MP_OBJ_TO_PTR(self_in);
     mp_uint_t max_field_size = 0;
-    mp_uint_t size = uctypes_struct_size(self->desc, &max_field_size);
+    mp_uint_t size = uctypes_struct_size(self->desc, self->flags, &max_field_size);
 
     bufinfo->buf = self->addr;
     bufinfo->len = size;
@@ -575,7 +588,7 @@ STATIC mp_int_t uctypes_get_buffer(mp_obj_t self_in, mp_buffer_info_t *bufinfo, 
 STATIC mp_obj_t uctypes_struct_addressof(mp_obj_t buf) {
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(buf, &bufinfo, MP_BUFFER_READ);
-    return mp_obj_new_int((mp_int_t)bufinfo.buf);
+    return mp_obj_new_int((mp_int_t)(uintptr_t)bufinfo.buf);
 }
 MP_DEFINE_CONST_FUN_OBJ_1(uctypes_struct_addressof_obj, uctypes_struct_addressof);
 
@@ -584,7 +597,7 @@ MP_DEFINE_CONST_FUN_OBJ_1(uctypes_struct_addressof_obj, uctypes_struct_addressof
 /// captured by reference (and thus memory pointed by bytearray may change
 /// or become invalid at later time). Use bytes_at() to capture by value.
 STATIC mp_obj_t uctypes_struct_bytearray_at(mp_obj_t ptr, mp_obj_t size) {
-    return mp_obj_new_bytearray_by_ref(mp_obj_int_get_truncated(size), (void*)mp_obj_int_get_truncated(ptr));
+    return mp_obj_new_bytearray_by_ref(mp_obj_int_get_truncated(size), (void*)(uintptr_t)mp_obj_int_get_truncated(ptr));
 }
 MP_DEFINE_CONST_FUN_OBJ_2(uctypes_struct_bytearray_at_obj, uctypes_struct_bytearray_at);
 
@@ -593,7 +606,7 @@ MP_DEFINE_CONST_FUN_OBJ_2(uctypes_struct_bytearray_at_obj, uctypes_struct_bytear
 /// captured by value, i.e. copied. Use bytearray_at() to capture by reference
 /// ("zero copy").
 STATIC mp_obj_t uctypes_struct_bytes_at(mp_obj_t ptr, mp_obj_t size) {
-    return mp_obj_new_bytes((void*)mp_obj_int_get_truncated(ptr), mp_obj_int_get_truncated(size));
+    return mp_obj_new_bytes((void*)(uintptr_t)mp_obj_int_get_truncated(ptr), mp_obj_int_get_truncated(size));
 }
 MP_DEFINE_CONST_FUN_OBJ_2(uctypes_struct_bytes_at_obj, uctypes_struct_bytes_at);
 
@@ -608,58 +621,58 @@ STATIC const mp_obj_type_t uctypes_struct_type = {
     .buffer_p = { .get_buffer = uctypes_get_buffer },
 };
 
-STATIC const mp_map_elem_t mp_module_uctypes_globals_table[] = {
-    { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_uctypes) },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_struct), (mp_obj_t)&uctypes_struct_type },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_sizeof), (mp_obj_t)&uctypes_struct_sizeof_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_addressof), (mp_obj_t)&uctypes_struct_addressof_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_bytes_at), (mp_obj_t)&uctypes_struct_bytes_at_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_bytearray_at), (mp_obj_t)&uctypes_struct_bytearray_at_obj },
+STATIC const mp_rom_map_elem_t mp_module_uctypes_globals_table[] = {
+    { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_uctypes) },
+    { MP_ROM_QSTR(MP_QSTR_struct), MP_ROM_PTR(&uctypes_struct_type) },
+    { MP_ROM_QSTR(MP_QSTR_sizeof), MP_ROM_PTR(&uctypes_struct_sizeof_obj) },
+    { MP_ROM_QSTR(MP_QSTR_addressof), MP_ROM_PTR(&uctypes_struct_addressof_obj) },
+    { MP_ROM_QSTR(MP_QSTR_bytes_at), MP_ROM_PTR(&uctypes_struct_bytes_at_obj) },
+    { MP_ROM_QSTR(MP_QSTR_bytearray_at), MP_ROM_PTR(&uctypes_struct_bytearray_at_obj) },
 
     /// \moduleref uctypes
 
     /// \constant NATIVE - Native structure layout - native endianness,
     /// platform-specific field alignment
-    { MP_OBJ_NEW_QSTR(MP_QSTR_NATIVE), MP_OBJ_NEW_SMALL_INT(LAYOUT_NATIVE) },
+    { MP_ROM_QSTR(MP_QSTR_NATIVE), MP_ROM_INT(LAYOUT_NATIVE) },
     /// \constant LITTLE_ENDIAN - Little-endian structure layout, tightly packed
     /// (no alignment constraints)
-    { MP_OBJ_NEW_QSTR(MP_QSTR_LITTLE_ENDIAN), MP_OBJ_NEW_SMALL_INT(LAYOUT_LITTLE_ENDIAN) },
+    { MP_ROM_QSTR(MP_QSTR_LITTLE_ENDIAN), MP_ROM_INT(LAYOUT_LITTLE_ENDIAN) },
     /// \constant BIG_ENDIAN - Big-endian structure layout, tightly packed
     /// (no alignment constraints)
-    { MP_OBJ_NEW_QSTR(MP_QSTR_BIG_ENDIAN), MP_OBJ_NEW_SMALL_INT(LAYOUT_BIG_ENDIAN) },
+    { MP_ROM_QSTR(MP_QSTR_BIG_ENDIAN), MP_ROM_INT(LAYOUT_BIG_ENDIAN) },
 
     /// \constant VOID - void value type, may be used only as pointer target type.
-    { MP_OBJ_NEW_QSTR(MP_QSTR_VOID), MP_OBJ_NEW_SMALL_INT(TYPE2SMALLINT(UINT8, VAL_TYPE_BITS)) },
+    { MP_ROM_QSTR(MP_QSTR_VOID), MP_ROM_INT(TYPE2SMALLINT(UINT8, VAL_TYPE_BITS)) },
 
     /// \constant UINT8 - uint8_t value type
-    { MP_OBJ_NEW_QSTR(MP_QSTR_UINT8), MP_OBJ_NEW_SMALL_INT(TYPE2SMALLINT(UINT8, 4)) },
+    { MP_ROM_QSTR(MP_QSTR_UINT8), MP_ROM_INT(TYPE2SMALLINT(UINT8, 4)) },
     /// \constant INT8 - int8_t value type
-    { MP_OBJ_NEW_QSTR(MP_QSTR_INT8), MP_OBJ_NEW_SMALL_INT(TYPE2SMALLINT(INT8, 4)) },
+    { MP_ROM_QSTR(MP_QSTR_INT8), MP_ROM_INT(TYPE2SMALLINT(INT8, 4)) },
     /// \constant UINT16 - uint16_t value type
-    { MP_OBJ_NEW_QSTR(MP_QSTR_UINT16), MP_OBJ_NEW_SMALL_INT(TYPE2SMALLINT(UINT16, 4)) },
+    { MP_ROM_QSTR(MP_QSTR_UINT16), MP_ROM_INT(TYPE2SMALLINT(UINT16, 4)) },
     /// \constant INT16 - int16_t value type
-    { MP_OBJ_NEW_QSTR(MP_QSTR_INT16), MP_OBJ_NEW_SMALL_INT(TYPE2SMALLINT(INT16, 4)) },
+    { MP_ROM_QSTR(MP_QSTR_INT16), MP_ROM_INT(TYPE2SMALLINT(INT16, 4)) },
     /// \constant UINT32 - uint32_t value type
-    { MP_OBJ_NEW_QSTR(MP_QSTR_UINT32), MP_OBJ_NEW_SMALL_INT(TYPE2SMALLINT(UINT32, 4)) },
+    { MP_ROM_QSTR(MP_QSTR_UINT32), MP_ROM_INT(TYPE2SMALLINT(UINT32, 4)) },
     /// \constant INT32 - int32_t value type
-    { MP_OBJ_NEW_QSTR(MP_QSTR_INT32), MP_OBJ_NEW_SMALL_INT(TYPE2SMALLINT(INT32, 4)) },
+    { MP_ROM_QSTR(MP_QSTR_INT32), MP_ROM_INT(TYPE2SMALLINT(INT32, 4)) },
     /// \constant UINT64 - uint64_t value type
-    { MP_OBJ_NEW_QSTR(MP_QSTR_UINT64), MP_OBJ_NEW_SMALL_INT(TYPE2SMALLINT(UINT64, 4)) },
+    { MP_ROM_QSTR(MP_QSTR_UINT64), MP_ROM_INT(TYPE2SMALLINT(UINT64, 4)) },
     /// \constant INT64 - int64_t value type
-    { MP_OBJ_NEW_QSTR(MP_QSTR_INT64), MP_OBJ_NEW_SMALL_INT(TYPE2SMALLINT(INT64, 4)) },
+    { MP_ROM_QSTR(MP_QSTR_INT64), MP_ROM_INT(TYPE2SMALLINT(INT64, 4)) },
 
-    { MP_OBJ_NEW_QSTR(MP_QSTR_BFUINT8), MP_OBJ_NEW_SMALL_INT(TYPE2SMALLINT(BFUINT8, 4)) },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_BFINT8), MP_OBJ_NEW_SMALL_INT(TYPE2SMALLINT(BFINT8, 4)) },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_BFUINT16), MP_OBJ_NEW_SMALL_INT(TYPE2SMALLINT(BFUINT16, 4)) },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_BFINT16), MP_OBJ_NEW_SMALL_INT(TYPE2SMALLINT(BFINT16, 4)) },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_BFUINT32), MP_OBJ_NEW_SMALL_INT(TYPE2SMALLINT(BFUINT32, 4)) },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_BFINT32), MP_OBJ_NEW_SMALL_INT(TYPE2SMALLINT(BFINT32, 4)) },
+    { MP_ROM_QSTR(MP_QSTR_BFUINT8), MP_ROM_INT(TYPE2SMALLINT(BFUINT8, 4)) },
+    { MP_ROM_QSTR(MP_QSTR_BFINT8), MP_ROM_INT(TYPE2SMALLINT(BFINT8, 4)) },
+    { MP_ROM_QSTR(MP_QSTR_BFUINT16), MP_ROM_INT(TYPE2SMALLINT(BFUINT16, 4)) },
+    { MP_ROM_QSTR(MP_QSTR_BFINT16), MP_ROM_INT(TYPE2SMALLINT(BFINT16, 4)) },
+    { MP_ROM_QSTR(MP_QSTR_BFUINT32), MP_ROM_INT(TYPE2SMALLINT(BFUINT32, 4)) },
+    { MP_ROM_QSTR(MP_QSTR_BFINT32), MP_ROM_INT(TYPE2SMALLINT(BFINT32, 4)) },
 
-    { MP_OBJ_NEW_QSTR(MP_QSTR_BF_POS), MP_OBJ_NEW_SMALL_INT(17) },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_BF_LEN), MP_OBJ_NEW_SMALL_INT(22) },
+    { MP_ROM_QSTR(MP_QSTR_BF_POS), MP_ROM_INT(17) },
+    { MP_ROM_QSTR(MP_QSTR_BF_LEN), MP_ROM_INT(22) },
 
-    { MP_OBJ_NEW_QSTR(MP_QSTR_PTR), MP_OBJ_NEW_SMALL_INT(TYPE2SMALLINT(PTR, AGG_TYPE_BITS)) },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_ARRAY), MP_OBJ_NEW_SMALL_INT(TYPE2SMALLINT(ARRAY, AGG_TYPE_BITS)) },
+    { MP_ROM_QSTR(MP_QSTR_PTR), MP_ROM_INT(TYPE2SMALLINT(PTR, AGG_TYPE_BITS)) },
+    { MP_ROM_QSTR(MP_QSTR_ARRAY), MP_ROM_INT(TYPE2SMALLINT(ARRAY, AGG_TYPE_BITS)) },
 };
 
 STATIC MP_DEFINE_CONST_DICT(mp_module_uctypes_globals, mp_module_uctypes_globals_table);

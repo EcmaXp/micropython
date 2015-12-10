@@ -242,8 +242,11 @@ Q(len)
 Q(list)
 Q(locals)
 Q(map)
+#if MICROPY_PY_BUILTINS_MIN_MAX
 Q(max)
 Q(min)
+Q(default)
+#endif
 Q(namedtuple)
 Q(next)
 Q(oct)
@@ -483,6 +486,9 @@ Q(name)
 Q(implementation)
 #if MICROPY_PY_SYS_MAXSIZE
 Q(maxsize)
+#endif
+#if MICROPY_PY_SYS_MODULES
+Q(modules)
 #endif
 #if MICROPY_PY_SYS_EXC_INFO
 Q(exc_info)

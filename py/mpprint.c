@@ -43,7 +43,7 @@
 static const char pad_spaces[] = "                ";
 static const char pad_zeroes[] = "0000000000000000";
 
-STATIC void plat_print_strn(void *env, const char *str, mp_uint_t len) {
+STATIC void plat_print_strn(void *env, const char *str, size_t len) {
     (void)env;
     MP_PLAT_PRINT_STRN(str, len);
 }
@@ -51,14 +51,14 @@ STATIC void plat_print_strn(void *env, const char *str, mp_uint_t len) {
 const mp_print_t mp_plat_print = {NULL, plat_print_strn};
 
 int mp_print_str(const mp_print_t *print, const char *str) {
-    mp_uint_t len = strlen(str);
+    size_t len = strlen(str);
     if (len) {
         print->print_strn(print->data, str, len);
     }
     return len;
 }
 
-int mp_print_strn(const mp_print_t *print, const char *str, mp_uint_t len, int flags, char fill, int width) {
+int mp_print_strn(const mp_print_t *print, const char *str, size_t len, int flags, char fill, int width) {
     int left_pad = 0;
     int right_pad = 0;
     int pad = width - len;
@@ -472,7 +472,7 @@ int mp_vprintf(const mp_print_t *print, const char *fmt, va_list args) {
             case 'q':
             {
                 qstr qst = va_arg(args, qstr);
-                mp_uint_t len;
+                size_t len;
                 const char *str = (const char*)qstr_data(qst, &len);
                 if (prec < 0) {
                     prec = len;
@@ -517,19 +517,9 @@ int mp_vprintf(const mp_print_t *print, const char *fmt, va_list args) {
             case 'g':
             case 'G':
             {
-#if MICROPY_FLOAT_IMPL == MICROPY_FLOAT_IMPL_FLOAT
+#if ((MICROPY_FLOAT_IMPL == MICROPY_FLOAT_IMPL_FLOAT) || (MICROPY_FLOAT_IMPL == MICROPY_FLOAT_IMPL_DOUBLE))
                 mp_float_t f = va_arg(args, double);
                 chrs += mp_print_float(print, f, *fmt, flags, fill, width, prec);
-#elif MICROPY_FLOAT_IMPL == MICROPY_FLOAT_IMPL_DOUBLE
-                // Currently mp_print_float uses snprintf, but snprintf
-                // itself may be implemented in terms of mp_vprintf() for
-                // some ports. So, for extra caution, this case is handled
-                // with assert below. Note that currently ports which
-                // use MICROPY_FLOAT_IMPL_DOUBLE, don't call mp_vprintf()
-                // with float format specifier at all.
-                // TODO: resolve this completely
-                assert(0);
-//#error Calling mp_print_float with double not supported from within printf
 #else
 #error Unknown MICROPY FLOAT IMPL
 #endif

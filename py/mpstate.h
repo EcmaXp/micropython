@@ -52,8 +52,8 @@ typedef struct _mp_state_mem_t {
     #if MICROPY_ENABLE_FINALISER
     byte *gc_finaliser_table_start;
     #endif
-    mp_uint_t *gc_pool_start;
-    mp_uint_t *gc_pool_end;
+    byte *gc_pool_start;
+    byte *gc_pool_end;
 
     int gc_stack_overflow;
     mp_uint_t gc_stack[MICROPY_ALLOC_GC_STACK_SIZE];
@@ -105,16 +105,15 @@ typedef struct _mp_state_vm_t {
     #endif
     #endif
 
-    // map with loaded modules
-    // TODO: expose as sys.modules
-    mp_map_t mp_loaded_modules_map;
+    // dictionary with loaded modules (may be exposed as sys.modules)
+    mp_obj_dict_t mp_loaded_modules_dict;
 
     // pending exception object (MP_OBJ_NULL if not pending)
     volatile mp_obj_t mp_pending_exception;
 
     // current exception being handled, for sys.exc_info()
     #if MICROPY_PY_SYS_EXC_INFO
-    mp_obj_t cur_exception;
+    mp_obj_base_t *cur_exception;
     #endif
 
     // dictionary for the __main__ module
