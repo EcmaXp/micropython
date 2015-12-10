@@ -113,6 +113,11 @@ THE SOFTWARE.
 #error jnupy require MICROPY_LIMIT_CPU
 #endif
 
+#if MICROPY_OBJ_REPR != MICROPY_OBJ_REPR_A
+// TODO: play with MP_ROM_stuff (HELL)
+#error jnupy only support MICROPY_OBJ_REPR_A
+#endif
+
 /** JNUPY INFO **/
 #define JNUPY_JNIVERSION JNI_VERSION_1_6
 // TODO: fill this.
