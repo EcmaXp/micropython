@@ -142,10 +142,9 @@ STATIC mp_obj_t microthread_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint
     
     // currently micropython just use local_dict as global_dict...
     STATE(CTX, dict_locals, global_dict);
-    
     STATE(CTX, dict_globals, global_dict);
 
-    STATE_FROM(VM, mp_loaded_modules_map);
+    STATE_FROM(VM, mp_loaded_modules_dict);
     STATE(VM, cur_exception, MP_OBJ_NULL);
     STATE_FROM(VM, mp_module_builtins_override_dict);
 
@@ -175,7 +174,7 @@ STATIC void mp_load_microthread_context(mp_microthread_context_t *context) {
     STATE(CTX, dict_locals);
     STATE(CTX, dict_globals);
 
-    STATE(VM, mp_loaded_modules_map);
+    STATE(VM, mp_loaded_modules_dict);
     STATE(VM, cur_exception);
     STATE(VM, mp_module_builtins_override_dict);
 
@@ -198,7 +197,7 @@ STATIC void mp_store_microthread_context(mp_microthread_context_t *context) {
     STATE(CTX, dict_locals);
     STATE(CTX, dict_globals);
 
-    STATE(VM, mp_loaded_modules_map);
+    STATE(VM, mp_loaded_modules_dict);
     STATE(VM, cur_exception);
     STATE(VM, mp_module_builtins_override_dict);
 

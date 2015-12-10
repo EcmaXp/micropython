@@ -40,7 +40,7 @@ typedef struct _mp_microthread_context_t {
 
     // == context.vm ==
     // map with loaded modules
-    mp_map_t mp_loaded_modules_map;
+    mp_obj_dict_t mp_loaded_modules_dict;
 
     #if MICROPY_PY_SYS_EXC_INFO
     mp_obj_t cur_exception;

@@ -1553,12 +1553,7 @@ STATIC mp_obj_t mod_jnupy_get_state_ident() {
 STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_jnupy_get_state_ident_obj, mod_jnupy_get_state_ident);
 
 STATIC mp_obj_t mod_jnupy_get_loaded_modules(void) {
-    mp_obj_dict_t *self = m_new_obj(mp_obj_dict_t);
-    self->base.type = &mp_type_dict;
-    self->map = MP_STATE_VM(mp_loaded_modules_map);
-
-    mp_obj_t copy_fun = mp_load_attr(self, MP_QSTR_copy);
-    return mp_call_function_0(copy_fun);
+    return MP_OBJ_FROM_PTR(&MP_STATE_VM(mp_loaded_modules_dict));
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_jnupy_get_loaded_modules_obj, mod_jnupy_get_loaded_modules);

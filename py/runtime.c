@@ -89,6 +89,7 @@ void mp_init(void) {
     mp_obj_dict_t *module_sys_dict = mp_call_function_0(mp_load_attr(mp_module_usys.globals, MP_QSTR_copy));
     mp_obj_dict_store(module_sys_dict, MP_OBJ_NEW_QSTR(MP_QSTR_argv), &MP_STATE_VM(mp_sys_argv_obj));
     mp_obj_dict_store(module_sys_dict, MP_OBJ_NEW_QSTR(MP_QSTR_path), &MP_STATE_VM(mp_sys_path_obj));
+    mp_obj_dict_store(module_sys_dict, MP_OBJ_NEW_QSTR(MP_QSTR_modules), &MP_STATE_VM(mp_loaded_modules_dict));
     module_sys->globals = module_sys_dict;
     #endif
 

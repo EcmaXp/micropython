@@ -128,7 +128,7 @@ mp_obj_dict_t *mp_obj_module_get_globals(mp_obj_t self_in) {
 /******************************************************************************/
 // Global module table and related functions
 
-STATIC const mp_map_elem_t mp_builtin_module_table[] = {
+STATIC const mp_rom_map_elem_t mp_builtin_module_table[] = {
 #if !MICROPY_MULTI_STATE_CONTEXT
     { MP_ROM_QSTR(MP_QSTR___main__), MP_ROM_PTR(&mp_module___main__) },
 #endif
@@ -156,13 +156,8 @@ STATIC const mp_map_elem_t mp_builtin_module_table[] = {
     { MP_ROM_QSTR(MP_QSTR_cmath), MP_ROM_PTR(&mp_module_cmath) },
 #endif
 #endif
-<<<<<<< HEAD
 #if MICROPY_PY_SYS && !MICROPY_MULTI_STATE_CONTEXT
-    { MP_OBJ_NEW_QSTR(MP_QSTR_sys), (mp_obj_t)&mp_module_sys },
-=======
-#if MICROPY_PY_SYS
     { MP_ROM_QSTR(MP_QSTR_sys), MP_ROM_PTR(&mp_module_sys) },
->>>>>>> master
 #endif
 #if MICROPY_PY_GC && MICROPY_ENABLE_GC
     { MP_ROM_QSTR(MP_QSTR_gc), MP_ROM_PTR(&mp_module_gc) },

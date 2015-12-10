@@ -142,7 +142,7 @@ STATIC mp_obj_t mp_sys_exc_info(void) {
 MP_DEFINE_CONST_FUN_OBJ_0(mp_sys_exc_info_obj, mp_sys_exc_info);
 #endif
 
-STATIC const mp_map_elem_t mp_module_sys_globals_table[] = {
+STATIC const mp_rom_map_elem_t mp_module_sys_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_sys) },
     #if MICROPY_MULTI_STATE_CONTEXT
     // path and argv will filled by runtime.c
@@ -190,7 +190,11 @@ STATIC const mp_map_elem_t mp_module_sys_globals_table[] = {
     #endif
 
     #if MICROPY_PY_SYS_MODULES
+    #if MICROPY_MULTI_STATE_CONTEXT
+    // modules will filled by runtime.c
+    #else
     { MP_OBJ_NEW_QSTR(MP_QSTR_modules), MP_ROM_PTR(&MP_STATE_VM(mp_loaded_modules_dict)) },
+    #endif
     #endif
     #if MICROPY_PY_SYS_EXC_INFO
     { MP_ROM_QSTR(MP_QSTR_exc_info), MP_ROM_PTR(&mp_sys_exc_info_obj) },

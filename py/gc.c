@@ -498,12 +498,7 @@ void gc_free(void *ptr) {
             DEBUG_printf("gc_free(%p) has bad free\n", ptr);
             assert(!"bad free");
         }
-<<<<<<< HEAD
-    } else if (ptr_in != NULL) {
-        DEBUG_printf("gc_free(%p) has bad free\n", ptr);
-=======
     } else if (ptr != NULL) {
->>>>>>> master
         assert(!"bad free");
     }
 }
