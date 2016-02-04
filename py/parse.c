@@ -482,7 +482,7 @@ STATIC bool fold_constants(parser_t *parser, const rule_t *rule, size_t num_args
         } else {
             op = MP_BINARY_OP_AND;
         }
-        for (ssize_t i = num_args - 2; i >= 0; --i) {
+        for (size_t i = num_args - 2; i >= 0; --i) {
             pn = peek_result(parser, i);
             mp_obj_t arg1;
             if (!mp_parse_node_get_int_maybe(pn, &arg1)) {
@@ -498,7 +498,7 @@ STATIC bool fold_constants(parser_t *parser, const rule_t *rule, size_t num_args
         if (!mp_parse_node_get_int_maybe(pn, &arg0)) {
             return false;
         }
-        for (ssize_t i = num_args - 2; i >= 1; i -= 2) {
+        for (size_t i = num_args - 2; i >= 1; i -= 2) {
             pn = peek_result(parser, i - 1);
             mp_obj_t arg1;
             if (!mp_parse_node_get_int_maybe(pn, &arg1)) {
