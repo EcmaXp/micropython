@@ -564,12 +564,9 @@ extern const mp_obj_type_t mp_type_property;
 extern const mp_obj_type_t mp_type_stringio;
 extern const mp_obj_type_t mp_type_bytesio;
 extern const mp_obj_type_t mp_type_reversed;
-<<<<<<< HEAD
 extern const mp_obj_type_t mp_type_closure;
 extern const mp_obj_type_t mp_type_bound_meth;
-=======
 extern const mp_obj_type_t mp_type_polymorph_iter;
->>>>>>> ff1a96ce2cd95c42beca5209b353f83da773522d
 
 // Exceptions
 extern const mp_obj_type_t mp_type_BaseException;
