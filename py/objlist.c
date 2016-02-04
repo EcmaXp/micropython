@@ -36,7 +36,7 @@
 STATIC mp_obj_t mp_obj_new_list_iterator(mp_obj_t list, mp_uint_t cur);
 STATIC mp_obj_list_t *list_new(mp_uint_t n);
 STATIC mp_obj_t list_extend(mp_obj_t self_in, mp_obj_t arg_in);
-STATIC mp_obj_t list_pop(mp_uint_t n_args, const mp_obj_t *args);
+STATIC mp_obj_t list_pop(size_t n_args, const mp_obj_t *args);
 
 // TODO: Move to mpconfig.h
 #define LIST_MIN_ALLOC 4
@@ -68,7 +68,7 @@ STATIC mp_obj_t list_extend_from_iter(mp_obj_t list, mp_obj_t iterable) {
     return list;
 }
 
-STATIC mp_obj_t list_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC mp_obj_t list_make_new(const mp_obj_type_t *type_in, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     (void)type_in;
     mp_arg_check_num(n_args, n_kw, 0, 1, false);
 
@@ -262,7 +262,7 @@ STATIC mp_obj_t list_extend(mp_obj_t self_in, mp_obj_t arg_in) {
     return mp_const_none; // return None, as per CPython
 }
 
-STATIC mp_obj_t list_pop(mp_uint_t n_args, const mp_obj_t *args) {
+STATIC mp_obj_t list_pop(size_t n_args, const mp_obj_t *args) {
     assert(1 <= n_args && n_args <= 2);
     assert(MP_OBJ_IS_TYPE(args[0], &mp_type_list));
     mp_obj_list_t *self = MP_OBJ_TO_PTR(args[0]);
@@ -311,23 +311,26 @@ STATIC void mp_quicksort(mp_obj_t *head, mp_obj_t *tail, mp_obj_t key_fn, mp_obj
 }
 
 // TODO Python defines sort to be stable but ours is not
-mp_obj_t mp_obj_list_sort(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+mp_obj_t mp_obj_list_sort(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
     static const mp_arg_t allowed_args[] = {
         { MP_QSTR_key, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_rom_obj = MP_ROM_PTR(&mp_const_none_obj)} },
         { MP_QSTR_reverse, MP_ARG_KW_ONLY | MP_ARG_BOOL, {.u_bool = false} },
     };
 
     // parse args
-    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
-    mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+    struct {
+        mp_arg_val_t key, reverse;
+    } args;
+    mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args,
+        MP_ARRAY_SIZE(allowed_args), allowed_args, (mp_arg_val_t*)&args);
 
     assert(MP_OBJ_IS_TYPE(pos_args[0], &mp_type_list));
     mp_obj_list_t *self = MP_OBJ_TO_PTR(pos_args[0]);
 
     if (self->len > 1) {
         mp_quicksort(self->items, self->items + self->len - 1,
-                     args[0].u_obj == mp_const_none ? MP_OBJ_NULL : args[0].u_obj,
-                     args[1].u_bool ? mp_const_false : mp_const_true);
+                     args.key.u_obj == mp_const_none ? MP_OBJ_NULL : args.key.u_obj,
+                     args.reverse.u_bool ? mp_const_false : mp_const_true);
     }
 
     return mp_const_none;
@@ -355,7 +358,7 @@ STATIC mp_obj_t list_count(mp_obj_t self_in, mp_obj_t value) {
     return mp_seq_count_obj(self->items, self->len, value);
 }
 
-STATIC mp_obj_t list_index(mp_uint_t n_args, const mp_obj_t *args) {
+STATIC mp_obj_t list_index(size_t n_args, const mp_obj_t *args) {
     assert(2 <= n_args && n_args <= 4);
     assert(MP_OBJ_IS_TYPE(args[0], &mp_type_list));
     mp_obj_list_t *self = MP_OBJ_TO_PTR(args[0]);
@@ -498,6 +501,7 @@ void mp_obj_list_store(mp_obj_t self_in, mp_obj_t index, mp_obj_t value) {
 
 typedef struct _mp_obj_list_it_t {
     mp_obj_base_t base;
+    mp_fun_1_t iternext;
     mp_obj_t list;
     mp_uint_t cur;
 } mp_obj_list_it_t;
@@ -514,16 +518,10 @@ STATIC mp_obj_t list_it_iternext(mp_obj_t self_in) {
     }
 }
 
-STATIC const mp_obj_type_t mp_type_list_it = {
-    { &mp_type_type },
-    .name = MP_QSTR_iterator,
-    .getiter = mp_identity,
-    .iternext = list_it_iternext,
-};
-
 mp_obj_t mp_obj_new_list_iterator(mp_obj_t list, mp_uint_t cur) {
     mp_obj_list_it_t *o = m_new_obj(mp_obj_list_it_t);
-    o->base.type = &mp_type_list_it;
+    o->base.type = &mp_type_polymorph_iter;
+    o->iternext = list_it_iternext;
     o->list = list;
     o->cur = cur;
     return MP_OBJ_FROM_PTR(o);

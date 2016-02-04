@@ -31,7 +31,7 @@
 #include "py/bc.h"
 #include "py/objclosure.h"
 
-STATIC mp_obj_t closure_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC mp_obj_t closure_call(mp_obj_t self_in, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     mp_obj_closure_t *self = MP_OBJ_TO_PTR(self_in);
 
     // need to concatenate closed-over-vars and args

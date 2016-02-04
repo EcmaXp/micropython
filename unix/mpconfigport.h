@@ -104,7 +104,13 @@
 #define MICROPY_PY_UHEAPQ           (1)
 #define MICROPY_PY_UHASHLIB         (1)
 #define MICROPY_PY_UBINASCII        (1)
+#define MICROPY_PY_URANDOM          (1)
+#ifndef MICROPY_PY_USELECT
+#define MICROPY_PY_USELECT          (1)
+#endif
 #define MICROPY_PY_MACHINE          (1)
+#define MICROPY_MACHINE_MEM_GET_READ_ADDR   mod_machine_mem_get_addr
+#define MICROPY_MACHINE_MEM_GET_WRITE_ADDR  mod_machine_mem_get_addr
 
 // Define to MICROPY_ERROR_REPORTING_DETAILED to get function, etc.
 // names in exception messages (may require more RAM).
@@ -123,7 +129,9 @@
 
 #define MICROPY_ENABLE_EMERGENCY_EXCEPTION_BUF   (1)
 #define MICROPY_EMERGENCY_EXCEPTION_BUF_SIZE  (256)
+#define MICROPY_ASYNC_KBD_INTR      (1)
 
+extern const struct _mp_obj_module_t mp_module_machine;
 extern const struct _mp_obj_module_t mp_module_os;
 extern const struct _mp_obj_module_t mp_module_uselect;
 extern const struct _mp_obj_module_t mp_module_time;
@@ -157,18 +165,26 @@ extern const struct _mp_obj_module_t mp_module_jni;
 #else
 #define MICROPY_PY_SOCKET_DEF
 #endif
+#if MICROPY_PY_USELECT
+#define MICROPY_PY_USELECT_DEF { MP_ROM_QSTR(MP_QSTR_uselect), MP_ROM_PTR(&mp_module_uselect) },
+#else
+#define MICROPY_PY_USELECT_DEF
+#endif
 
 #define MICROPY_PORT_BUILTIN_MODULES \
     MICROPY_PY_FFI_DEF \
     MICROPY_PY_JNI_DEF \
     MICROPY_PY_TIME_DEF \
     MICROPY_PY_SOCKET_DEF \
-    { MP_ROM_QSTR(MP_QSTR__os), MP_ROM_PTR(&mp_module_os) }, \
-    { MP_ROM_QSTR(MP_QSTR_uselect), MP_ROM_PTR(&mp_module_uselect) }, \
+    { MP_ROM_QSTR(MP_QSTR_umachine), MP_ROM_PTR(&mp_module_machine) }, \
+    { MP_ROM_QSTR(MP_QSTR_uos), MP_ROM_PTR(&mp_module_os) }, \
+    MICROPY_PY_USELECT_DEF \
     MICROPY_PY_TERMIOS_DEF \
 
 // type definitions for the specific machine
 
+// assume that if we already defined the obj repr then we also defined types
+#ifndef MICROPY_OBJ_REPR
 #ifdef __LP64__
 typedef long mp_int_t; // must be pointer size
 typedef unsigned long mp_uint_t; // must be pointer size
@@ -177,6 +193,7 @@ typedef unsigned long mp_uint_t; // must be pointer size
 // regardless of actual size.
 typedef int mp_int_t; // must be pointer size
 typedef unsigned int mp_uint_t; // must be pointer size
+#endif
 #endif
 
 #define BYTES_PER_WORD sizeof(mp_int_t)
@@ -197,8 +214,16 @@ void mp_unix_mark_exec(void);
 #define MP_PLAT_ALLOC_EXEC(min_size, ptr, size) mp_unix_alloc_exec(min_size, ptr, size)
 #define MP_PLAT_FREE_EXEC(ptr, size) mp_unix_free_exec(ptr, size)
 
+#ifndef MP_NOINLINE
+#define MP_NOINLINE __attribute__((noinline))
+#endif
+
+#if MICROPY_PY_OS_DUPTERM
+#define MP_PLAT_PRINT_STRN(str, len) mp_hal_stdout_tx_strn_cooked(str, len)
+#else
 #include <unistd.h>
 #define MP_PLAT_PRINT_STRN(str, len) do { ssize_t ret = write(1, str, len); (void)ret; } while (0)
+#endif
 
 #ifdef __linux__
 // Can access physical memory using /dev/mem
@@ -239,4 +264,18 @@ extern const struct _mp_obj_fun_builtin_t mp_builtin_open_obj;
 #else
 #include <alloca.h>
 #endif
+#endif
+
+// From "man readdir": "Under glibc, programs can check for the availability
+// of the fields [in struct dirent] not defined in POSIX.1 by testing whether
+// the macros [...], _DIRENT_HAVE_D_TYPE are defined."
+// Other libc's don't define it, but proactively assume that dirent->d_type
+// is available on a modern *nix system.
+#ifndef _DIRENT_HAVE_D_TYPE
+#define _DIRENT_HAVE_D_TYPE (1)
+#endif
+// This macro is not provided by glibc but we need it so ports that don't have
+// dirent->d_ino can disable the use of this field.
+#ifndef _DIRENT_HAVE_D_INO
+#define _DIRENT_HAVE_D_INO (1)
 #endif

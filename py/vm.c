@@ -805,7 +805,7 @@ unwind_jump:;
                             exc_sp--; // pop exception handler
                             goto dispatch_loop; // run the exception handler
                         }
-                        exc_sp--;
+                        POP_EXC_BLOCK();
                     }
                     ip = (const byte*)MP_OBJ_TO_PTR(POP()); // pop destination ip for jump
                     if (unum != 0) {
@@ -889,14 +889,6 @@ unwind_jump:;
                     //exc_sp--; // discard ip
                     POP_EXC_BLOCK();
                     //sp -= 3; // pop 3 exception values
-                    DISPATCH();
-
-                ENTRY(MP_BC_NOT):
-                    if (TOP() == mp_const_true) {
-                        SET_TOP(mp_const_false);
-                    } else {
-                        SET_TOP(mp_const_true);
-                    }
                     DISPATCH();
 
                 ENTRY(MP_BC_BUILD_TUPLE): {
@@ -1092,7 +1084,7 @@ unwind_jump:;
                         
                         mp_uint_t n_args = unum & 0xff;
                         mp_uint_t n_kw = (unum >> 8) & 0xff;
-                        int adjust = (sp[1] == NULL) ? 0 : 1;
+                        int adjust = (sp[1] == MP_OBJ_NULL) ? 0 : 1;
 
                         mp_code_state *new_state = flatcall(*sp, n_args + adjust, n_kw, sp + 2 - adjust);
                         if (new_state) {
@@ -1137,6 +1129,14 @@ unwind_jump:;
 
                 ENTRY(MP_BC_RETURN_VALUE):
                     MARK_EXC_IP_SELECTIVE();
+                    // These next 3 lines pop a try-finally exception handler, if one
+                    // is there on the exception stack.  Without this the finally block
+                    // is executed a second time when the return is executed, because
+                    // the try-finally exception handler is still on the stack.
+                    // TODO Possibly find a better way to handle this case.
+                    if (currently_in_except_block) {
+                        POP_EXC_BLOCK();
+                    }
 unwind_return:
                     while (exc_sp >= exc_stack) {
                         if (MP_TAGPTR_TAG1(exc_sp->val_sp)) {
@@ -1328,7 +1328,7 @@ yield:
                     } else if (ip[-1] < MP_BC_STORE_FAST_MULTI + 16) {
                         fastn[MP_BC_STORE_FAST_MULTI - (mp_int_t)ip[-1]] = POP();
                         DISPATCH();
-                    } else if (ip[-1] < MP_BC_UNARY_OP_MULTI + 6) {
+                    } else if (ip[-1] < MP_BC_UNARY_OP_MULTI + 7) {
                         SET_TOP(mp_unary_op(ip[-1] - MP_BC_UNARY_OP_MULTI, TOP()));
                         DISPATCH();
                     } else if (ip[-1] < MP_BC_BINARY_OP_MULTI + 36) {
@@ -1410,9 +1410,9 @@ unwind_loop:
                 qstr block_name = mp_decode_uint(&ip);
                 qstr source_file = mp_decode_uint(&ip);
                 #endif
-                mp_uint_t bc = code_state->ip - code_state->code_info - code_info_size;
-                mp_uint_t source_line = 1;
-                mp_uint_t c;
+                size_t bc = code_state->ip - code_state->code_info - code_info_size;
+                size_t source_line = 1;
+                size_t c;
                 while ((c = *ip)) {
                     mp_uint_t b, l;
                     if ((c & 0x80) == 0) {

@@ -46,6 +46,7 @@ Q(__locals__)
 Q(__main__)
 Q(__module__)
 Q(__name__)
+Q(__dict__)
 Q(__hash__)
 Q(__next__)
 Q(__qualname__)
@@ -112,6 +113,7 @@ Q(asm_thumb)
 Q(label)
 Q(align)
 Q(data)
+Q(uint)
 #endif
 
 Q(builtins)
@@ -441,6 +443,13 @@ Q(mem_peak)
 #endif
 Q(mem_info)
 Q(qstr_info)
+#if MICROPY_STACK_CHECK
+Q(stack_use)
+#endif
+#endif
+#if MICROPY_ENABLE_GC
+Q(heap_lock)
+Q(heap_unlock)
 #endif
 
 #if MICROPY_ENABLE_EMERGENCY_EXCEPTION_BUF && (MICROPY_EMERGENCY_EXCEPTION_BUF_SIZE == 0)
@@ -497,9 +506,12 @@ Q(print_exception)
 #endif
 
 #if MICROPY_PY_STRUCT
+Q(struct)
 Q(ustruct)
 Q(pack)
+Q(pack_into)
 Q(unpack)
+Q(unpack_from)
 Q(calcsize)
 #endif
 
@@ -578,6 +590,7 @@ Q(property)
 Q(getter)
 Q(setter)
 Q(deleter)
+Q(doc)
 #endif
 
 #if MICROPY_PY_UZLIB
@@ -612,6 +625,7 @@ Q(uhashlib)
 Q(update)
 Q(digest)
 Q(sha256)
+Q(sha1)
 #endif
 
 #if MICROPY_PY_UBINASCII
@@ -623,7 +637,7 @@ Q(b2a_base64)
 #endif
 
 #if MICROPY_PY_MACHINE
-Q(machine)
+Q(umachine)
 Q(mem)
 Q(mem8)
 Q(mem16)
@@ -661,5 +675,33 @@ Q(settimeout)
 // for lwip.slip
 Q(slip)
 Q(status)
+#endif
+#endif
+
+#if MICROPY_FSUSERMOUNT
+// for user-mountable block devices
+Q(mount)
+Q(readonly)
+Q(mkfs)
+Q(readblocks)
+Q(writeblocks)
+Q(sync)
+Q(count)
+#endif
+
+#if MICROPY_PY_OS_DUPTERM
+Q(dupterm)
+#endif
+
+#if MICROPY_PY_URANDOM
+Q(urandom)
+Q(getrandbits)
+Q(seed)
+#if MICROPY_PY_URANDOM_EXTRA_FUNCS
+Q(randrange)
+Q(randint)
+Q(choice)
+Q(random)
+Q(uniform)
 #endif
 #endif

@@ -74,7 +74,7 @@ STATIC mp_obj_t code_execute(mp_obj_code_t *self, mp_obj_dict_t *globals, mp_obj
     }
 }
 
-STATIC mp_obj_t mp_builtin_compile(mp_uint_t n_args, const mp_obj_t *args) {
+STATIC mp_obj_t mp_builtin_compile(size_t n_args, const mp_obj_t *args) {
     (void)n_args;
 
     // get the source
@@ -107,7 +107,9 @@ MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mp_builtin_compile_obj, 3, 6, mp_builtin_com
 
 #endif // MICROPY_PY_BUILTINS_COMPILE
 
-STATIC mp_obj_t eval_exec_helper(mp_uint_t n_args, const mp_obj_t *args, mp_parse_input_kind_t parse_input_kind) {
+#if MICROPY_PY_BUILTINS_EVAL_EXEC
+
+STATIC mp_obj_t eval_exec_helper(size_t n_args, const mp_obj_t *args, mp_parse_input_kind_t parse_input_kind) {
     // work out the context
     mp_obj_dict_t *globals = mp_globals_get();
     mp_obj_dict_t *locals = mp_locals_get();
@@ -145,18 +147,20 @@ STATIC mp_obj_t eval_exec_helper(mp_uint_t n_args, const mp_obj_t *args, mp_pars
     return mp_parse_compile_execute(lex, parse_input_kind, globals, locals);
 }
 
-STATIC mp_obj_t mp_builtin_eval(mp_uint_t n_args, const mp_obj_t *args) {
+STATIC mp_obj_t mp_builtin_eval(size_t n_args, const mp_obj_t *args) {
     return eval_exec_helper(n_args, args, MP_PARSE_EVAL_INPUT);
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mp_builtin_eval_obj, 1, 3, mp_builtin_eval);
 
-STATIC mp_obj_t mp_builtin_exec(mp_uint_t n_args, const mp_obj_t *args) {
+STATIC mp_obj_t mp_builtin_exec(size_t n_args, const mp_obj_t *args) {
     return eval_exec_helper(n_args, args, MP_PARSE_FILE_INPUT);
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mp_builtin_exec_obj, 1, 3, mp_builtin_exec);
 
+#endif // MICROPY_PY_BUILTINS_EVAL_EXEC
+
 #if MICROPY_PY_BUILTINS_EXECFILE
-STATIC mp_obj_t mp_builtin_execfile(mp_uint_t n_args, const mp_obj_t *args) {
+STATIC mp_obj_t mp_builtin_execfile(size_t n_args, const mp_obj_t *args) {
     // MP_PARSE_SINGLE_INPUT is used to indicate a file input
     return eval_exec_helper(n_args, args, MP_PARSE_SINGLE_INPUT);
 }

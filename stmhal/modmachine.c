@@ -30,6 +30,7 @@
 #include "py/gc.h"
 #include "py/runtime.h"
 #include "py/mphal.h"
+#include "extmod/machine_mem.h"
 #include "lib/fatfs/ff.h"
 #include "lib/fatfs/diskio.h"
 #include "gccollect.h"
@@ -252,7 +253,7 @@ STATIC mp_obj_t machine_freq(mp_uint_t n_args, const mp_obj_t *args) {
         //printf("%lu %lu %lu %lu %lu\n", sysclk_source, m, n, p, q);
 
         // let the USB CDC have a chance to process before we change the clock
-        HAL_Delay(USBD_CDC_POLLING_INTERVAL + 2);
+        HAL_Delay(5);
 
         // desired system clock source is in sysclk_source
         RCC_ClkInitTypeDef RCC_ClkInitStruct;
@@ -314,9 +315,6 @@ STATIC mp_obj_t machine_freq(mp_uint_t n_args, const mp_obj_t *args) {
                 goto fail;
             }
         }
-
-        // re-init TIM3 for USB CDC rate
-        timer_tim3_init();
 
         #if defined(MICROPY_HW_CLK_LAST_FREQ) && MICROPY_HW_CLK_LAST_FREQ
         #if defined(MCU_SERIES_F7)
@@ -419,7 +417,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_0(machine_reset_cause_obj, machine_reset_cause);
 #endif
 
 STATIC const mp_map_elem_t machine_module_globals_table[] = {
-    { MP_OBJ_NEW_QSTR(MP_QSTR___name__),            MP_OBJ_NEW_QSTR(MP_QSTR_machine) },
+    { MP_OBJ_NEW_QSTR(MP_QSTR___name__),            MP_OBJ_NEW_QSTR(MP_QSTR_umachine) },
     { MP_OBJ_NEW_QSTR(MP_QSTR_info),                (mp_obj_t)&machine_info_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_unique_id),           (mp_obj_t)&machine_unique_id_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_reset),               (mp_obj_t)&machine_reset_obj },
@@ -438,6 +436,10 @@ STATIC const mp_map_elem_t machine_module_globals_table[] = {
 
     { MP_OBJ_NEW_QSTR(MP_QSTR_disable_irq),         (mp_obj_t)&pyb_disable_irq_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_enable_irq),          (mp_obj_t)&pyb_enable_irq_obj },
+
+    { MP_ROM_QSTR(MP_QSTR_mem8),                    (mp_obj_t)&machine_mem8_obj },
+    { MP_ROM_QSTR(MP_QSTR_mem16),                   (mp_obj_t)&machine_mem16_obj },
+    { MP_ROM_QSTR(MP_QSTR_mem32),                   (mp_obj_t)&machine_mem32_obj },
 
     { MP_OBJ_NEW_QSTR(MP_QSTR_Pin),                 (mp_obj_t)&pin_type },
 
@@ -475,7 +477,7 @@ STATIC MP_DEFINE_CONST_DICT(machine_module_globals, machine_module_globals_table
 
 const mp_obj_module_t machine_module = {
     .base = { &mp_type_module },
-    .name = MP_QSTR_machine,
+    .name = MP_QSTR_umachine,
     .globals = (mp_obj_dict_t*)&machine_module_globals,
 };
 

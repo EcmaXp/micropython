@@ -31,6 +31,7 @@
 #include "py/smallint.h"
 #include "py/objint.h"
 #include "py/objstr.h"
+#include "py/objtype.h"
 #include "py/runtime0.h"
 #include "py/runtime.h"
 #include "py/builtin.h"
@@ -47,7 +48,7 @@ extern struct _mp_dummy_t mp_sys_stdout_obj; // type is irrelevant, just need po
 // args[0] is function from class body
 // args[1] is class name
 // args[2:] are base objects
-STATIC mp_obj_t mp_builtin___build_class__(mp_uint_t n_args, const mp_obj_t *args) {
+STATIC mp_obj_t mp_builtin___build_class__(size_t n_args, const mp_obj_t *args) {
     assert(2 <= n_args);
 
     // set the new classes __locals__ object
@@ -192,10 +193,11 @@ STATIC mp_obj_t mp_builtin_chr(mp_obj_t o_in) {
 }
 MP_DEFINE_CONST_FUN_OBJ_1(mp_builtin_chr_obj, mp_builtin_chr);
 
-STATIC mp_obj_t mp_builtin_dir(mp_uint_t n_args, const mp_obj_t *args) {
+STATIC mp_obj_t mp_builtin_dir(size_t n_args, const mp_obj_t *args) {
     // TODO make this function more general and less of a hack
 
     mp_obj_dict_t *dict = NULL;
+    mp_map_t *members = NULL;
     if (n_args == 0) {
         // make a list of names in the local name space
         dict = mp_locals_get();
@@ -214,6 +216,10 @@ STATIC mp_obj_t mp_builtin_dir(mp_uint_t n_args, const mp_obj_t *args) {
                 dict = type->locals_dict;
             }
         }
+        if (mp_obj_is_instance_type(mp_obj_get_type(args[0]))) {
+            mp_obj_instance_t *inst = MP_OBJ_TO_PTR(args[0]);
+            members = &inst->members;
+        }
     }
 
     mp_obj_t dir = mp_obj_new_list(0, NULL);
@@ -224,7 +230,13 @@ STATIC mp_obj_t mp_builtin_dir(mp_uint_t n_args, const mp_obj_t *args) {
             }
         }
     }
-
+    if (members != NULL) {
+        for (mp_uint_t i = 0; i < members->alloc; i++) {
+            if (MP_MAP_SLOT_IS_FILLED(members, i)) {
+                mp_obj_list_append(dir, members->table[i].key);
+            }
+        }
+    }
     return dir;
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mp_builtin_dir_obj, 0, 1, mp_builtin_dir);
@@ -252,7 +264,7 @@ MP_DEFINE_CONST_FUN_OBJ_1(mp_builtin_iter_obj, mp_builtin_iter);
 
 #if MICROPY_PY_BUILTINS_MIN_MAX
 
-STATIC mp_obj_t mp_builtin_min_max(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwargs, mp_uint_t op) {
+STATIC mp_obj_t mp_builtin_min_max(size_t n_args, const mp_obj_t *args, mp_map_t *kwargs, mp_uint_t op) {
     mp_map_elem_t *key_elem = mp_map_lookup(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_key), MP_MAP_LOOKUP);
     mp_map_elem_t *default_elem;
     mp_obj_t key_fn = key_elem == NULL ? MP_OBJ_NULL : key_elem->value;
@@ -293,12 +305,12 @@ STATIC mp_obj_t mp_builtin_min_max(mp_uint_t n_args, const mp_obj_t *args, mp_ma
     }
 }
 
-STATIC mp_obj_t mp_builtin_max(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
+STATIC mp_obj_t mp_builtin_max(size_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
     return mp_builtin_min_max(n_args, args, kwargs, MP_BINARY_OP_MORE);
 }
 MP_DEFINE_CONST_FUN_OBJ_KW(mp_builtin_max_obj, 1, mp_builtin_max);
 
-STATIC mp_obj_t mp_builtin_min(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
+STATIC mp_obj_t mp_builtin_min(size_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
     return mp_builtin_min_max(n_args, args, kwargs, MP_BINARY_OP_LESS);
 }
 MP_DEFINE_CONST_FUN_OBJ_KW(mp_builtin_min_obj, 1, mp_builtin_min);
@@ -363,7 +375,7 @@ STATIC mp_obj_t mp_builtin_ord(mp_obj_t o_in) {
 }
 MP_DEFINE_CONST_FUN_OBJ_1(mp_builtin_ord_obj, mp_builtin_ord);
 
-STATIC mp_obj_t mp_builtin_pow(mp_uint_t n_args, const mp_obj_t *args) {
+STATIC mp_obj_t mp_builtin_pow(size_t n_args, const mp_obj_t *args) {
     assert(2 <= n_args && n_args <= 3);
     switch (n_args) {
         case 2: return mp_binary_op(MP_BINARY_OP_POWER, args[0], args[1]);
@@ -372,7 +384,7 @@ STATIC mp_obj_t mp_builtin_pow(mp_uint_t n_args, const mp_obj_t *args) {
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mp_builtin_pow_obj, 2, 3, mp_builtin_pow);
 
-STATIC mp_obj_t mp_builtin_print(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
+STATIC mp_obj_t mp_builtin_print(size_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
     mp_map_elem_t *sep_elem = mp_map_lookup(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_sep), MP_MAP_LOOKUP);
     mp_map_elem_t *end_elem = mp_map_lookup(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_end), MP_MAP_LOOKUP);
     const char *sep_data = " ";
@@ -444,7 +456,7 @@ STATIC mp_obj_t mp_builtin_repr(mp_obj_t o_in) {
 }
 MP_DEFINE_CONST_FUN_OBJ_1(mp_builtin_repr_obj, mp_builtin_repr);
 
-STATIC mp_obj_t mp_builtin_round(mp_uint_t n_args, const mp_obj_t *args) {
+STATIC mp_obj_t mp_builtin_round(size_t n_args, const mp_obj_t *args) {
     mp_obj_t o_in = args[0];
     if (MP_OBJ_IS_INT(o_in)) {
         return o_in;
@@ -478,7 +490,7 @@ STATIC mp_obj_t mp_builtin_round(mp_uint_t n_args, const mp_obj_t *args) {
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mp_builtin_round_obj, 1, 2, mp_builtin_round);
 
-STATIC mp_obj_t mp_builtin_sum(mp_uint_t n_args, const mp_obj_t *args) {
+STATIC mp_obj_t mp_builtin_sum(size_t n_args, const mp_obj_t *args) {
     assert(1 <= n_args && n_args <= 2);
     mp_obj_t value;
     switch (n_args) {
@@ -494,13 +506,13 @@ STATIC mp_obj_t mp_builtin_sum(mp_uint_t n_args, const mp_obj_t *args) {
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mp_builtin_sum_obj, 1, 2, mp_builtin_sum);
 
-STATIC mp_obj_t mp_builtin_sorted(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
+STATIC mp_obj_t mp_builtin_sorted(size_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
     assert(n_args >= 1);
     if (n_args > 1) {
         nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError,
                                           "must use keyword argument for key function"));
     }
-    mp_obj_t self = mp_type_list.make_new(MP_OBJ_FROM_PTR(&mp_type_list), 1, 0, args);
+    mp_obj_t self = mp_type_list.make_new(&mp_type_list, 1, 0, args);
     mp_obj_list_sort(1, &self, kwargs);
 
     return self;
@@ -523,7 +535,7 @@ STATIC inline mp_obj_t mp_load_attr_default(mp_obj_t base, qstr attr, mp_obj_t d
     }
 }
 
-STATIC mp_obj_t mp_builtin_getattr(mp_uint_t n_args, const mp_obj_t *args) {
+STATIC mp_obj_t mp_builtin_getattr(size_t n_args, const mp_obj_t *args) {
     mp_obj_t defval = MP_OBJ_NULL;
     if (n_args > 2) {
         defval = args[2];
@@ -552,11 +564,19 @@ STATIC mp_obj_t mp_builtin_hasattr(mp_obj_t object_in, mp_obj_t attr_in) {
 }
 MP_DEFINE_CONST_FUN_OBJ_2(mp_builtin_hasattr_obj, mp_builtin_hasattr);
 
+STATIC mp_obj_t mp_builtin_globals(void) {
+    return MP_OBJ_FROM_PTR(mp_globals_get());
+}
+MP_DEFINE_CONST_FUN_OBJ_0(mp_builtin_globals_obj, mp_builtin_globals);
+
+STATIC mp_obj_t mp_builtin_locals(void) {
+    return MP_OBJ_FROM_PTR(mp_locals_get());
+}
+MP_DEFINE_CONST_FUN_OBJ_0(mp_builtin_locals_obj, mp_builtin_locals);
+
 // These are defined in terms of MicroPython API functions right away
 MP_DEFINE_CONST_FUN_OBJ_1(mp_builtin_id_obj, mp_obj_id);
 MP_DEFINE_CONST_FUN_OBJ_1(mp_builtin_len_obj, mp_obj_len);
-MP_DEFINE_CONST_FUN_OBJ_0(mp_builtin_globals_obj, mp_globals_get);
-MP_DEFINE_CONST_FUN_OBJ_0(mp_builtin_locals_obj, mp_locals_get);
 
 STATIC const mp_rom_map_elem_t mp_module_builtins_globals_table[] = {
     // built-in core functions
@@ -630,8 +650,10 @@ STATIC const mp_rom_map_elem_t mp_module_builtins_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_chr), MP_ROM_PTR(&mp_builtin_chr_obj) },
     { MP_ROM_QSTR(MP_QSTR_dir), MP_ROM_PTR(&mp_builtin_dir_obj) },
     { MP_ROM_QSTR(MP_QSTR_divmod), MP_ROM_PTR(&mp_builtin_divmod_obj) },
+    #if MICROPY_PY_BUILTINS_EVAL_EXEC
     { MP_ROM_QSTR(MP_QSTR_eval), MP_ROM_PTR(&mp_builtin_eval_obj) },
     { MP_ROM_QSTR(MP_QSTR_exec), MP_ROM_PTR(&mp_builtin_exec_obj) },
+    #endif
     #if MICROPY_PY_BUILTINS_EXECFILE
     { MP_ROM_QSTR(MP_QSTR_execfile), MP_ROM_PTR(&mp_builtin_execfile_obj) },
     #endif

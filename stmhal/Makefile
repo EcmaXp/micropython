@@ -264,6 +264,19 @@ $(BUILD)/$(HAL_DIR)/src/stm32$(MCU_SERIES)xx_hal_sd.o: COPT += -Os
 
 all: $(BUILD)/firmware.dfu $(BUILD)/firmware.hex
 
+ifneq ($(FROZEN_DIR),)
+CFLAGS += -DMICROPY_MODULE_FROZEN
+OBJ += $(BUILD)/frozen-files.o
+MAKE_FROZEN = ../tools/make-frozen.py
+
+$(BUILD)/frozen-files.o: $(BUILD)/frozen-files.c
+	$(call compile_c)
+
+$(BUILD)/frozen-files.c: $(shell find $(FROZEN_DIR) -type f)
+	@$(ECHO) "Creating $@"
+	$(Q)$(PYTHON) $(MAKE_FROZEN) $(FROZEN_DIR) > $@
+endif
+
 .PHONY: deploy
 
 deploy: $(BUILD)/firmware.dfu
@@ -330,21 +343,22 @@ $(BUILD)/pins_$(BOARD).o: $(BUILD)/pins_$(BOARD).c
 
 GEN_STMCONST_HDR = $(HEADER_BUILD)/modstm_const.h
 GEN_STMCONST_QSTR = $(BUILD)/modstm_qstr.h
+GEN_STMCONST_MPZ = $(HEADER_BUILD)/modstm_mpz.h
 CMSIS_MCU_LOWER = $(shell echo $(CMSIS_MCU) | tr '[:upper:]' '[:lower:]')
 CMSIS_MCU_HDR = cmsis/devinc/$(CMSIS_MCU_LOWER).h
 
 $(BUILD)/modstm.o: $(GEN_STMCONST_HDR)
 # Use a pattern rule here so that make will only call make-stmconst.py once to
 # make both modstm_const.h and modstm_qstr.h
-$(HEADER_BUILD)/%_const.h $(BUILD)/%_qstr.h: $(CMSIS_MCU_HDR) make-stmconst.py
+$(HEADER_BUILD)/%_const.h $(BUILD)/%_qstr.h: $(CMSIS_MCU_HDR) make-stmconst.py | $(HEADER_BUILD)
 	$(ECHO) "Create stmconst $@"
-	$(Q)$(PYTHON) make-stmconst.py --qstr $(GEN_STMCONST_QSTR) $(CMSIS_MCU_HDR) > $(GEN_STMCONST_HDR)
+	$(Q)$(PYTHON) make-stmconst.py --qstr $(GEN_STMCONST_QSTR) --mpz $(GEN_STMCONST_MPZ) $(CMSIS_MCU_HDR) > $(GEN_STMCONST_HDR)
 
-$(GEN_CDCINF_HEADER): $(GEN_CDCINF_FILE) $(FILE2H)
+$(GEN_CDCINF_HEADER): $(GEN_CDCINF_FILE) $(FILE2H) | $(HEADER_BUILD)
 	$(ECHO) "Create $@"
 	$(Q)$(PYTHON) $(FILE2H) $< > $@
 
-$(GEN_CDCINF_FILE): $(CDCINF_TEMPLATE) $(INSERT_USB_IDS) $(USB_IDS_FILE)
+$(GEN_CDCINF_FILE): $(CDCINF_TEMPLATE) $(INSERT_USB_IDS) $(USB_IDS_FILE) | $(HEADER_BUILD)
 	$(ECHO) "Create $@"
 	$(Q)$(PYTHON) $(INSERT_USB_IDS) $(USB_IDS_FILE) $< > $@
 

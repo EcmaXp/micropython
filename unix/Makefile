@@ -1,5 +1,5 @@
-include ../py/mkenv.mk
 -include mpconfigport.mk
+include ../py/mkenv.mk
 
 # define main target
 PROG = micropython
@@ -28,6 +28,31 @@ CFLAGS += -g
 COPT = -O0
 else
 COPT = -Os #-DNDEBUG
+# _FORTIFY_SOURCE is a feature in gcc/glibc which is intended to provide extra
+# security for detecting buffer overflows. Some distros (Ubuntu at the very least)
+# have it enabled by default.
+#
+# gcc already optimizes some printf calls to call puts and/or putchar. When
+# _FORTIFY_SOURCE is enabled and compiling with -O1 or greater, then some
+# printf calls will also be optimized to call __printf_chk (in glibc). Any
+# printfs which get redirected to __printf_chk are then no longer synchronized
+# with printfs that go through mp_printf.
+#
+# In MicroPython, we don't want to use the runtime library's printf but rather
+# go through mp_printf, so that stdout is properly tied into streams, etc.
+# This means that we either need to turn off _FORTIFY_SOURCE or provide our
+# own implementation of __printf_chk. We've chosen to turn off _FORTIFY_SOURCE.
+# It should also be noted that the use of printf in MicroPython is typically
+# quite limited anyways (primarily for debug and some error reporting, etc
+# in the unix version).
+#
+# Information about _FORTIFY_SOURCE seems to be rather scarce. The best I could
+# find was this: https://securityblog.redhat.com/2014/03/26/fortify-and-you/
+# Original patchset was introduced by
+# https://gcc.gnu.org/ml/gcc-patches/2004-09/msg02055.html .
+#
+# Turning off _FORTIFY_SOURCE is only required when compiling with -O1 or greater
+CFLAGS += -U _FORTIFY_SOURCE
 endif
 
 # On OSX, 'gcc' is a symlink to clang unless a real gcc is installed.
@@ -114,6 +139,7 @@ SRC_C = \
 	unix_mphal.c \
 	input.c \
 	file.c \
+	modmachine.c \
 	modos.c \
 	moduselect.c \
 	alloc.c \
@@ -124,6 +150,10 @@ SRC_C = \
 ifeq ($(PROG),micropython)
 SRC_C += $(BUILD)/_frozen_upip.c
 else ifeq ($(PROG),micropython_coverage)
+SRC_C += $(BUILD)/_frozen_upip.c
+else ifeq ($(PROG), micropython_nanbox)
+SRC_C += $(BUILD)/_frozen_upip.c
+else ifeq ($(PROG), micropython_freedos)
 SRC_C += $(BUILD)/_frozen_upip.c
 endif
 
@@ -168,9 +198,27 @@ fast:
 minimal:
 	$(MAKE) COPT="-Os -DNDEBUG" CFLAGS_EXTRA='-DMP_CONFIGFILE="<mpconfigport_minimal.h>"' BUILD=build-minimal PROG=micropython_minimal MICROPY_PY_TIME=0 MICROPY_PY_TERMIOS=0 MICROPY_PY_SOCKET=0 MICROPY_PY_FFI=0 MICROPY_USE_READLINE=0
 
+# build interpreter with nan-boxing as object model
+nanbox:
+	$(MAKE) \
+	CFLAGS_EXTRA='-DMP_CONFIGFILE="<mpconfigport_nanbox.h>"' \
+	BUILD=build-nanbox \
+	PROG=micropython_nanbox \
+	MICROPY_FORCE_32BIT=1 \
+
+freedos:
+	$(MAKE) \
+	CC=i586-pc-msdosdjgpp-gcc \
+	CFLAGS_EXTRA='-DMP_CONFIGFILE="<mpconfigport_freedos.h>" -DMICROPY_NLR_SETJMP -Dtgamma=gamma -DMICROPY_EMIT_X86=0 -DMICROPY_NO_ALLOCA=1 -DMICROPY_PY_USELECT=0' \
+	BUILD=build-freedos \
+	PROG=micropython_freedos \
+	MICROPY_PY_SOCKET=0 \
+	MICROPY_PY_FFI=0 \
+	MICROPY_PY_JNI=0
+
 # build an interpreter for coverage testing and do the testing
 coverage:
-	$(MAKE) COPT="-O0" CFLAGS_EXTRA='-fprofile-arcs -ftest-coverage -Wdouble-promotion -Wformat -Wmissing-declarations -Wmissing-prototypes -Wold-style-definition -Wpointer-arith -Wshadow -Wsign-compare -Wuninitialized -Wunused-parameter -DMICROPY_UNIX_COVERAGE' LDFLAGS_EXTRA='-fprofile-arcs -ftest-coverage' BUILD=build-coverage PROG=micropython_coverage
+	$(MAKE) COPT="-O0" CFLAGS_EXTRA='-fprofile-arcs -ftest-coverage -Wdouble-promotion -Wformat -Wmissing-declarations -Wmissing-prototypes -Wold-style-definition -Wpointer-arith -Wshadow -Wsign-compare -Wuninitialized -Wunused-parameter -DMICROPY_UNIX_COVERAGE -DMICROPY_PY_URANDOM_EXTRA_FUNCS' LDFLAGS_EXTRA='-fprofile-arcs -ftest-coverage' BUILD=build-coverage PROG=micropython_coverage
 
 coverage_test: coverage
 	$(eval DIRNAME=$(notdir $(CURDIR)))

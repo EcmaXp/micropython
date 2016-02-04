@@ -335,6 +335,7 @@ int main(void) {
 
     // Stack limit should be less than real stack size, so we have a chance
     // to recover from limit hit.  (Limit is measured in bytes.)
+    mp_stack_ctrl_init();
     mp_stack_set_limit((char*)&_ram_end - (char*)&_heap_end - 1024);
 
     /* STM32F4xx HAL library initialization:
@@ -394,12 +395,6 @@ int main(void) {
 
     // basic sub-system init
     pendsv_init();
-    #if defined(MICROPY_HW_USE_ALT_IRQ_FOR_CDC)
-    HAL_NVIC_SetPriority(PVD_IRQn, 6, 0); // same priority as USB
-    HAL_NVIC_EnableIRQ(PVD_IRQn);
-    #else
-    timer_tim3_init();
-    #endif
     led_init();
 #if MICROPY_HW_HAS_SWITCH
     switch_init0();

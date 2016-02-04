@@ -293,6 +293,11 @@
 /*****************************************************************************/
 /* Compiler configuration                                                    */
 
+// Whether to include the compiler
+#ifndef MICROPY_ENABLE_COMPILER
+#define MICROPY_ENABLE_COMPILER (1)
+#endif
+
 // Whether to enable constant folding; eg 1+2 rewritten as 3
 #ifndef MICROPY_COMP_CONST_FOLDING
 #define MICROPY_COMP_CONST_FOLDING (1)
@@ -352,6 +357,12 @@
 #define MICROPY_OPT_CACHE_MAP_LOOKUP_IN_BYTECODE (0)
 #endif
 
+// Whether to use fast versions of bitwise operations (and, or, xor) when the
+// arguments are both positive.  Increases Thumb2 code size by about 250 bytes.
+#ifndef MICROPY_OPT_MPZ_BITWISE
+#define MICROPY_OPT_MPZ_BITWISE (0)
+#endif
+
 /*****************************************************************************/
 /* Python internal features                                                  */
 
@@ -379,6 +390,12 @@
 #   ifndef MICROPY_EMERGENCY_EXCEPTION_BUF_SIZE
 #   define MICROPY_EMERGENCY_EXCEPTION_BUF_SIZE (0)   // 0 - implies dynamic allocation
 #   endif
+#endif
+
+// Prefer to raise KeyboardInterrupt asynchronously (from signal or interrupt
+// handler) - if supported by a particular port.
+#ifndef MICROPY_ASYNC_KBD_INTR
+#define MICROPY_ASYNC_KBD_INTR (0)
 #endif
 
 // Whether to include REPL helper function
@@ -659,6 +676,12 @@ endif
 #define MICROPY_PY_BUILTINS_ENUMERATE (1)
 #endif
 
+// Whether to support eval and exec functions
+// By default they are supported if the compiler is enabled
+#ifndef MICROPY_PY_BUILTINS_EVAL_EXEC
+#define MICROPY_PY_BUILTINS_EVAL_EXEC (MICROPY_ENABLE_COMPILER)
+#endif
+
 // Whether to support the Python 2 execfile function
 #ifndef MICROPY_PY_BUILTINS_EXECFILE
 #define MICROPY_PY_BUILTINS_EXECFILE (0)
@@ -835,6 +858,15 @@ endif
 #define MICROPY_PY_UBINASCII (0)
 #endif
 
+#ifndef MICROPY_PY_URANDOM
+#define MICROPY_PY_URANDOM (0)
+#endif
+
+// Whether to include: randrange, randint, choice, random, uniform
+#ifndef MICROPY_PY_URANDOM_EXTRA_FUNCS
+#define MICROPY_PY_URANDOM_EXTRA_FUNCS (0)
+#endif
+
 #ifndef MICROPY_PY_MACHINE
 #define MICROPY_PY_MACHINE (0)
 #endif
@@ -979,9 +1011,8 @@ endif
 #define UINT_FMT "%lu"
 #define INT_FMT "%ld"
 #elif defined(_WIN64)
-#include <inttypes.h>
-#define UINT_FMT "%"PRIu64
-#define INT_FMT "%"PRId64
+#define UINT_FMT "%llu"
+#define INT_FMT "%lld"
 #else
 // Archs where mp_int_t == int
 #define UINT_FMT "%u"

@@ -45,6 +45,7 @@
 #include "py/gc.h"
 #include "py/stackctrl.h"
 #include "py/mphal.h"
+#include "extmod/misc.h"
 #include "genhdr/mpversion.h"
 #include "input.h"
 
@@ -61,6 +62,7 @@ long heap_size = 1024*1024 * (sizeof(mp_uint_t) / 4);
 STATIC void stderr_print_strn(void *env, const char *str, size_t len) {
     (void)env;
     ssize_t dummy = write(STDERR_FILENO, str, len);
+    mp_uos_dupterm_tx_strn(str, len);
     (void)dummy;
 }
 
@@ -176,7 +178,11 @@ STATIC int do_repl(void) {
         int ret = readline(&line, ">>> ");
         mp_parse_input_kind_t parse_input_kind = MP_PARSE_SINGLE_INPUT;
 
-        if (ret == CHAR_CTRL_D) {
+        if (ret == CHAR_CTRL_C) {
+            // cancel input
+            mp_hal_stdout_tx_str("\r\n");
+            goto input_restart;
+        } else if (ret == CHAR_CTRL_D) {
             // EOF
             printf("\n");
             mp_hal_stdio_mode_orig();
@@ -370,26 +376,19 @@ STATIC void set_sys_argv(char *argv[], int argc, int start_arg) {
 #define PATHLIST_SEP_CHAR ':'
 #endif
 
-/*
-typedef union _a_t { uint32_t u32; uint64_t u64; } a_t;
-STATIC const uint64_t table[4] = {
-    1,
-    2,
-    3,
-    //(a_t){(uint32_t)&set_sys_argv}.u64,
-    ((a_t){(uint32_t)123}).u64,
-};
-*/
+MP_NOINLINE int main_(int argc, char **argv);
 
 int main(int argc, char **argv) {
-    /*
-    printf("sizeof(void*)=%u\n", (uint)sizeof(void*));
-    for (int i = 0; i < sizeof(table); ++i) {
-        byte *ptr = (void*)&table[0];
-        printf(" %02x", ptr[i]);
-        if ((i + 1)%8 == 0) printf("\n");
-    }
-    */
+    // We should capture stack top ASAP after start, and it should be
+    // captured guaranteedly before any other stack variables are allocated.
+    // For this, actual main (renamed main_) should not be inlined into
+    // this function. main_() itself may have other functions inlined (with
+    // their own stack variables), that's why we need this main/main_ split.
+    mp_stack_ctrl_init();
+    return main_(argc, argv);
+}
+
+MP_NOINLINE int main_(int argc, char **argv) {
     mp_stack_set_limit(40000 * (BYTES_PER_WORD / 4));
 
     pre_process_options(argc, argv);
@@ -401,10 +400,8 @@ int main(int argc, char **argv) {
 
     mp_init();
 
-    #ifndef _WIN32
     // create keyboard interrupt object
     MP_STATE_VM(keyboard_interrupt_obj) = mp_obj_new_exception(&mp_type_KeyboardInterrupt);
-    #endif
 
     char *home = getenv("HOME");
     char *path = getenv("MICROPYPATH");
@@ -451,7 +448,7 @@ int main(int argc, char **argv) {
     #if defined(MICROPY_UNIX_COVERAGE)
     {
         MP_DECLARE_CONST_FUN_OBJ(extra_coverage_obj);
-        mp_store_global(QSTR_FROM_STR_STATIC("extra_coverage"), (mp_obj_t)&extra_coverage_obj);
+        mp_store_global(QSTR_FROM_STR_STATIC("extra_coverage"), MP_OBJ_FROM_PTR(&extra_coverage_obj));
     }
     #endif
 

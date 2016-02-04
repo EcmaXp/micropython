@@ -42,6 +42,7 @@ typedef struct _mp_obj_set_t {
 
 typedef struct _mp_obj_set_it_t {
     mp_obj_base_t base;
+    mp_fun_1_t iternext;
     mp_obj_set_t *set;
     mp_uint_t cur;
 } mp_obj_set_it_t;
@@ -118,7 +119,7 @@ STATIC void set_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t
     #endif
 }
 
-STATIC mp_obj_t set_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC mp_obj_t set_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 0, 1, false);
 
     switch (n_args) {
@@ -126,7 +127,7 @@ STATIC mp_obj_t set_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw,
             // create a new, empty set
             mp_obj_set_t *set = MP_OBJ_TO_PTR(mp_obj_new_set(0, NULL));
             // set actual set/frozenset type
-            set->base.type = MP_OBJ_TO_PTR(type_in);
+            set->base.type = type;
             return MP_OBJ_FROM_PTR(set);
         }
 
@@ -140,21 +141,13 @@ STATIC mp_obj_t set_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw,
                 mp_obj_set_store(set, item);
             }
             // Set actual set/frozenset type
-            ((mp_obj_set_t*)MP_OBJ_TO_PTR(set))->base.type = MP_OBJ_TO_PTR(type_in);
+            ((mp_obj_set_t*)MP_OBJ_TO_PTR(set))->base.type = type;
             return set;
         }
     }
 }
 
-const mp_obj_type_t mp_type_set_it = {
-    { &mp_type_type },
-    .name = MP_QSTR_iterator,
-    .getiter = mp_identity,
-    .iternext = set_it_iternext,
-};
-
 STATIC mp_obj_t set_it_iternext(mp_obj_t self_in) {
-    assert(MP_OBJ_IS_TYPE(self_in, &mp_type_set_it));
     mp_obj_set_it_t *self = MP_OBJ_TO_PTR(self_in);
     mp_uint_t max = self->set->set.alloc;
     mp_set_t *set = &self->set->set;
@@ -171,7 +164,8 @@ STATIC mp_obj_t set_it_iternext(mp_obj_t self_in) {
 
 STATIC mp_obj_t set_getiter(mp_obj_t set_in) {
     mp_obj_set_it_t *o = m_new_obj(mp_obj_set_it_t);
-    o->base.type = &mp_type_set_it;
+    o->base.type = &mp_type_polymorph_iter;
+    o->iternext = set_it_iternext;
     o->set = (mp_obj_set_t *)MP_OBJ_TO_PTR(set_in);
     o->cur = 0;
     return MP_OBJ_FROM_PTR(o);
@@ -229,7 +223,7 @@ STATIC mp_obj_t set_discard(mp_obj_t self_in, mp_obj_t item) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(set_discard_obj, set_discard);
 
-STATIC mp_obj_t set_diff_int(mp_uint_t n_args, const mp_obj_t *args, bool update) {
+STATIC mp_obj_t set_diff_int(size_t n_args, const mp_obj_t *args, bool update) {
     assert(n_args > 0);
 
     mp_obj_t self;
@@ -259,12 +253,12 @@ STATIC mp_obj_t set_diff_int(mp_uint_t n_args, const mp_obj_t *args, bool update
     return self;
 }
 
-STATIC mp_obj_t set_diff(mp_uint_t n_args, const mp_obj_t *args) {
+STATIC mp_obj_t set_diff(size_t n_args, const mp_obj_t *args) {
     return set_diff_int(n_args, args, false);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR(set_diff_obj, 1, set_diff);
 
-STATIC mp_obj_t set_diff_update(mp_uint_t n_args, const mp_obj_t *args) {
+STATIC mp_obj_t set_diff_update(size_t n_args, const mp_obj_t *args) {
     set_diff_int(n_args, args, true);
     return mp_const_none;
 }
@@ -333,7 +327,7 @@ STATIC mp_obj_t set_issubset_internal(mp_obj_t self_in, mp_obj_t other_in, bool 
     if (is_set_or_frozenset(self_in)) {
         self = MP_OBJ_TO_PTR(self_in);
     } else {
-        self = MP_OBJ_TO_PTR(set_make_new(MP_OBJ_FROM_PTR(&mp_type_set), 1, 0, &self_in));
+        self = MP_OBJ_TO_PTR(set_make_new(&mp_type_set, 1, 0, &self_in));
         cleanup_self = true;
     }
 
@@ -342,7 +336,7 @@ STATIC mp_obj_t set_issubset_internal(mp_obj_t self_in, mp_obj_t other_in, bool 
     if (is_set_or_frozenset(other_in)) {
         other = MP_OBJ_TO_PTR(other_in);
     } else {
-        other = MP_OBJ_TO_PTR(set_make_new(MP_OBJ_FROM_PTR(&mp_type_set), 1, 0, &other_in));
+        other = MP_OBJ_TO_PTR(set_make_new(&mp_type_set, 1, 0, &other_in));
         cleanup_other = true;
     }
     bool out = true;
@@ -448,7 +442,7 @@ STATIC void set_update_int(mp_obj_set_t *self, mp_obj_t other_in) {
     }
 }
 
-STATIC mp_obj_t set_update(mp_uint_t n_args, const mp_obj_t *args) {
+STATIC mp_obj_t set_update(size_t n_args, const mp_obj_t *args) {
     assert(n_args > 0);
 
     for (mp_uint_t i = 1; i < n_args; i++) {

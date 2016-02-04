@@ -70,20 +70,3 @@ try:
 except NotImplementedError:
     print('NotImplementedError')
 
-# mpz and with both args negative
-try:
-    -(1<<70) & -2
-except NotImplementedError:
-    print('NotImplementedError')
-
-# mpz or with args opposite sign
-try:
-    -(1<<70) | 2
-except NotImplementedError:
-    print('NotImplementedError')
-
-# mpz xor with args opposite sign
-try:
-    -(1<<70) ^ 2
-except NotImplementedError:
-    print('NotImplementedError')

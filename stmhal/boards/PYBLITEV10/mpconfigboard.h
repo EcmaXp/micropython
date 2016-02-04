@@ -12,9 +12,6 @@
 #define MICROPY_HW_ENABLE_TIMER     (1)
 #define MICROPY_HW_ENABLE_SERVO     (1)
 #define MICROPY_HW_ENABLE_DAC       (0)
-#define MICROPY_HW_ENABLE_SPI1      (1)
-#define MICROPY_HW_ENABLE_SPI2      (1)
-#define MICROPY_HW_ENABLE_SPI3      (0)
 #define MICROPY_HW_ENABLE_CAN       (0)
 
 // HSE is 12MHz
@@ -52,7 +49,15 @@
 
 // SPI busses
 #define MICROPY_HW_SPI1_NAME "X"
+#define MICROPY_HW_SPI1_NSS  (pin_A4) // X5
+#define MICROPY_HW_SPI1_SCK  (pin_A5) // X6
+#define MICROPY_HW_SPI1_MISO (pin_A6) // X7
+#define MICROPY_HW_SPI1_MOSI (pin_A7) // X8
 #define MICROPY_HW_SPI2_NAME "Y"
+#define MICROPY_HW_SPI2_NSS  (pin_B12) // Y5
+#define MICROPY_HW_SPI2_SCK  (pin_B13) // Y6
+#define MICROPY_HW_SPI2_MISO (pin_B14) // Y7
+#define MICROPY_HW_SPI2_MOSI (pin_B15) // Y8
 
 // USRSW has no pullup or pulldown, and pressing the switch makes the input go low
 #define MICROPY_HW_USRSW_PIN        (pin_B3)
@@ -65,7 +70,8 @@
 #define MICROPY_HW_LED2             (pin_A14) // green
 #define MICROPY_HW_LED3             (pin_A15) // yellow
 #define MICROPY_HW_LED4             (pin_B4)  // blue
-#define MICROPY_HW_LED4_PWM         (0) // TIM3 is now a user timer
+#define MICROPY_HW_LED3_PWM         { TIM2, 2, GPIO_AF1_TIM2 }
+#define MICROPY_HW_LED4_PWM         { TIM3, 3, GPIO_AF2_TIM3 }
 #define MICROPY_HW_LED_OTYPE        (GPIO_MODE_OUTPUT_PP)
 #define MICROPY_HW_LED_ON(pin)      (pin->gpio->BSRRL = pin->pin_mask)
 #define MICROPY_HW_LED_OFF(pin)     (pin->gpio->BSRRH = pin->pin_mask)
@@ -77,7 +83,6 @@
 
 // USB config
 #define MICROPY_HW_USB_VBUS_DETECT_PIN (pin_A9)
-#define MICROPY_HW_USE_ALT_IRQ_FOR_CDC (1)
 
 // MMA accelerometer config
 #define MICROPY_HW_MMA_AVDD_PIN     (pin_A10)
