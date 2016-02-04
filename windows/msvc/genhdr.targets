@@ -20,7 +20,7 @@
   <Target Name="MakeQstrData" DependsOnTargets="MakeDestDir">
     <PropertyGroup>
       <PreProc>$(DestDir)qstrdefs.preprocessed.h</PreProc>
-      <QstrDefs>$(PyBaseDir)unix\qstrdefsport.h</QstrDefs>
+      <QstrDefs>$(PyBaseDir)opencom\qstrdefsport.h</QstrDefs>
       <DestFile>$(DestDir)qstrdefs.generated.h</DestFile>
       <TmpFile>$(DestFile).tmp</TmpFile>
     </PropertyGroup>

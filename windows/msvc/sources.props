@@ -3,16 +3,13 @@
   <Import Project="paths.props" Condition="'$(PyPathsIncluded)' != 'True'"/>
   <ItemGroup>
     <ClCompile Include="$(PyBaseDir)py\*.c" />
-    <ClCompile Include="$(PyBaseDir)windows\*.c" />
+    <ClInclude Include="$(PyBaseDir)windows\init.c" />
+    <ClInclude Include="$(PyBaseDir)windows\realpath.c" />
+    <ClInclude Include="$(PyBaseDir)windows\sleep.c" />
     <ClCompile Include="$(PyBaseDir)windows\msvc\*.c" />
-    <ClCompile Include="$(PyBaseDir)lib\mp-readline\*.c" />
-    <ClCompile Include="$(PyBaseDir)unix\file.c"/>
-    <ClCompile Include="$(PyBaseDir)unix\gccollect.c"/>
-    <ClCompile Include="$(PyBaseDir)unix\input.c"/>
-    <ClCompile Include="$(PyBaseDir)unix\main.c"/>
-    <ClCompile Include="$(PyBaseDir)unix\modos.c"/>
-    <ClCompile Include="$(PyBaseDir)unix\modtime.c"/>
-    <ClCompile Include="$(PyBaseDir)unix\modmachine.c" />
+    <ClCompile Include="$(PyBaseDir)opencom\gccollect.c"/>
+    <ClCompile Include="$(PyBaseDir)opencom\jnupy.c"/>
+    <ClCompile Include="$(PyBaseDir)opencom\modmicrothread.c"/>
     <ClCompile Include="$(PyBaseDir)extmod\machine_mem.c" />
     <ClCompile Include="$(PyBaseDir)extmod\modubinascii.c" />
     <ClCompile Include="$(PyBaseDir)extmod\moductypes.c" />
@@ -25,7 +22,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(PyBaseDir)py\*.h" />
-    <ClInclude Include="$(PyBaseDir)windows\*.h" />
+    <ClInclude Include="$(PyBaseDir)opencom\*.h" />
+    <ClInclude Include="$(PyBaseDir)windows\init.h" />
+    <ClInclude Include="$(PyBaseDir)windows\realpath.h" />
+    <ClInclude Include="$(PyBaseDir)windows\sleep.h" />
     <ClInclude Include="$(PyBaseDir)windows\msvc\*.h" />
   </ItemGroup>
 </Project>
