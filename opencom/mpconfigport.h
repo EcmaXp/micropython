@@ -113,8 +113,8 @@
 #define MICROPY_EMERGENCY_EXCEPTION_BUF_SIZE  (256)
 
 #ifdef MP_WIN
-#define MICROPY_PORT_INIT_FUNC      init()
-#define MICROPY_PORT_DEINIT_FUNC    deinit()
+// #define MICROPY_PORT_INIT_FUNC      init()
+// #define MICROPY_PORT_DEINIT_FUNC    deinit()
 #endif
 
 // Porting Program's internal modules.

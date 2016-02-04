@@ -28,7 +28,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include "opencom/modmicrothread.h"
-#include "opencom/parsebc.h"
 #include "py/objfun.h"
 #include "py/objclosure.h"
 #include "py/objboundmeth.h"
@@ -36,7 +35,6 @@
 #include "py/scope.h"
 #include "py/parse.h"
 #include "py/emit.h"
-#include "py/emitbc.h"
 #include "py/gc.h"
 
 #if !MICROPY_ENABLE_GC
@@ -512,6 +510,7 @@ STATIC void mp_persist_copy_bytecode_sub(void *data_ptr, const mp_parsebc_opdata
         *bcdata->extra_data++ = opdata->extra;
 }
 
+/*
 mp_parsebc_opcounter_t *mp_persist_copy_bytecode(const byte *ip, mp_uint_t len) {
     mp_parsebc_opcounter_t *opcounter = mp_parsebc_count(ip, len);
     mp_persist_bcdata_t *bcdata = m_new_obj(mp_persist_bcdata_t);
@@ -532,6 +531,7 @@ mp_parsebc_opcounter_t *mp_persist_copy_bytecode(const byte *ip, mp_uint_t len) 
     
     return opcounter;
 }
+*/
 
 /*
 Store the bytecode by split to 6 layer

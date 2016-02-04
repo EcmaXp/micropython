@@ -40,8 +40,10 @@ try:
 except ImportError:
     sys.exit("This script should running with jnupy")
 
-__path__ = __file__.rpartition("/")[0]
+# TODO: support sep on windows?
+__path__ = __file__.rpartition("\\")[0]
 sys.path.append(__path__ + "/lib")
+print(__path__)
 
 # TODO: site module?
 

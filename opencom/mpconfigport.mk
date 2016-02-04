@@ -1,6 +1,10 @@
 # Enable/disable modules and 3rd-party libs to be included in interpreter
 # And custom settings?
 
+# Enable PIC while compile library
+# (disable on window, enable on linux)
+MICROPY_ENABLE_PIC = 0
+
 # Build 32-bit binaries on a 64-bit host
 MICROPY_FORCE_32BIT = 0
 

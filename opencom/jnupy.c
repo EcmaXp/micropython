@@ -48,7 +48,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 **/
 
-#include <jni.h>
+#define DEBUG_BACKTRACE 0
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -59,7 +59,12 @@ THE SOFTWARE.
 #include <ctype.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+
+#if DEBUG_BACKTRACE
 #include <execinfo.h>
+#endif
+
+#include <jni.h>
 
 #include "mpconfigport.h"
 
@@ -142,7 +147,6 @@ int DEBUG_printf(const char *fmt, ...) {
 #define _D(x) (void)0
 #endif
 
-#define DEBUG_BACKTRACE 1
 #define DEBUG_BACKTRACE_SIZE 8
 #define DEBUG_BACKTRACE_FD 2 // stderr
 
@@ -618,7 +622,12 @@ STATIC jobject jnupy_refenum(jclass class_, const char *enumName, const char *en
 	return JNUPY_RAW_CALL(NewGlobalRef, enum_);
 }
 
+void main(void) {
+
+}
+
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
+	// printf("hello world\n");
     JNUPY_G_VM = vm;
 
     if (JNUPY_RAW_CALL_WITH(JNUPY_G_VM, GetEnv, (void **) &JNUPY_ENV, JNUPY_JNIVERSION) != JNI_OK) {
