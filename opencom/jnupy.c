@@ -1343,7 +1343,7 @@ STATIC void jobject_print(const mp_print_t *print, mp_obj_t o_in, mp_print_kind_
     }
 }
 
-STATIC mp_obj_t jobject_del(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC mp_obj_t jobject_del(mp_obj_t self_in) {
     jnupy_jobj_t *self = self_in;
     JNUPY_CALL(DeleteGlobalRef, self->jobj);
 
@@ -1461,7 +1461,7 @@ STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, c
 	return result;
 }
 
-STATIC mp_obj_t jfunc_del(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC mp_obj_t jfunc_del(mp_obj_t self_in) {
     mp_obj_jfunc_t *o = self_in;
     JNUPY_CALL(DeleteGlobalRef, o->jstate);
     JNUPY_CALL(DeleteGlobalRef, o->jfunc);
@@ -1541,7 +1541,7 @@ const mp_obj_type_t mp_type_pyref = {
     .name = MP_QSTR_PyRef,
 };
 
-STATIC mp_obj_t mod_jnupy_test(mp_obj_t asdf) {
+STATIC mp_obj_t mod_jnupy_test() {
     return mp_const_none;
 }
 
