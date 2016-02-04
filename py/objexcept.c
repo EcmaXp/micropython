@@ -114,7 +114,7 @@ STATIC void mp_obj_exception_print(const mp_print_t *print, mp_obj_t o_in, mp_pr
     mp_obj_tuple_print(print, MP_OBJ_FROM_PTR(o->args), kind);
 }
 
-mp_obj_t mp_obj_exception_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+mp_obj_t mp_obj_exception_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 0, MP_OBJ_FUN_ARGS_MAX, false);
     mp_obj_exception_t *o = m_new_obj_var_maybe(mp_obj_exception_t, mp_obj_t, 0);
     if (o == NULL) {
@@ -125,7 +125,7 @@ mp_obj_t mp_obj_exception_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t
     } else {
         o->args = MP_OBJ_TO_PTR(mp_obj_new_tuple(n_args, args));
     }
-    o->base.type = MP_OBJ_TO_PTR(type_in);
+    o->base.type = type;
     o->traceback_data = NULL;
     return MP_OBJ_FROM_PTR(o);
 }
@@ -153,7 +153,7 @@ STATIC void exception_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
     }
 }
 
-STATIC mp_obj_t exc___init__(mp_uint_t n_args, const mp_obj_t *args) {
+STATIC mp_obj_t exc___init__(size_t n_args, const mp_obj_t *args) {
     mp_obj_exception_t *self = MP_OBJ_TO_PTR(args[0]);
     mp_obj_t argst = mp_obj_new_tuple(n_args - 1, args + 1);
     self->args = MP_OBJ_TO_PTR(argst);
@@ -300,7 +300,7 @@ mp_obj_t mp_obj_new_exception_arg1(const mp_obj_type_t *exc_type, mp_obj_t arg) 
 
 mp_obj_t mp_obj_new_exception_args(const mp_obj_type_t *exc_type, mp_uint_t n_args, const mp_obj_t *args) {
     assert(exc_type->make_new == mp_obj_exception_make_new);
-    return exc_type->make_new(MP_OBJ_FROM_PTR(exc_type), n_args, 0, args);
+    return exc_type->make_new(exc_type, n_args, 0, args);
 }
 
 mp_obj_t mp_obj_new_exception_msg(const mp_obj_type_t *exc_type, const char *msg) {
@@ -356,9 +356,9 @@ mp_obj_t mp_obj_new_exception_msg_varg(const mp_obj_type_t *exc_type, const char
             offset += sizeof(void *) - 1;
             offset &= ~(sizeof(void *) - 1);
 
-            if ((mp_emergency_exception_buf_size - offset) > (sizeof(mp_uint_t) * 3)) {
+            if ((mp_emergency_exception_buf_size - offset) > (sizeof(o->traceback_data[0]) * 3)) {
                 // We have room to store some traceback.
-                o->traceback_data = (mp_uint_t*)((byte *)MP_STATE_VM(mp_emergency_exception_buf) + offset);
+                o->traceback_data = (size_t*)((byte *)MP_STATE_VM(mp_emergency_exception_buf) + offset);
                 o->traceback_alloc = (MP_STATE_VM(mp_emergency_exception_buf) + mp_emergency_exception_buf_size - (byte *)o->traceback_data) / sizeof(o->traceback_data[0]);
                 o->traceback_len = 0;
             }
@@ -439,14 +439,14 @@ void mp_obj_exception_clear_traceback(mp_obj_t self_in) {
     self->traceback_data = NULL;
 }
 
-void mp_obj_exception_add_traceback(mp_obj_t self_in, qstr file, mp_uint_t line, qstr block) {
+void mp_obj_exception_add_traceback(mp_obj_t self_in, qstr file, size_t line, qstr block) {
     GET_NATIVE_EXCEPTION(self, self_in);
 
     // append this traceback info to traceback data
     // if memory allocation fails (eg because gc is locked), just return
 
     if (self->traceback_data == NULL) {
-        self->traceback_data = m_new_maybe(mp_uint_t, 3);
+        self->traceback_data = m_new_maybe(size_t, 3);
         if (self->traceback_data == NULL) {
             return;
         }
@@ -454,7 +454,7 @@ void mp_obj_exception_add_traceback(mp_obj_t self_in, qstr file, mp_uint_t line,
         self->traceback_len = 0;
     } else if (self->traceback_len + 3 > self->traceback_alloc) {
         // be conservative with growing traceback data
-        mp_uint_t *tb_data = m_renew_maybe(mp_uint_t, self->traceback_data, self->traceback_alloc, self->traceback_alloc + 3, true);
+        size_t *tb_data = m_renew_maybe(size_t, self->traceback_data, self->traceback_alloc, self->traceback_alloc + 3, true);
         if (tb_data == NULL) {
             return;
         }
@@ -462,14 +462,14 @@ void mp_obj_exception_add_traceback(mp_obj_t self_in, qstr file, mp_uint_t line,
         self->traceback_alloc += 3;
     }
 
-    mp_uint_t *tb_data = &self->traceback_data[self->traceback_len];
+    size_t *tb_data = &self->traceback_data[self->traceback_len];
     self->traceback_len += 3;
-    tb_data[0] = (mp_uint_t)file;
-    tb_data[1] = (mp_uint_t)line;
-    tb_data[2] = (mp_uint_t)block;
+    tb_data[0] = file;
+    tb_data[1] = line;
+    tb_data[2] = block;
 }
 
-void mp_obj_exception_get_traceback(mp_obj_t self_in, mp_uint_t *n, mp_uint_t **values) {
+void mp_obj_exception_get_traceback(mp_obj_t self_in, size_t *n, size_t **values) {
     GET_NATIVE_EXCEPTION(self, self_in);
 
     if (self->traceback_data == NULL) {

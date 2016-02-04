@@ -36,7 +36,7 @@
 
 #define MP_OBJ_IS_DICT_TYPE(o) (MP_OBJ_IS_OBJ(o) && ((mp_obj_base_t*)MP_OBJ_TO_PTR(o))->type->make_new == dict_make_new)
 
-STATIC mp_obj_t dict_update(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwargs);
+STATIC mp_obj_t dict_update(size_t n_args, const mp_obj_t *args, mp_map_t *kwargs);
 
 // This is a helper function to iterate through a dictionary.  The state of
 // the iteration is held in *cur and should be initialised with zero for the
@@ -82,12 +82,12 @@ STATIC void dict_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_
     }
 }
 
-STATIC mp_obj_t dict_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC mp_obj_t dict_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     mp_obj_t dict_out = mp_obj_new_dict(0);
     mp_obj_dict_t *dict = MP_OBJ_TO_PTR(dict_out);
-    dict->base.type = MP_OBJ_TO_PTR(type_in);
+    dict->base.type = type;
     #if MICROPY_PY_COLLECTIONS_ORDEREDDICT
-    if (MP_OBJ_TO_PTR(type_in) == &mp_type_ordereddict) {
+    if (type == &mp_type_ordereddict) {
         dict->map.is_ordered = 1;
     }
     #endif
@@ -186,6 +186,7 @@ STATIC mp_obj_t dict_subscr(mp_obj_t self_in, mp_obj_t index, mp_obj_t value) {
 
 typedef struct _mp_obj_dict_it_t {
     mp_obj_base_t base;
+    mp_fun_1_t iternext;
     mp_obj_t dict;
     mp_uint_t cur;
 } mp_obj_dict_it_t;
@@ -201,16 +202,10 @@ STATIC mp_obj_t dict_it_iternext(mp_obj_t self_in) {
     }
 }
 
-STATIC const mp_obj_type_t mp_type_dict_it = {
-    { &mp_type_type },
-    .name = MP_QSTR_iterator,
-    .getiter = mp_identity,
-    .iternext = dict_it_iternext,
-};
-
 STATIC mp_obj_t dict_getiter(mp_obj_t self_in) {
     mp_obj_dict_it_t *o = m_new_obj(mp_obj_dict_it_t);
-    o->base.type = &mp_type_dict_it;
+    o->base.type = &mp_type_polymorph_iter;
+    o->iternext = dict_it_iternext;
     o->dict = self_in;
     o->cur = 0;
     return MP_OBJ_FROM_PTR(o);
@@ -245,7 +240,7 @@ STATIC mp_obj_t dict_copy(mp_obj_t self_in) {
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(dict_copy_obj, dict_copy);
 
 // this is a classmethod
-STATIC mp_obj_t dict_fromkeys(mp_uint_t n_args, const mp_obj_t *args) {
+STATIC mp_obj_t dict_fromkeys(size_t n_args, const mp_obj_t *args) {
     assert(2 <= n_args && n_args <= 3);
     mp_obj_t iter = mp_getiter(args[1]);
     mp_obj_t len = mp_obj_len_maybe(iter);
@@ -299,7 +294,7 @@ STATIC mp_obj_t dict_get_helper(mp_map_t *self, mp_obj_t key, mp_obj_t deflt, mp
     return value;
 }
 
-STATIC mp_obj_t dict_get(mp_uint_t n_args, const mp_obj_t *args) {
+STATIC mp_obj_t dict_get(size_t n_args, const mp_obj_t *args) {
     assert(2 <= n_args && n_args <= 3);
     assert(MP_OBJ_IS_DICT_TYPE(args[0]));
     mp_obj_dict_t *self = MP_OBJ_TO_PTR(args[0]);
@@ -311,7 +306,7 @@ STATIC mp_obj_t dict_get(mp_uint_t n_args, const mp_obj_t *args) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(dict_get_obj, 2, 3, dict_get);
 
-STATIC mp_obj_t dict_pop(mp_uint_t n_args, const mp_obj_t *args) {
+STATIC mp_obj_t dict_pop(size_t n_args, const mp_obj_t *args) {
     assert(2 <= n_args && n_args <= 3);
     assert(MP_OBJ_IS_DICT_TYPE(args[0]));
     mp_obj_dict_t *self = MP_OBJ_TO_PTR(args[0]);
@@ -324,7 +319,7 @@ STATIC mp_obj_t dict_pop(mp_uint_t n_args, const mp_obj_t *args) {
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(dict_pop_obj, 2, 3, dict_pop);
 
 
-STATIC mp_obj_t dict_setdefault(mp_uint_t n_args, const mp_obj_t *args) {
+STATIC mp_obj_t dict_setdefault(size_t n_args, const mp_obj_t *args) {
     assert(2 <= n_args && n_args <= 3);
     assert(MP_OBJ_IS_DICT_TYPE(args[0]));
     mp_obj_dict_t *self = MP_OBJ_TO_PTR(args[0]);
@@ -355,7 +350,7 @@ STATIC mp_obj_t dict_popitem(mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(dict_popitem_obj, dict_popitem);
 
-STATIC mp_obj_t dict_update(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
+STATIC mp_obj_t dict_update(size_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
     assert(MP_OBJ_IS_DICT_TYPE(args[0]));
     mp_obj_dict_t *self = MP_OBJ_TO_PTR(args[0]);
 

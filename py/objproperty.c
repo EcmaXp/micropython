@@ -37,29 +37,23 @@ typedef struct _mp_obj_property_t {
     mp_obj_t proxy[3]; // getter, setter, deleter
 } mp_obj_property_t;
 
-STATIC mp_obj_t property_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
-    mp_arg_check_num(n_args, n_kw, 0, 4, false);
+STATIC mp_obj_t property_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
+    enum { ARG_fget, ARG_fset, ARG_fdel, ARG_doc };
+    static const mp_arg_t allowed_args[] = {
+        { MP_QSTR_, MP_ARG_OBJ, {.u_rom_obj = MP_ROM_PTR(&mp_const_none_obj)} },
+        { MP_QSTR_, MP_ARG_OBJ, {.u_rom_obj = MP_ROM_PTR(&mp_const_none_obj)} },
+        { MP_QSTR_, MP_ARG_OBJ, {.u_rom_obj = MP_ROM_PTR(&mp_const_none_obj)} },
+        { MP_QSTR_doc, MP_ARG_OBJ, {.u_rom_obj = MP_ROM_PTR(&mp_const_none_obj)} },
+    };
+    mp_arg_val_t vals[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, vals);
 
     mp_obj_property_t *o = m_new_obj(mp_obj_property_t);
-    o->base.type = MP_OBJ_TO_PTR(type_in);
-    if (n_args >= 4) {
-        // doc ignored
-    }
-    if (n_args >= 3) {
-        o->proxy[2] = args[2];
-    } else {
-        o->proxy[2] = mp_const_none;
-    }
-    if (n_args >= 2) {
-        o->proxy[1] = args[1];
-    } else {
-        o->proxy[1] = mp_const_none;
-    }
-    if (n_args >= 1) {
-        o->proxy[0] = args[0];
-    } else {
-        o->proxy[0] = mp_const_none;
-    }
+    o->base.type = type;
+    o->proxy[0] = vals[ARG_fget].u_obj;
+    o->proxy[1] = vals[ARG_fset].u_obj;
+    o->proxy[2] = vals[ARG_fdel].u_obj;
+    // vals[ARG_doc] is silently discarded
     return MP_OBJ_FROM_PTR(o);
 }
 

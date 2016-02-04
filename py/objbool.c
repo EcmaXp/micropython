@@ -52,7 +52,7 @@ STATIC void bool_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_
     }
 }
 
-STATIC mp_obj_t bool_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC mp_obj_t bool_make_new(const mp_obj_type_t *type_in, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     (void)type_in;
     mp_arg_check_num(n_args, n_kw, 0, 1, false);
 
@@ -74,15 +74,6 @@ STATIC mp_obj_t bool_unary_op(mp_uint_t op, mp_obj_t o_in) {
         case MP_UNARY_OP_POSITIVE: return MP_OBJ_NEW_SMALL_INT(value);
         case MP_UNARY_OP_NEGATIVE: return MP_OBJ_NEW_SMALL_INT(-value);
         case MP_UNARY_OP_INVERT: return MP_OBJ_NEW_SMALL_INT(~value);
-
-        // only bool needs to implement MP_UNARY_OP_NOT
-        case MP_UNARY_OP_NOT:
-            if (value) {
-                return mp_const_false;
-            } else {
-                return mp_const_true;
-            }
-
         default: return MP_OBJ_NULL; // op not supported
     }
 }

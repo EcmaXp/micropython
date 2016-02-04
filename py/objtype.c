@@ -43,14 +43,14 @@
 #define DEBUG_printf(...) (void)0
 #endif
 
-STATIC mp_obj_t static_class_method_make_new(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args);
+STATIC mp_obj_t static_class_method_make_new(const mp_obj_type_t *self_in, size_t n_args, size_t n_kw, const mp_obj_t *args);
 
 /******************************************************************************/
 // instance object
 
-STATIC mp_obj_t mp_obj_new_instance(mp_obj_t class, uint subobjs) {
+STATIC mp_obj_t mp_obj_new_instance(const mp_obj_type_t *class, uint subobjs) {
     mp_obj_instance_t *o = m_new_obj_var(mp_obj_instance_t, mp_obj_t, subobjs);
-    o->base.type = MP_OBJ_TO_PTR(class);
+    o->base.type = class;
     mp_map_init(&o->members, 0);
     mp_seq_clear(o->subobj, 0, subobjs, sizeof(*o->subobj));
     return MP_OBJ_FROM_PTR(o);
@@ -235,16 +235,14 @@ STATIC void instance_print(const mp_print_t *print, mp_obj_t self_in, mp_print_k
     mp_printf(print, "<%s object at %p>", mp_obj_get_type_str(self_in), self_in);
 }
 
-mp_obj_t mp_obj_instance_make_new(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
-    assert(MP_OBJ_IS_TYPE(self_in, &mp_type_type));
-    mp_obj_type_t *self = MP_OBJ_TO_PTR(self_in);
+mp_obj_t mp_obj_instance_make_new(const mp_obj_type_t *self, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     assert(mp_obj_is_instance_type(self));
 
     const mp_obj_type_t *native_base;
     uint num_native_bases = instance_count_native_bases(self, &native_base);
     assert(num_native_bases < 2);
 
-    mp_obj_instance_t *o = MP_OBJ_TO_PTR(mp_obj_new_instance(self_in, num_native_bases));
+    mp_obj_instance_t *o = MP_OBJ_TO_PTR(mp_obj_new_instance(self, num_native_bases));
 
     // This executes only "__new__" part of obejection creation.
     // TODO: This won't work will for classes with native bases.
@@ -269,14 +267,15 @@ mp_obj_t mp_obj_instance_make_new(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t 
     if (init_fn[0] == MP_OBJ_SENTINEL) {
         // Native type's constructor is what wins - it gets all our arguments,
         // and none Python classes are initialized at all.
-        o->subobj[0] = native_base->make_new(MP_OBJ_FROM_PTR(native_base), n_args, n_kw, args);
+        o->subobj[0] = native_base->make_new(native_base, n_args, n_kw, args);
     } else if (init_fn[0] != MP_OBJ_NULL) {
         // now call Python class __new__ function with all args
         if (n_args == 0 && n_kw == 0) {
-            new_ret = mp_call_function_n_kw(init_fn[0], 1, 0, (mp_obj_t*)(void*)&self_in);
+            mp_obj_t args2[1] = {MP_OBJ_FROM_PTR(self)};
+            new_ret = mp_call_function_n_kw(init_fn[0], 1, 0, args2);
         } else {
             mp_obj_t *args2 = m_new(mp_obj_t, 1 + n_args + 2 * n_kw);
-            args2[0] = self_in;
+            args2[0] = MP_OBJ_FROM_PTR(self);
             memcpy(args2 + 1, args, (n_args + 2 * n_kw) * sizeof(mp_obj_t));
             new_ret = mp_call_function_n_kw(init_fn[0], n_args + 1, n_kw, args2);
             m_del(mp_obj_t, args2, 1 + n_args + 2 * n_kw);
@@ -472,7 +471,22 @@ STATIC void mp_obj_instance_load_attr(mp_obj_t self_in, qstr attr, mp_obj_t *des
         dest[0] = elem->value;
         return;
     }
-
+#if MICROPY_CPYTHON_COMPAT
+    if (attr == MP_QSTR___dict__) {
+        // Create a new dict with a copy of the instance's map items.
+        // This creates, unlike CPython, a 'read-only' __dict__: modifying
+        // it will not result in modifications to the actual instance members.
+        mp_map_t *map = &self->members;
+        mp_obj_t attr_dict = mp_obj_new_dict(map->used);
+        for (mp_uint_t i = 0; i < map->alloc; ++i) {
+            if (MP_MAP_SLOT_IS_FILLED(map, i)) {
+                mp_obj_dict_store(attr_dict, map->table[i].key, map->table[i].value);
+            }
+        }
+        dest[0] = attr_dict;
+        return;
+    }
+#endif
     struct class_lookup_data lookup = {
         .obj = self,
         .attr = attr,
@@ -692,7 +706,7 @@ bool mp_obj_instance_is_callable(mp_obj_t self_in) {
     return mp_obj_instance_get_call(self_in) != MP_OBJ_NULL;
 }
 
-mp_obj_t mp_obj_instance_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+mp_obj_t mp_obj_instance_call(mp_obj_t self_in, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     mp_obj_t call = mp_obj_instance_get_call(self_in);
     if (call == MP_OBJ_NULL) {
         if (MICROPY_ERROR_REPORTING == MICROPY_ERROR_REPORTING_TERSE) {
@@ -763,7 +777,7 @@ STATIC void type_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_
     mp_printf(print, "<class '%q'>", self->name);
 }
 
-STATIC mp_obj_t type_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC mp_obj_t type_make_new(const mp_obj_type_t *type_in, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     (void)type_in;
 
     mp_arg_check_num(n_args, n_kw, 1, 3, false);
@@ -783,7 +797,7 @@ STATIC mp_obj_t type_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw
     }
 }
 
-STATIC mp_obj_t type_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC mp_obj_t type_call(mp_obj_t self_in, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     // instantiate an instance of a class
 
     mp_obj_type_t *self = MP_OBJ_TO_PTR(self_in);
@@ -798,7 +812,7 @@ STATIC mp_obj_t type_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, co
     }
 
     // make new instance
-    mp_obj_t o = self->make_new(self_in, n_args, n_kw, args);
+    mp_obj_t o = self->make_new(self, n_args, n_kw, args);
 
     // return new instance
     return o;
@@ -916,7 +930,7 @@ mp_obj_t mp_obj_new_type(qstr name, mp_obj_t bases_tuple, mp_obj_t locals_dict) 
         // __new__ slot exists; check if it is a function
         if (MP_OBJ_IS_FUN(elem->value)) {
             // __new__ is a function, wrap it in a staticmethod decorator
-            elem->value = static_class_method_make_new(MP_OBJ_FROM_PTR(&mp_type_staticmethod), 1, 0, &elem->value);
+            elem->value = static_class_method_make_new(&mp_type_staticmethod, 1, 0, &elem->value);
         }
     }
 
@@ -942,7 +956,7 @@ STATIC void super_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind
     mp_print_str(print, ">");
 }
 
-STATIC mp_obj_t super_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC mp_obj_t super_make_new(const mp_obj_type_t *type_in, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     (void)type_in;
     // 0 arguments are turned into 2 in the compiler
     // 1 argument is not yet implemented
@@ -1093,8 +1107,7 @@ mp_obj_t mp_instance_cast_to_native_base(mp_const_obj_t self_in, mp_const_obj_t 
 /******************************************************************************/
 // staticmethod and classmethod types (probably should go in a different file)
 
-STATIC mp_obj_t static_class_method_make_new(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
-    mp_obj_type_t *self = MP_OBJ_TO_PTR(self_in);
+STATIC mp_obj_t static_class_method_make_new(const mp_obj_type_t *self, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     assert(self == &mp_type_staticmethod || self == &mp_type_classmethod);
 
     mp_arg_check_num(n_args, n_kw, 1, 1, false);

@@ -217,7 +217,7 @@ int mp_print_mp_int(const mp_print_t *print, mp_obj_t x, int base, int base_char
     char prefix_buf[4];
     char *prefix = prefix_buf;
 
-    if (mp_obj_int_is_positive(x)) {
+    if (mp_obj_int_sign(x) > 0) {
         if (flags & PF_FLAG_SHOW_SIGN) {
             *prefix++ = '+';
         } else if (flags & PF_FLAG_SPACE_SIGN) {
@@ -494,16 +494,16 @@ int mp_vprintf(const mp_print_t *print, const char *fmt, va_list args) {
                 break;
             }
             case 'u':
-                chrs += mp_print_int(print, va_arg(args, int), 0, 10, 'a', flags, fill, width);
+                chrs += mp_print_int(print, va_arg(args, unsigned int), 0, 10, 'a', flags, fill, width);
                 break;
             case 'd':
                 chrs += mp_print_int(print, va_arg(args, int), 1, 10, 'a', flags, fill, width);
                 break;
             case 'x':
-                chrs += mp_print_int(print, va_arg(args, int), 0, 16, 'a', flags, fill, width);
+                chrs += mp_print_int(print, va_arg(args, unsigned int), 0, 16, 'a', flags, fill, width);
                 break;
             case 'X':
-                chrs += mp_print_int(print, va_arg(args, int), 0, 16, 'A', flags, fill, width);
+                chrs += mp_print_int(print, va_arg(args, unsigned int), 0, 16, 'A', flags, fill, width);
                 break;
             case 'p':
             case 'P': // don't bother to handle upcase for 'P'
@@ -526,6 +526,20 @@ int mp_vprintf(const mp_print_t *print, const char *fmt, va_list args) {
                 break;
             }
 #endif
+            // Because 'l' is eaten above, another 'l' means %ll.  We need to support
+            // this length specifier for OBJ_REPR_D (64-bit NaN boxing).
+            // TODO Either enable this unconditionally, or provide a specific config var.
+            #if (MICROPY_OBJ_REPR == MICROPY_OBJ_REPR_D) || defined(_WIN64)
+            case 'l': {
+                unsigned long long int arg_value = va_arg(args, unsigned long long int);
+                ++fmt;
+                if (*fmt == 'u' || *fmt == 'd') {
+                    chrs += mp_print_int(print, arg_value, *fmt == 'd', 10, 'a', flags, fill, width);
+                    break;
+                }
+                // fall through to default case to print unknown format char
+            }
+            #endif
             default:
                 print->print_strn(print->data, fmt, 1);
                 chrs += 1;

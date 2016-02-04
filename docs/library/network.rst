@@ -8,7 +8,8 @@
 This module provides network drivers and routing configuration.  Network
 drivers for specific hardware are available within this module and are
 used to configure a hardware network interface.  Configured interfaces
-are then available for use via the :mod:`socket` module.
+are then available for use via the :mod:`socket` module. To use this module
+the network build of firmware must be installed.
 
 For example::
 
@@ -37,6 +38,14 @@ For example::
     The server class controls the behaviour and the configuration of the FTP and telnet
     services running on the WiPy. Any changes performed using this class' methods will
     affect both.
+
+    Example::
+
+    import network
+    s = network.server()
+    s.deinit() # disable the server
+    # enable the server again with new settings
+    s.init(login=('user', 'password'), timeout=600)
 
     Constructors
     ------------

@@ -32,6 +32,7 @@ void do_str(const char *src, mp_parse_input_kind_t input_kind) {
 }
 
 int main(int argc, char **argv) {
+    mp_stack_ctrl_init();
     mp_stack_set_limit(10240);
     void *heap = malloc(16 * 1024);
     gc_init(heap, (char*)heap + 16 * 1024);
@@ -52,7 +53,7 @@ mp_import_stat_t mp_import_stat(const char *path) {
     return MP_IMPORT_STAT_NO_EXIST;
 }
 
-mp_obj_t mp_builtin_open(uint n_args, const mp_obj_t *args, mp_map_t *kwargs) {
+mp_obj_t mp_builtin_open(size_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
     return mp_const_none;
 }
 MP_DEFINE_CONST_FUN_OBJ_KW(mp_builtin_open_obj, 1, mp_builtin_open);
