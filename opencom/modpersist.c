@@ -371,7 +371,7 @@ STATIC mp_int_t system_buf_get_buffer(mp_obj_t self_in, mp_buffer_info_t *bufinf
     }
 }
 
-STATIC mp_obj_t system_buf_del(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC mp_obj_t system_buf_del(mp_uint_t n_args, const mp_obj_t *args) {
     mp_obj_system_buf_t *pbuf = self_in;
 
     free(pbuf->buf);

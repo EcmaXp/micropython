@@ -63,7 +63,7 @@ STATIC mp_obj_t mod_microthread_current_thread(void) {
 
 MP_DEFINE_CONST_FUN_OBJ_0(mod_microthread_current_thread_obj, mod_microthread_current_thread);
 
-STATIC mp_obj_t microthread_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC mp_obj_t microthread_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 2, n_args, true);
 
     mp_obj_t name_obj = args[0];
@@ -339,7 +339,7 @@ mp_microthread_resume_kind_t microthread_resume(mp_obj_microthread_t *thread, mp
     return resume_kind;
 }
 
-STATIC mp_obj_t microthread_attr_resume(mp_uint_t n_args, mp_obj_t args[]) {
+STATIC mp_obj_t microthread_attr_resume(mp_uint_t n_args, const mp_obj_t *args) {
     mp_obj_t microthread_obj = args[0];
     mp_obj_t send_value = n_args == 2? args[1]: mp_const_none;
 
@@ -396,7 +396,7 @@ STATIC mp_obj_t microthread_attr_del(mp_obj_t microthread_obj) {
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(microthread_attr_del_obj, microthread_attr_del);
 
-STATIC mp_obj_t mod_microthread_pause(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC mp_obj_t mod_microthread_pause(mp_uint_t n_args, const mp_obj_t *args) {
     if (1 <= n_args) {
         mp_current_microthread->last_result = args[0];
     }
