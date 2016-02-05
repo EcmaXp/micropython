@@ -284,7 +284,7 @@ void gc_collect_start(void) {
     // Yes: mp_nlr_top is external value when MICROPY_MULTI_STATE_CONTEXT is enabled.
     DEBUG_printf("gc_collect_root(mp_nlr_top=%p)\n", mp_nlr_top);
     if (mp_nlr_top != NULL) {
-        gc_collect_root((void**)(void*)mp_nlr_top, 1);
+        gc_collect_root((void**)(void*)mp_nlr_top, sizeof(nlr_buf_t) / sizeof(void*));
     }
     
     if (MP_STATE_CTX_PTR == NULL) {

@@ -98,7 +98,7 @@ void nlr_jump_fail(void *val);
 #include "mpstate.h"
 #define nlr_raise(val) \
     do { \
-        /*printf("nlr_raise: nlr_top=%p\n", mp_nlr_top); \
+        /*printf("nlr_raise: nlr_top=%p\n", MP_STATE_VM(nlr_top)); \
         fflush(stdout);*/ \
         void *_val = MP_OBJ_TO_PTR(val); \
         assert(_val != NULL); \

@@ -216,12 +216,19 @@ typedef enum {
 #if !MICROPY_ALLOW_PAUSE_VM
 mp_vm_return_kind_t mp_execute_bytecode(mp_code_state *code_state, volatile mp_obj_t inject_exc) {
 #else
+#include "py/gc.h"
 mp_vm_return_kind_t mp_execute_bytecode(mp_code_state *code_state, volatile mp_obj_t inject_exc) {
     mp_code_state *first_code_state = code_state;
     while (first_code_state->prev != NULL) {
         first_code_state = first_code_state->prev;
     }
     
+	gc_info_t info;
+	gc_info(&info);
+	if (info.free < 6000) {
+		// ...
+	}
+
     mp_vm_return_kind_t kind = mp_execute_bytecode_body(false, first_code_state, code_state, inject_exc);
     mp_obj_t exc = NULL;
     

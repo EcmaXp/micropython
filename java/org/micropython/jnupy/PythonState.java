@@ -27,9 +27,14 @@
 package org.micropython.jnupy;
 
 import java.io.Console;
+import java.awt.HeadlessException;
 import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.Map;
+
+import javax.swing.JFrame;
+import javax.swing.JOptionPane;
+
 import java.util.HashMap;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -145,8 +150,18 @@ public class PythonState extends PythonNativeState {
 			public Object invoke(PythonState pythonState, PythonArguments args) throws PythonException {
 				Console c = System.console();
 				if (c == null) {
-					// TODO: raise error?
-					return null;
+					try {
+						JFrame frame = new JFrame("<jnupy-input>");
+	    				try {
+	    					String s = (String)JOptionPane.showInputDialog(frame, "prompt", "jnupy input", JOptionPane.PLAIN_MESSAGE);
+	        				return s;
+	    				} finally {
+	    					frame.dispose();
+	    				}
+					} catch (HeadlessException e) {
+						// TODO: raise error?
+						return null;
+					}
 				}
 				
 				// TODO: how to handle Ctrl-C or Ctrl-D;

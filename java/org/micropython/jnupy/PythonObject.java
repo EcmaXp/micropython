@@ -60,11 +60,13 @@ public class PythonObject {
     }
 
     private void refIncr() {
-        pythonState.jnupy_ref_incr(refObject);
+    	if (pythonState.isOpen())
+    		pythonState.jnupy_ref_incr(refObject);
     }
 
     private void refDerc() {
-        pythonState.jnupy_ref_derc(refObject);
+    	if (pythonState.isOpen())
+    		pythonState.jnupy_ref_derc(refObject);
     }
 
     public static PythonObject fromObject(Object obj) {
@@ -112,6 +114,8 @@ public class PythonObject {
         if (pythonState != pyState) {
             throw new RuntimeException("invaild state (not match)");
         }
+        
+        pythonState.check();
     }
 
     public Object invoke(Object... args) throws PythonException {

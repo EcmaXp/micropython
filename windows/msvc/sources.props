@@ -7,7 +7,6 @@
     <ClInclude Include="$(PyBaseDir)windows\realpath.c" />
     <ClInclude Include="$(PyBaseDir)windows\sleep.c" />
     <ClCompile Include="$(PyBaseDir)windows\msvc\*.c" />
-    <ClCompile Include="$(PyBaseDir)opencom\gccollect.c"/>
     <ClCompile Include="$(PyBaseDir)opencom\jnupy.c"/>
     <ClCompile Include="$(PyBaseDir)opencom\modmicrothread.c"/>
     <ClCompile Include="$(PyBaseDir)extmod\machine_mem.c" />

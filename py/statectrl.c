@@ -24,6 +24,7 @@
  * THE SOFTWARE.
  */
 
+#include <windows.h>
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -47,9 +48,17 @@ void mp_state_free(mp_state_ctx_t *state) {
 
 void mp_state_load_raw(mp_state_ctx_t *state) {
     // TODO: acquire lock?
-    
+	// printf("LOAD: thread=%i; state=%p\n", GetThreadId(GetCurrentThread()), state);
+
     if (mp_state_ctx != NULL) {
         // prev state
+		if (MP_STATE_VM(is_state_loaded)) {
+			printf("LOAD: thread=%i; state=%p\n", GetThreadId(GetCurrentThread()), mp_state_ctx, state);
+			while (MP_STATE_VM(is_state_loaded)) {
+
+			}
+			printf("THANKS!!!\n");
+		}
         assert(!MP_STATE_VM(is_state_loaded));
     }
     
@@ -80,13 +89,16 @@ void mp_state_force_load(mp_state_ctx_t *state) {
 }
 
 void mp_state_store(mp_state_ctx_t *state) {
-    // TODO: acquire lock?
+	// printf("STORE: thread=%i; state=%p\n", GetThreadId(GetCurrentThread()), state);
+
+	// TODO: acquire lock?
     assert(mp_state_ctx != NULL);
     assert(mp_state_ctx == state);
     
     // will prev state
     assert(MP_STATE_VM(is_state_loaded));
     MP_STATE_VM(is_state_loaded) = false;
+	mp_state_ctx = NULL;
 }
 
 bool mp_state_is_loaded(mp_state_ctx_t *state) {

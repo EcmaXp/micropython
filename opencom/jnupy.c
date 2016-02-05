@@ -59,6 +59,7 @@ THE SOFTWARE.
 #include <ctype.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <setjmp.h>
 
 #if DEBUG_BACKTRACE
 #include <execinfo.h>
@@ -107,6 +108,10 @@ THE SOFTWARE.
 #if MICROPY_LONGINT_IMPL != MICROPY_LONGINT_IMPL_LONGLONG
 #error jnupy support only MICROPY_LONGINT_IMPL_LONGLONG
 // TODO: support MICROPY_LONGINT_IMPL_MPZ...
+#endif
+
+#if !MICROPY_GCREGS_SETJMP
+#error jnupy require MICROPY_GCREGS_SETJMP
 #endif
 
 /** BUILD SOFT LIMITER **/
@@ -159,6 +164,18 @@ typedef struct _nlr_gk_buf_t {
     nlr_buf_t buf;
 } nlr_gk_buf_t;
 
+typedef struct _jnupy_func_stack_t {
+	struct _jnupy_func_stack_t *prev; // prev jfs
+	bool with_state; // if require fill JNUPY_MP_STATE
+	bool is_first_load; // false
+	bool has_exception; // false
+	bool before_return; // false
+	char *stack_last; // NULL (nested call fill that)
+	char *stack_top; // last MP_STATE_VM(stack_top)
+	nlr_buf_t *nlr_ptr; // last mp_nlr_top
+	nlr_gk_buf_t _nlr_gk; // new nlr_gk buf
+} jnupy_func_stack_t;
+
 typedef struct _jnupy_current_state_t {
     // JNUPY_MP_STATE
     // micropython state context
@@ -167,6 +184,9 @@ typedef struct _jnupy_current_state_t {
     // JNUPY_NLR_GK_TOP
     // nlr goalkeeper top (for JNI function call warpper)
     nlr_gk_buf_t *nlr_gk_top;
+
+	// JNUPY_JFS_TOP
+	jnupy_func_stack_t *jfs_top;
 
     // JNUPY_ENV
     // java env (vaild only current thread)
@@ -199,12 +219,43 @@ STATIC JNIEnv *jnupy_glob_java_env;
 #define JNUPY_MP_STATE _JNUPY_CUR_STATE(mp_state)
 #define JNUPY_PY_JSTATE _JNUPY_CUR_STATE(java_pystate)
 #define JNUPY_NLR_GK_TOP _JNUPY_CUR_STATE(nlr_gk_top)
+#define JNUPY_JFS_TOP _JNUPY_CUR_STATE(jfs_top)
+
+void jnupy_nest_prepare(char *stack_top) {
+	if (JNUPY_JFS_TOP != NULL) {
+		JNUPY_JFS_TOP->stack_last = MP_STATE_VM(stack_top);
+		// printf("STACK LAST SETUP: %p\n", MP_STATE_VM(stack_top));
+	}
+
+	MP_STATE_VM(stack_top) = stack_top;
+}
+
+void jnupy_nest_cleanup() {
+	if (JNUPY_JFS_TOP != NULL) {
+		JNUPY_JFS_TOP->stack_last = NULL;
+		// printf("STACK LAST CLEANUP: %p\n", JNUPY_JFS_TOP->stack_last);
+	}
+}
 
 /** JNUPY CALL MECRO **/
 #define JNUPY_RAW_CALL_WITH(env, func, ...) (*env)->func(env, __VA_ARGS__)
 #define JNUPY_RAW_CALL(func, ...) (*JNUPY_ENV)->func(JNUPY_ENV, __VA_ARGS__)
 #define JNUPY_RAW_CALL1(func) (*JNUPY_ENV)->func(JNUPY_ENV)
 #define JNUPY_RAW_AUTO_THROW (jnupy_throw_jerror_auto())
+#define JNUPY_ASSIGN_WITH_NESTED_CALL(value, func, ...) \
+	char *_jnupy_stack_top = MP_STATE_VM(stack_top); \
+	mp_stack_ctrl_init(); \
+	jnupy_nest_prepare(_jnupy_stack_top); \
+	value = (*JNUPY_ENV)->func(JNUPY_ENV, __VA_ARGS__); \
+	jnupy_nest_cleanup(); \
+	JNUPY_RAW_AUTO_THROW
+#define JNUPY_VOID_NESTED_CALL(func, ...) \
+	void *_jnupy_stack_top = MP_STATE_VM(stack_top); \
+	mp_stack_ctrl_init(); \
+	jnupy_nest_prepare(_jnupy_stack_top); \
+	(*JNUPY_ENV)->func(JNUPY_ENV, __VA_ARGS__); \
+	jnupy_nest_cleanup(); \
+	JNUPY_RAW_AUTO_THROW
 #define JNUPY_CALL(func, ...) (*JNUPY_ENV)->func(JNUPY_ENV, __VA_ARGS__); JNUPY_RAW_AUTO_THROW
 /* JNUPY_CALL usage:
 
@@ -266,17 +317,19 @@ NORETURN void nlr_gk_jump_raw(void *val) {
     
         nlr_gk_set_buf(JNUPY_NLR_GK_TOP);
         JNUPY_NLR_GK_TOP = JNUPY_NLR_GK_TOP->prev;
-    }
-    
-    nlr_jump(val);
+
+		nlr_jump(val);
+	} else {
+		nlr_jump_fail(val);
+	}
 }
 
 NORETURN void jnupy_throw_jerror(jthrowable jerror);
 void jnupy_throw_jerror_auto() {
     jthrowable jerror = JNUPY_RAW_CALL1(ExceptionOccurred);
-    if (jerror != NULL) {
-        jnupy_throw_jerror(jerror);
-    }
+	if (jerror != NULL) {
+		jnupy_throw_jerror(jerror);
+	}
 }
 
 /** JNI CLASS/VALUE REFERENCE MECRO **/
@@ -883,7 +936,7 @@ NORETURN void mp_assert_fail(const char *assertion, const char *file,
 
         // assert is very special error. so just bypass all handler.
         // (and that's why need nlr goal keeper.)
-        nlr_gk_jump(NULL);
+        nlr_gk_jump(NULL); // THROW NULL MAKE ERROR MAN (must clear NULL behavior)
     } else {
         printf("%s\n", buf);
     }
@@ -904,6 +957,46 @@ void nlr_jump_fail(void *val) {
     abort();
 }
 
+typedef jmp_buf regs_t;
+
+STATIC void gc_helper_get_regs(regs_t arr) {
+	setjmp(arr);
+}
+
+void gc_collect(void) {
+	volatile int stack_dummy;
+	//gc_dump_info();
+
+	gc_collect_start();
+	regs_t regs;
+
+	gc_helper_get_regs(regs);
+	// GC stack (and regs because we captured them)
+	void **regs_ptr = (void**)(void*)&regs;
+	gc_collect_root(regs_ptr, ((mp_uint_t)MP_STATE_VM(stack_top) - (mp_uint_t)&regs) / sizeof(mp_uint_t));
+
+	if (JNUPY_JFS_TOP != NULL) {
+		assert(JNUPY_JFS_TOP->stack_last == NULL);
+		JNUPY_JFS_TOP->stack_last = &stack_dummy;
+	}
+	
+	jnupy_func_stack_t *jfs = JNUPY_JFS_TOP;
+	while (jfs != NULL) {
+		size_t stack = ((mp_uint_t)MP_STATE_VM(stack_top) - (mp_uint_t)jfs->stack_last) / sizeof(mp_uint_t);
+		gc_collect_root((void **)(void *)jfs->stack_last, stack);
+		jfs = jfs->prev;
+	}
+
+	if (JNUPY_JFS_TOP != NULL) {
+		JNUPY_JFS_TOP->stack_last = NULL;
+	}
+
+	gc_collect_end();
+
+	//printf("-----\n");
+	//gc_dump_info();
+}
+
 // mp_plat_print_strn call it for print to stdout.
 void jnupy_print_strn(const char *str, mp_uint_t len) {
     if (MP_STATE_CTX_PTR == NULL || !MP_STATE_VM(is_state_loaded) || (JNUPY_PY_JSTATE == NULL)) {
@@ -913,7 +1006,8 @@ void jnupy_print_strn(const char *str, mp_uint_t len) {
         jbyteArray bytearr = JNUPY_CALL(NewByteArray, len);
         JNUPY_CALL(SetByteArrayRegion, bytearr, 0, len, (const jbyte *)str);
 
-        JNUPY_CALL(CallVoidMethod, JNUPY_PY_JSTATE, JMETHOD(PythonNativeState, print), bytearr);
+		// [!:JNUPY_NESTED_CALL] lead to nested call
+        JNUPY_VOID_NESTED_CALL(CallVoidMethod, JNUPY_PY_JSTATE, JMETHOD(PythonNativeState, print), bytearr);
 
         JNUPY_CALL(ReleaseByteArrayElements, bytearr, NULL, JNI_ABORT);
     }
@@ -921,7 +1015,10 @@ void jnupy_print_strn(const char *str, mp_uint_t len) {
 
 uint mp_import_stat(const char *path) {
     jstring jpath = JNUPY_CALL(NewStringUTF, path);
-    jobject jresult = JNUPY_CALL(CallObjectMethod, JNUPY_PY_JSTATE, JMETHOD(PythonNativeState, readStat), jpath);
+
+	// [!:JNUPY_NESTED_CALL] lead to nested call
+	jobject jresult;
+	JNUPY_ASSIGN_WITH_NESTED_CALL(jresult, CallObjectMethod, JNUPY_PY_JSTATE, JMETHOD(PythonNativeState, readStat), jpath);
 
     JNUPY_CALL(ReleaseStringUTFChars, jpath, NULL);
 
@@ -938,7 +1035,10 @@ uint mp_import_stat(const char *path) {
 
 mp_lexer_t *mp_lexer_new_from_file(const char *filename) {
     jstring jfilename = JNUPY_CALL(NewStringUTF, filename);
-    jstring jcodestr = JNUPY_CALL(CallObjectMethod, JNUPY_PY_JSTATE, JMETHOD(PythonNativeState, readFile), jfilename);
+
+	// [!:JNUPY_NESTED_CALL] lead to nested call
+	jstring jcodestr;
+	JNUPY_ASSIGN_WITH_NESTED_CALL(jcodestr, CallObjectMethod, JNUPY_PY_JSTATE, JMETHOD(PythonNativeState, readFile), jfilename);
 
     jsize codelen = JNUPY_CALL(GetStringUTFLength, jcodestr);
     const char* codetmpstr = JNUPY_CALL(GetStringUTFChars, jcodestr, JNI_FALSE);
@@ -1211,8 +1311,9 @@ mp_obj_t jnupy_obj_j2py(jobject obj) {
         // TODO: handle set?
     } else {
         // TODO: change exception (with failed object)
-        JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/IllegalArgumentException", C5K3P), "failed convert object");
-        nlr_jump(NULL);
+        // JNUPY_RAW_CALL(ThrowNew, JNUPY_CLASS("java/lang/IllegalArgumentException", C5K3P), "failed convert object");
+        // nlr_gk_jump(NULL); // ANA
+		nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "failed convert object"));
     }
 
     return mp_const_none;
@@ -1339,7 +1440,10 @@ STATIC void jobject_print(const mp_print_t *print, mp_obj_t o_in, mp_print_kind_
 
     jclass class_ = JNUPY_CALL(GetObjectClass, jobj);
     jmethodID mid = JNUPY_CALL(GetMethodID, class_, "toString", "()Ljava/lang/String;");
-    jstring val = JNUPY_CALL(CallObjectMethod, jobj, mid);
+
+	// [!:JNUPY_NESTED_CALL] lead to nested call
+	jstring val;
+	JNUPY_ASSIGN_WITH_NESTED_CALL(val, CallObjectMethod, jobj, mid);
     const char *buf = JNUPY_CALL(GetStringUTFChars, val, NULL);
 
     if (kind == PRINT_REPR) {
@@ -1395,7 +1499,8 @@ NORETURN void jnupy_throw_jerror(jthrowable jerror) {
     nlr_buf_t nlr;
     if (nlr_push(&nlr) == 0) {
         mp_obj_t pyexc = MP_OBJ_NULL;
-	    if (JNUPY_RAW_CALL(IsInstanceOf, jerror, JCLASS(PythonNativeException))) {
+		bool is_exception = JNUPY_RAW_CALL(IsInstanceOf, jerror, JCLASS(PythonNativeException));
+	    if (is_exception) {
             jobject pyref = JNUPY_RAW_CALL(GetObjectField, jerror, JFIELD(PythonNativeException, pyobj));
             pyexc = jnupy_obj_j2py(pyref);
             if (pyexc != MP_OBJ_NULL) {
@@ -1420,7 +1525,9 @@ STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, c
     jobject jfunc = o->jfunc;
 
     JNUPY_PY_JSTATE = o->jstate;
-    JNUPY_CALL(CallVoidMethod, jfunc, JMETHOD(JavaFunction, checkInvoke), JNUPY_PY_JSTATE, (jint)n_args, (jint)n_kw);
+
+	// [!:JNUPY_NESTED_CALL] lead to nested call
+    JNUPY_VOID_NESTED_CALL(CallVoidMethod, jfunc, JMETHOD(JavaFunction, checkInvoke), JNUPY_PY_JSTATE, (jint)n_args, (jint)n_kw);
 
     jobjectArray jargarr = JNUPY_CALL(NewObjectArray, n_args, JCLASS(PythonObject), NULL);
     jobject jkwargs = NULL;
@@ -1449,7 +1556,8 @@ STATIC mp_obj_t jfunc_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, c
 
     nlr_buf_t nlr;
     if (nlr_push(&nlr) == 0) {
-        jresult = JNUPY_CALL(CallObjectMethod, jfunc, JMETHOD(JavaFunction, invoke), JNUPY_PY_JSTATE, jargs);
+		// [!:JNUPY_NESTED_CALL] lead to nested call
+		JNUPY_ASSIGN_WITH_NESTED_CALL(jresult, CallObjectMethod, jfunc, JMETHOD(JavaFunction, invoke), JNUPY_PY_JSTATE, jargs);
         nlr_pop();
     } else {
         // TODO: if jname instanceof NamedJavaFunction, then just call NamedJavaFunction with getName
@@ -1628,23 +1736,18 @@ JNUPY_FUNC_DEF(jstring, jnupy_1mp_1version)
 /** JNI EXPORT FUNCTION BODY MECRO **/
 // TODO: re-compute stack_limit for setuped stack_top...
 // TODO: it is possible compute stack_top?
-
-typedef struct _jnupy_func_stack_t {
-    bool with_state; // if require fill JNUPY_MP_STATE
-    bool is_first_load; // false
-    bool has_exception; // false
-    bool before_return; // false
-    void *stack_top; // last MP_STATE_VM(stack_top)
-    nlr_buf_t *nlr_ptr; // last mp_nlr_top
-    nlr_gk_buf_t _nlr_gk; // new nlr_gk buf
-} jnupy_func_stack_t;
+//	  -> use [!:JNUPY_NESTED_CALL] for deal with nested call.
 
 void jnupy_func_stack_with_state(jnupy_func_stack_t *jfs) {
     jfs->is_first_load = !mp_state_is_loaded(JNUPY_MP_STATE);
     if (jfs->is_first_load) {
         mp_state_load(JNUPY_MP_STATE);
     }
+
     jfs->stack_top = MP_STATE_VM(stack_top);
+	
+	jfs->prev = JNUPY_JFS_TOP;
+	JNUPY_JFS_TOP = jfs;
 }
 
 void jnupy_func_stack_error(jnupy_func_stack_t *jfs) {
@@ -1656,13 +1759,13 @@ void jnupy_func_stack_leave(jnupy_func_stack_t *jfs) {
     if (!jfs->before_return) {
         jfs->before_return = true;
 
-        if (jfs->with_state && JNUPY_MP_STATE != NULL) {
-            MP_STATE_VM(stack_top) = jfs->stack_top;
+        if (jfs->with_state && JNUPY_MP_STATE != NULL && JNUPY_MP_STATE == MP_STATE_CTX_PTR) {
+			MP_STATE_VM(stack_top) = jfs->stack_top;
             if (jfs->is_first_load) {
                 gc_collect();
                 mp_state_store(JNUPY_MP_STATE);
             }
-        }
+		}
     }
 
     if (!jfs->has_exception) {
@@ -1671,15 +1774,18 @@ void jnupy_func_stack_leave(jnupy_func_stack_t *jfs) {
 
     nlr_gk_pop(&jfs->_nlr_gk);
     mp_nlr_top = jfs->nlr_ptr;
+	JNUPY_JFS_TOP = jfs->prev;
 }
 
 #define _JNUPY_FUNC_BODY_START(_with_state, init_expr) \
     jnupy_setup_env(env, self); \
     jnupy_func_stack_t _jfs = { \
+		.prev = NULL, \
         .with_state = _with_state, \
         .is_first_load = false, \
         .has_exception = false, \
         .before_return = false, \
+		.stack_last = NULL, \
         .stack_top = NULL, \
         .nlr_ptr = mp_nlr_top, \
         ._nlr_gk = nlr_gk_new(), \
@@ -1920,13 +2026,13 @@ JNUPY_FUNC_DEF(jobject, jnupy_1func_1call) // jnupy_func_call
         }
 
         if (args != MP_OBJ_NULL) {
-            m_free(args, jargs_length);
+            // m_free(args, jargs_length);
         }
 
         nlr_pop();
     } else {
         if (args != MP_OBJ_NULL) {
-            m_free(args, jargs_length);
+            // m_free(args, jargs_length);
         }
 
         nlr_gk_jump(nlr.ret_val);

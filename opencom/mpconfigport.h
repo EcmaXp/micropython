@@ -115,6 +115,7 @@
 #ifdef MP_WIN
 // #define MICROPY_PORT_INIT_FUNC      init()
 // #define MICROPY_PORT_DEINIT_FUNC    deinit()
+typedef long long ssize_t; // ?
 #endif
 
 // Porting Program's internal modules.
